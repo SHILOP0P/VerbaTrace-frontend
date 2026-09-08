@@ -364,6 +364,26 @@ function App() {
     return closeStream;
   }, [session, selectedCall?.id]);
 
+  useEffect(() => {
+    const callId = selectedCall?.id;
+    if (!callId || !session || !["pending", "processing"].includes(analyses[callId]?.status ?? "")) return;
+    let cancelled = false;
+    let refreshing = false;
+    const timer = window.setInterval(async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const [analysis, call] = await Promise.all([api.getAnalysis(callId), api.getCall(callId)]);
+        if (!cancelled) {
+          setAnalyses((current) => ({ ...current, [callId]: analysis }));
+          setCalls((current) => current.map((item) => item.id === callId ? call : item));
+        }
+      } catch { /* Keep the last result; a transient request failure can be retried. */ }
+      finally { refreshing = false; }
+    }, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [session, selectedCall?.id, analyses[selectedCall?.id ?? ""]?.status]);
+
   function navigate(nextPage: AppPage) {
     setShowPublicLanding(false);
     setPage(nextPage);

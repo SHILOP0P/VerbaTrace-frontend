@@ -10,9 +10,12 @@ import type {
   AnalysisResponse,
   CallResponse,
   ReportFormat,
-  ReportResponse
+  ReportResponse,
+  TranscriptionResponse,
+  TranscriptionRevisionSummary
 } from "../../types";
 
+import { SelectControl } from "../../shared/ui/primitives";
 import { isAnalysisDone } from "../../shared/lib/analysis";
 import { formatBytes, formatDate, reportFormatLabel, reportStatusLabel } from "../../shared/lib/formatters";
 
@@ -37,11 +40,17 @@ function reportDisplayName(fileName: string) {
 
 export function ReportExportPanel({
   call,
-  analysis
+  analysis,
+  transcription
 }: {
   call: CallResponse;
   analysis?: AnalysisResponse;
+  transcription?: TranscriptionResponse;
 }) {
+  const [content, setContent] = useState<"full" | "transcription">(() => { try { return localStorage.getItem("verbatrace-report-content") === "full" ? "full" : "transcription"; } catch { return "transcription"; } });
+  const [revision, setRevision] = useState(0);
+  const [revisions, setRevisions] = useState<TranscriptionRevisionSummary[]>([]);
+  const [transcriptReady, setTranscriptReady] = useState(false);
   const [reports, setReports] = useState<ReportResponse[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
   const [busyFormat, setBusyFormat] = useState<ReportFormat | null>(null);
@@ -50,12 +59,6 @@ export function ReportExportPanel({
   const [exportEnabled, setExportEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (exportEnabled !== true) {
-      setReports([]);
-      setLoadingReports(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function loadReports() {
@@ -78,7 +81,7 @@ export function ReportExportPanel({
     return () => {
       cancelled = true;
     };
-  }, [call.id, exportEnabled]);
+  }, [call.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +109,20 @@ export function ReportExportPanel({
     };
   }, [call.company_uuid, call.id, call.visibility_scope]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setRevision(transcription?.revision ?? 0);
+    setRevisions([]);
+    setTranscriptReady(transcription?.status === "transcribed");
+    Promise.all([api.getTranscription(call.id), loadAllRevisions(call.id).catch(() => null)])
+      .then(([current, history]) => { if (!cancelled) { setTranscriptReady(current.status === "transcribed"); setRevision(() => { try { const saved = Number(localStorage.getItem(`verbatrace-report-revision:${call.id}`)); return history?.items.some((item) => item.revision === saved) ? saved : current.revision ?? 1; } catch { return current.revision ?? 1; } }); setRevisions(history?.items ?? []); } })
+      .catch(() => { if (!cancelled) setTranscriptReady(false); });
+    return () => { cancelled = true; };
+  }, [call.id, call.status, transcription?.revision]);
+
+  function chooseContent(value: "full" | "transcription") { setContent(value); try { localStorage.setItem("verbatrace-report-content", value); } catch { /* Selection still works without storage. */ } }
+  function chooseRevision(value: number) { setRevision(value); try { localStorage.setItem(`verbatrace-report-revision:${call.id}`, String(value)); } catch { /* Selection still works without storage. */ } }
+
   async function refreshReports() {
     const response = await api.listReports(call.id);
     setReports(response.reports);
@@ -115,7 +132,7 @@ export function ReportExportPanel({
     setError("");
     setBusyFormat(format);
     try {
-      const created = await api.createReport(call.id, { format });
+      const created = await api.createReport(call.id, { format, content: selectedContent, transcription_revision: revision || undefined });
       await refreshReports();
       if (created.status === "ready") {
         await downloadReport(created);
@@ -162,38 +179,46 @@ export function ReportExportPanel({
   }
 
   const analysisReady = isAnalysisDone(analysis);
-  const exportBlocked = exportEnabled === false;
+  const selectedContent = content === "full" && analysisReady && exportEnabled ? "full" : "transcription";
+  const exportBlocked = selectedContent === "full" && exportEnabled !== true;
+  const ready = selectedContent === "transcription" ? transcriptReady : analysisReady;
 
-  if (exportEnabled !== true) {
-    return null;
-  }
 
   return (
     <section className="report-panel">
       <div className="card-title">
         <div>
           <h3>Экспорт отчета</h3>
-          <p>Файл строится из готового анализа звонка и доступной транскрипции.</p>
+          <p>Выберите содержимое и формат. Транскрипцию можно скачать отдельно на любом тарифе.</p>
         </div>
-        <span className={`status-chip ${analysisReady ? "ok" : "warn"}`}>
-          {analysisReady ? "Анализ готов" : "Нужен готовый анализ"}
+        <span className={`status-chip ${ready ? "ok" : "warn"}`}>
+          {ready ? "Можно скачать" : "Ожидаем готовый результат"}
         </span>
+      </div>
+      <div className="report-export-options">
+        <label><span>Содержимое</span><SelectControl aria-label="Содержимое отчёта" value={selectedContent} onChange={(event) => chooseContent(event.target.value as "full" | "transcription")} disabled={busyFormat !== null}>
+          <option value="transcription">Только транскрипция</option>
+          {exportEnabled && analysisReady && <option value="full">Анализ и транскрипция</option>}
+        </SelectControl></label>
+        {<label><span>Версия транскрипции</span><SelectControl aria-label="Версия транскрипции для отчёта" value={revision} onChange={(event) => chooseRevision(Number(event.target.value))} disabled={busyFormat !== null || !transcriptReady}>
+          {revisions.length ? revisions.map((item) => <option key={item.id} value={item.revision}>Версия {item.revision}{item.is_current ? " · выбрана для звонка" : ""}</option>) : <option value={revision}>{revision ? `Версия ${revision}` : "Текущая версия"}</option>}
+        </SelectControl></label>}
       </div>
       <div className="report-format-grid">
         {reportFormats.map((item) => (
           (() => {
-            const existing = reports.find((report) => report.format === item.format && (report.status === "ready" || report.status === "pending"));
+            const existing = reports.find((report) => report.format === item.format && (report.content ?? "full") === selectedContent && report.transcription_revision === revision && (selectedContent !== "full" || report.analysis_uuid === analysis?.id) && (report.status === "ready" || report.status === "pending"));
             return (
           <button
             className="report-format-button"
             key={item.format}
             onClick={() => createReport(item.format)}
-            disabled={!analysisReady || exportBlocked || busyFormat !== null || Boolean(existing)}
+            disabled={!ready || exportBlocked || busyFormat !== null || Boolean(existing)}
           >
             <FileDown size={18} />
             <span>
               <strong>{item.label}</strong>
-              <small>{busyFormat === item.format ? "Создаю отчет..." : existing ? (existing.status === "ready" ? "Уже готов — ниже" : "Уже формируется") : item.description}</small>
+              <small>{busyFormat === item.format ? "Создаю отчет..." : existing ? (existing.status === "ready" ? "Уже готов — ниже" : "Уже формируется") : (item.format === "xlsx" && selectedContent === "transcription" ? "Текст и сведения о звонке" : item.description)}</small>
             </span>
           </button>
             );
@@ -218,7 +243,7 @@ export function ReportExportPanel({
             <div className="report-row-content">
               <strong className="report-file-name" title={report.file_name}>{reportDisplayName(report.file_name)}</strong>
               <small className="report-meta">
-                {reportFormatLabel(report.format)} · {formatBytes(report.size_bytes)} · создан{" "}
+                {report.content === "transcription" ? `Транскрипция · версия ${report.transcription_revision} · ` : "Анализ и транскрипция · "}{reportFormatLabel(report.format)} · {formatBytes(report.size_bytes)} · создан{" "}
                 {formatDate(report.created_at)} · хранится до {formatDate(report.expires_at)}
               </small>
               {report.error_message && <small className="report-error">{report.error_message}</small>}
@@ -249,4 +274,13 @@ export function ReportExportPanel({
       </div>
     </section>
   );
+}
+
+async function loadAllRevisions(callId: string) {
+ const items: TranscriptionRevisionSummary[] = [];
+ for (let offset = 0; ; offset += 100) {
+  const page = await api.listTranscriptionRevisions(callId, 100, offset);
+  items.push(...page.items);
+  if (items.length >= page.total || page.items.length === 0) return { items };
+ }
 }

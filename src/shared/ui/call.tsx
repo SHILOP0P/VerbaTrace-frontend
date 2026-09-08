@@ -34,25 +34,30 @@ type StatusTone = "ok" | "warn" | "bad";
 export function StatusChip({
   status,
   analysisStatus,
-  label
+  label,
+  transcriptionOnly = false
 }: {
   status: CallStatus;
   analysisStatus?: AnalysisResponse["status"];
   label?: string;
+  transcriptionOnly?: boolean;
 }) {
-  return <span className={`status-chip ${callStatusTone(status, analysisStatus)}`}>{label ?? callStatusChip(status, analysisStatus)}</span>;
+  const transcriptReady = transcriptionOnly && status === "transcribed" && !analysisStatus;
+  return <span className={`status-chip ${transcriptReady ? "ok" : callStatusTone(status, analysisStatus)}`}>{label ?? (transcriptReady ? "Транскрипция готова" : callStatusChip(status, analysisStatus))}</span>;
 }
 
 export function StatusTimeline({
   current,
   statuses,
-  analysisStatus
+  analysisStatus,
+  transcriptionOnly = false
 }: {
+  transcriptionOnly?: boolean;
   current: CallStatus;
   statuses?: CallStatus[];
   analysisStatus?: AnalysisResponse["status"];
 }) {
-  const steps = visibleTimelineSteps(current, statuses);
+  const steps = visibleTimelineSteps(current, statuses).filter((step) => !transcriptionOnly || step !== "analyzed");
   const currentIndex = steps.indexOf(current);
 
   return (
@@ -72,8 +77,8 @@ export function StatusTimeline({
             {step === "analyzed" && <Check size={19} />}
             {step === "failed" && <X size={19} />}
           </span>
-          <strong>{timelineStepLabel(step)}</strong>
-          <small>{timelineStepCaption(step, index, current, currentIndex, analysisStatus)}</small>
+          <strong>{transcriptionOnly && step === "transcribed" ? "Транскрипция готова" : timelineStepLabel(step)}</strong>
+          <small>{transcriptionOnly && step === "transcribed" && current === "transcribed" ? "Транскрипция готова" : timelineStepCaption(step, index, current, currentIndex, analysisStatus)}</small>
         </div>
       ))}
     </div>

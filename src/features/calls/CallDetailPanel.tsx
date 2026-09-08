@@ -319,6 +319,7 @@ export function CallDetailPanel({
 
   const transcriptionState = transcriptionCardState(call, transcription);
   const analysisState = analysisCardState(call, analysis);
+  const transcriptionOnly = Boolean(call.transcription_only && !analysis && call.status !== "analyzed");
 
   function openEvidence(target: MediaSeekTarget) {
     setShowFullTranscript(true);
@@ -449,7 +450,7 @@ export function CallDetailPanel({
               )}
             </div>
           )}
-          {onDeleteCall && !call.is_test && (
+          {onDeleteCall && !call.is_test && !transcriptionOnly && (
             <button className="ghost-button small call-analysis-button" type="button" onClick={() => void runAnalysis()} disabled={analysisBusy}>
               <WandSparkles size={16} />
               {analysisBusy ? "Анализирую…" : "Сделать анализ"}
@@ -471,7 +472,7 @@ export function CallDetailPanel({
           <PhoneCall size={22} />
         </div>
         <div className="selected-call-main">
-          <StatusChip status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} />
+          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} />
           <strong>{call.title}</strong>
           <small>
             {formatDate(call.created_at)} · {formatDuration(call.duration_seconds)} ·{" "}
@@ -489,9 +490,10 @@ export function CallDetailPanel({
         seekTarget={seekTarget}
         onActiveWordChange={setActiveWordIndex}
       />
-      {!call.is_test && <StatusTimeline current={call.status} statuses={timelineStatuses} analysisStatus={analysis?.status} />}
-      {showReports && !call.is_test && <ReportExportPanel call={call} analysis={analysis} />}
-      <div className={`detail-grid${call.is_test ? " is-test-call" : ""}`}>
+      {!call.is_test && <StatusTimeline transcriptionOnly={transcriptionOnly} current={call.status} statuses={timelineStatuses} analysisStatus={analysis?.status} />}
+      {(showReports || transcriptionOnly) && !call.is_test && <ReportExportPanel call={call} analysis={analysis} transcription={localTranscription} />}
+      {transcriptionOnly && <div className="transcription-analysis-entry"><div><strong>Нужен анализ разговора?</strong><p>Запустите его по готовой транскрипции, когда понадобится.</p></div><button className="primary-button" disabled={analysisBusy || localTranscription?.status !== "transcribed"} onClick={() => void runAnalysis()}><WandSparkles size={18} />{analysisBusy ? "Запускаю…" : "Анализировать"}</button>{analysisRunError && <div className="form-error">{analysisRunError}</div>}</div>}
+      <div className={`detail-grid${call.is_test || transcriptionOnly ? " is-test-call" : ""}`}>
         <InfoCard
           title="Расшифровка"
           className="transcript-card"
@@ -541,7 +543,7 @@ export function CallDetailPanel({
             onOverflowChange={setTranscriptExpandable}
           />
         </InfoCard>
-        {!call.is_test && <div className="analysis-card-stack">
+        {!call.is_test && !transcriptionOnly && <div className="analysis-card-stack">
           {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="primary-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}>{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
           {qualityReviewError && <div className="form-error is-dismissible" role="alert">{qualityReviewError}</div>}
           <InfoCard

@@ -2,6 +2,7 @@ import {
   Building2,
   Check,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   CloudUpload,
   Filter,
@@ -929,6 +930,10 @@ export function CallsPage({
   }, [companies.length, folderForm.scope]);
 
   useEffect(() => {
+    if (companies.length === 0) {
+      setParticipantFilter("all");
+      setManagerFilter("all");
+    }
     if (companyFilter !== "all" && !companies.some((company) => company.id === companyFilter)) {
       setCompanyFilter("all");
       setDepartmentFilter("all");
@@ -1054,7 +1059,7 @@ export function CallsPage({
           <Play size={14} fill="currentColor" />
         </span>
         <span className="call-row-main">
-          <StatusChip status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} />
+          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} />
           <strong>{call.title}</strong>
           <small>
             {formatDate(call.display_time || call.occurred_at || call.created_at)} · {formatDuration(call.duration_seconds)}
@@ -1192,17 +1197,17 @@ export function CallsPage({
           </div>
           <div className="call-filter-grid">
             <label><span>Статус</span><SelectControl aria-label="Статус" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as CallStatus | "all")}><option value="all">Все статусы</option><option value="new">Новые</option><option value="processing">В обработке</option><option value="transcribed">Расшифрованы</option><option value="analyzed">Анализ готов</option><option value="failed">Ошибки</option></SelectControl></label>
-            <label><span>Сотрудник</span><SelectControl aria-label="Сотрудник" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value)}><option value="all">Все сотрудники</option>{participantOptions.map((member) => <option key={member.user_uuid} value={member.user_uuid}>{[member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || "Пользователь"}</option>)}</SelectControl></label>
-            <label><span>Компания</span><SelectControl aria-label="Компания" value={companyFilter} onChange={(event) => { const companyId = event.target.value; setCompanyFilter(companyId); setDepartmentFilter("all"); setConnectionFilter("all"); }}><option value="all">Все компании</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</SelectControl></label>
-            <label><span>Отдел</span><SelectControl aria-label="Отдел" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}><option value="all">Все отделы</option>{departments.filter((department) => companyFilter === "all" || department.company_uuid === companyFilter).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</SelectControl></label>
-            <label><span>Загрузил</span><SelectControl aria-label="Загрузил" value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)}><option value="all">Любой пользователь</option>{managerOptions.map((manager) => <option key={manager.id} value={manager.id}>{managerLabel(manager, session)}</option>)}</SelectControl></label>
+            {companies.length > 0 && <label><span>Сотрудник</span><SelectControl aria-label="Сотрудник" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value)}><option value="all">Все сотрудники</option>{participantOptions.map((member) => <option key={member.user_uuid} value={member.user_uuid}>{[member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || "Пользователь"}</option>)}</SelectControl></label>}
+            {companies.length > 0 && <label><span>Компания</span><SelectControl aria-label="Компания" value={companyFilter} onChange={(event) => { const companyId = event.target.value; setCompanyFilter(companyId); setDepartmentFilter("all"); setConnectionFilter("all"); }}><option value="all">Все компании</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</SelectControl></label>}
+            {companies.length > 0 && <label><span>Отдел</span><SelectControl aria-label="Отдел" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}><option value="all">Все отделы</option>{departments.filter((department) => companyFilter === "all" || department.company_uuid === companyFilter).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</SelectControl></label>}
+            {companies.length > 0 && <label><span>Загрузил</span><SelectControl aria-label="Загрузил" value={managerFilter} onChange={(event) => setManagerFilter(event.target.value)}><option value="all">Любой пользователь</option>{managerOptions.map((manager) => <option key={manager.id} value={manager.id}>{managerLabel(manager, session)}</option>)}</SelectControl></label>}
             <label><span>Источник</span><SelectControl aria-label="Источник" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}><option value="all">Все источники</option><option value="manual">Ручная загрузка</option><option value="generic_api">API</option><option value="bitrix24">Bitrix24</option></SelectControl></label>
             <label><span>Подключение</span><SelectControl aria-label="Подключение" value={connectionFilter} onChange={(event) => setConnectionFilter(event.target.value)}><option value="all">Все подключения</option>{connectionOptions.map((connection) => <option key={connection.id} value={connection.id}>{connection.name}{connection.provider === "bitrix24" ? " · Bitrix24" : ""}</option>)}</SelectControl></label>
             <label><span>Быстрый период</span><SelectControl aria-label="Период" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value as "all" | "7d" | "30d")}><option value="all">Все даты</option><option value="7d">Последние 7 дней</option><option value="30d">Последние 30 дней</option></SelectControl></label>
             <label><span>Разговор с</span><DateTimePicker mode="date" placement="right-center" ariaLabel="Дата начала периода" value={occurredFrom} onChange={(value) => { setOccurredFrom(value); setPeriodFilter("all"); }} /></label>
             <label><span>Разговор до</span><DateTimePicker mode="date" placement="right-center" ariaLabel="Дата окончания периода" value={occurredTo} onChange={(value) => { setOccurredTo(value); setPeriodFilter("all"); }} /></label>
-            <label><span>Длительность от, сек.</span><input inputMode="numeric" min="0" type="number" value={durationMin} onChange={(event) => setDurationMin(event.target.value)} /></label>
-            <label><span>Длительность до, сек.</span><input inputMode="numeric" min="0" type="number" value={durationMax} onChange={(event) => setDurationMax(event.target.value)} /></label>
+            <label><span>Длительность от, сек.</span><DurationFilterInput label="Длительность от, сек." value={durationMin} onChange={setDurationMin} /></label>
+            <label><span>Длительность до, сек.</span><DurationFilterInput label="Длительность до, сек." value={durationMax} onChange={setDurationMax} /></label>
             <label><span>Анализ</span><SelectControl aria-label="Наличие анализа" value={analysisFilter} onChange={(event) => setAnalysisFilter(event.target.value as typeof analysisFilter)}><option value="all">Не важно</option><option value="yes">Есть анализ</option><option value="no">Без анализа</option></SelectControl></label>
             <label><span>Действия</span><SelectControl aria-label="Наличие действий" value={actionsFilter} onChange={(event) => setActionsFilter(event.target.value as typeof actionsFilter)}><option value="all">Не важно</option><option value="yes">Есть действия</option><option value="no">Без действий</option></SelectControl></label>
             <label><span>Сортировка</span><SelectControl aria-label="Сортировка" value={sortFilter} onChange={(event) => setSortFilter(event.target.value as typeof sortFilter)}><option value="occurred_at">Время разговора</option><option value="created_at">Время импорта</option><option value="duration">Длительность</option></SelectControl></label>
@@ -1761,4 +1766,20 @@ function buildFolderPayload(
       ,instruction_uuids: form.instruction_uuids
     }
   };
+}
+
+function DurationFilterInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  function step(direction: number) {
+    if (!input.current) return;
+    if (direction > 0) input.current.stepUp(); else input.current.stepDown();
+    onChange(input.current.value);
+  }
+  return <div className="call-duration-control">
+    <input ref={input} aria-label={label} inputMode="numeric" min="0" step="1" type="number" value={value} onChange={(event) => onChange(event.target.value)} />
+    <div className="call-duration-arrows">
+      <button className="icon-button" type="button" aria-label={`Увеличить: ${label}`} onClick={() => step(1)}><ChevronUp size={14} /></button>
+      <button className="icon-button" type="button" aria-label={`Уменьшить: ${label}`} disabled={value !== "" && Number(value) <= 0} onClick={() => step(-1)}><ChevronDown size={14} /></button>
+    </div>
+  </div>;
 }

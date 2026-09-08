@@ -329,6 +329,7 @@ export function UploadPage({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const processingMode = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "transcribe" ? "transcribe" : "analyze";
     setError("");
 
     if (uploadMode === "single" && !title.trim()) {
@@ -359,6 +360,7 @@ export function UploadPage({
     setBusy(true);
     try {
       const sharedInput = {
+        processingMode: processingMode as "transcribe" | "analyze",
         companyUuid: scope === "company" || scope === "department" ? companyId : undefined,
         departmentUuid: scope === "department" ? departmentId : undefined,
         useCustomInstructions: selectedInstructionIds.length > 0,
@@ -420,8 +422,8 @@ export function UploadPage({
           </div>
         </div>
         <StepItem active number="1" title="Файл и принадлежность" text="Загрузите файл и выберите, куда добавить звонок." />
-        <StepItem number="2" title="Инструкция для анализа" text="Будет применена подходящая инструкция." />
-        <StepItem number="3" title="Обработка и анализ" text="Звонок будет обработан и проанализирован." />
+        <StepItem number="2" title="Инструкция для анализа" text="Выберите инструкции, если нужен анализ." />
+        <StepItem number="3" title="Результат обработки" text="Транскрипция или транскрипция с анализом — на ваш выбор." />
         <StepItem done title="Готово" text="Результаты появятся в обзоре звонка." />
       </aside>
 
@@ -672,10 +674,12 @@ export function UploadPage({
           emptyText="Инструкции не выбраны."
         />
         {error && <div className="form-error">{error}</div>}
+        <p className="upload-processing-hint">«Транскрибировать» — получить текст разговора. «Анализировать» — получить текст и анализ по выбранным инструкциям. Транскрипция доступна на всех тарифах; анализ можно запустить позже.</p>
         <div className="form-actions">
-          <button className="primary-button" type="submit" disabled={busy}>
+          <button className="ghost-button" type="submit" name="processing_mode" value="transcribe" disabled={busy}><FileText size={18} />{busy ? "Загружаю…" : uploadMode === "multiple" ? "Транскрибировать всё" : "Транскрибировать"}</button>
+          <button className="primary-button" type="submit" name="processing_mode" value="analyze" disabled={busy}>
             <CloudUpload size={18} />
-            {busy ? "Загружаю..." : uploadMode === "multiple" ? "Загрузить всё и поставить в очередь" : "Загрузить и поставить в очередь"}
+            {busy ? "Загружаю…" : uploadMode === "multiple" ? "Анализировать всё" : "Анализировать"}
           </button>
           <button className="ghost-button" type="button" onClick={() => onNavigate("calls")}>
             Отмена

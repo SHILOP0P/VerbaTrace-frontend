@@ -8810,3 +8810,12 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
   opacity: 1;
   mix-blend-mode: normal;
 }
+
+/* Independent transcription and report export. */
+.upload-processing-hint { color: var(--app-muted, var(--text-muted)); font-size: 13px; line-height: 1.65; margin: 20px 0 14px; max-width: 780px; }
+.report-export-options { display: flex; flex-wrap: wrap; gap: 16px; margin: 18px 0; }
+.report-export-options label { display: grid; gap: 8px; flex: 1 1 220px; font-size: 13px; }
+.report-export-options select { width: 100%; min-height: 44px; border-radius: 12px; border: 1px solid var(--app-border, var(--border-color)); background: var(--app-surface, var(--surface)); color: inherit; padding: 10px 12px; font: inherit; }
+.transcription-analysis-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 20px; margin: 18px 0; border: 1px solid var(--app-border, var(--border-color)); border-radius: 16px; }
+.transcription-analysis-entry p { margin: 6px 0 0; color: var(--app-muted, var(--text-muted)); font-size: 13px; }
+@media (max-width: 600px) { .transcription-analysis-entry > button { width: 100%; } .upload-form .form-actions { flex-wrap: wrap; } }

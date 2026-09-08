@@ -313,6 +313,7 @@ export interface UpdatePreferencesRequest {
 }
 
 export interface CallResponse {
+  transcription_only?: boolean;
   id: string;
   title: string;
   status: CallStatus;
@@ -640,6 +641,8 @@ export interface AnalysisV2Result {
 }
 
 export interface CreateReportRequest {
+  content?: "full" | "transcription";
+  transcription_revision?: number;
   format: ReportFormat;
   privacy_variant?: "redacted";
 }
@@ -656,9 +659,11 @@ export interface CreateGlobalReportRequest {
 }
 
 export interface ReportResponse {
+  content?: "full" | "transcription";
+  transcription_revision?: number;
   id: string;
   call_uuid: string;
-  analysis_uuid: string;
+  analysis_uuid: string | null;
   requested_by_user_uuid: string;
   format: ReportFormat;
   status: ReportStatus;

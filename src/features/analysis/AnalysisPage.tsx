@@ -192,7 +192,7 @@ export function AnalysisPage({
         </span>
         <span>
           <strong>{call.title}</strong>
-          <StatusChip status={call.status} analysisStatus={analyses[call.id]?.status} />
+          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={analyses[call.id]?.status} />
         </span>
       </button>
     );
@@ -336,11 +336,11 @@ export function AnalysisPage({
         {error && <div className="form-error">{error}</div>}
         {deleteError && <div className="form-error">{deleteError}</div>}
         {selectedCall && (
-          <StatusTimeline current={selectedCall.status} statuses={selectedCallTimeline} analysisStatus={analysis?.status} />
+          <StatusTimeline transcriptionOnly={Boolean(selectedCall.transcription_only && !analysis)} current={selectedCall.status} statuses={selectedCallTimeline} analysisStatus={analysis?.status} />
         )}
         {selectedCall && <ReportExportPanel call={selectedCall} analysis={analysis} />}
         <div className="analysis-content-grid">
-          <div className="info-card report-panel analysis-result-panel">
+          {!(selectedCall?.transcription_only && !analysis) && <div className="info-card report-panel analysis-result-panel">
             <div className="card-title">
               <h3>Результат</h3>
               <span className={`status-chip ${resultState.tone} ${resultState.thinking ? "thinking-status" : ""}`}>
@@ -375,7 +375,7 @@ export function AnalysisPage({
                 </button>
               </div>
             )}
-          </div>
+          </div>}
           <div className="info-card">
             <div className="card-title">
               <h3>Инструкции для этого звонка</h3>

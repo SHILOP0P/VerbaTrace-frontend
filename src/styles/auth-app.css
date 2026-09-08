@@ -4982,7 +4982,7 @@ html[data-theme="light"] .progress-ring::before {
     padding: 16px;
   }
 
-  .app-shell .reports-page {
+  .app-shell :is(.reports-page, .settings-overview) {
     height: calc(100dvh - 120px);
     margin-top: -18px;
   }
@@ -4995,7 +4995,7 @@ html[data-theme="light"] .progress-ring::before {
     padding-top: 28px;
   }
 
-  .app-shell .reports-page.atmospheric-page {
+  .app-shell :is(.reports-page, .settings-overview).atmospheric-page {
     padding-top: 26px;
   }
 }
@@ -8291,7 +8291,7 @@ html[data-theme="light"] .app-shell .bitrix-backfill-fields input { color-scheme
   background: color-mix(in srgb, var(--surface) 72%, transparent);
   cursor: pointer;
 }
-.integration-checkbox input[type="checkbox"] {
+:is(.integration-checkbox, .call-filter-check) input[type="checkbox"] {
   appearance: none;
   width: 20px;
   min-width: 20px;
@@ -8305,12 +8305,12 @@ html[data-theme="light"] .app-shell .bitrix-backfill-fields input { color-scheme
   box-shadow: none;
   cursor: pointer;
 }
-.integration-checkbox input[type="checkbox"]:checked {
+:is(.integration-checkbox, .call-filter-check) input[type="checkbox"]:checked {
   border-color: var(--app-accent, #ff5a2f);
   background: var(--app-accent, #ff5a2f) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fffaf5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.8' d='m3.25 8 3.05 3.05 6.45-6.45'/%3E%3C/svg%3E") center / 15px no-repeat;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent, #ff5a2f) 18%, transparent), inset 0 1px 0 rgba(255, 255, 255, .24);
 }
-.integration-checkbox input[type="checkbox"]:focus-visible {
+:is(.integration-checkbox, .call-filter-check) input[type="checkbox"]:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--app-accent, #ff5a2f) 28%, transparent);
   outline-offset: 2px;
 }
@@ -8382,3 +8382,24 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
 @media (max-width: 620px) { .integration-section-heading { align-items:stretch; flex-direction:column; }.integration-section-heading > button { width:100%; }.integration-metadata { grid-template-columns:1fr; }.integration-metadata > div { grid-template-columns:1fr; gap:2px; }.integration-permissions { grid-template-columns:1fr; }.integration-permissions > span:first-child { padding-top:0; }.integration-key-row .integration-key-metadata { padding-left:0; } }
 @media (max-width: 620px) { .integration-management-card > button, .integration-stack > .integration-card:first-child > button { justify-self:stretch; width:100%; min-width:0; } }
 @media (max-width: 768px) { .integration-inline-form { grid-template-columns: 1fr; }.integration-inline-form .ghost-button { width: 100%; min-height: 44px; } }
+
+/* The media shell is the stable sibling, including protected media and loading states. */
+.app-shell .selected-call-card + .privacy-media-shell {
+  padding-top: 16px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.app-shell .calls-filter-bar > :is(input, button.call-filter-toggle) {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  width: 100%;
+  margin: 0;
+}
+.call-duration-control { position: relative; min-width: 0; }
+.app-shell .call-duration-control input { width: 100%; padding-right: 40px; appearance: textfield; -moz-appearance: textfield; }
+.call-duration-control input::-webkit-inner-spin-button,
+.call-duration-control input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.call-duration-arrows { position: absolute; right: 5px; top: 4px; bottom: 4px; display: grid; grid-template-rows: 1fr 1fr; gap: 2px; }
+.app-shell .call-duration-arrows .icon-button { width: 28px; min-width: 28px; height: 100%; min-height: 0; padding: 0; border-radius: 5px; }

@@ -6,6 +6,7 @@ import type {
 } from "../../types";
 import { createContext, useContext } from "react";
 import { transcriptionSpeakerLabel } from "../lib/formatters";
+import { maskProfanity } from "../lib/display-text";
 
 import {
   analysisDetails,
@@ -407,7 +408,7 @@ function EvidenceItems({ evidence, fallbackQuotes, onActivate }: { evidence: Ana
     const matched = item.match_status === "matched" && typeof item.start_seconds === "number";
     const time = matched ? formatEvidenceTime(item.start_seconds!) : "";
     const speaker = item.speaker ? transcriptionSpeakerLabel(item.speaker, speakerAssignments) : "";
-    if (!matched) return <blockquote key={`${item.quote}-${index}`}>{speaker && <small className="evidence-speaker">{speaker}</small>}{item.quote}<small>Точное место не определено</small></blockquote>;
+    if (!matched) return <blockquote key={`${item.quote}-${index}`}>{speaker && <small className="evidence-speaker">{speaker}</small>}<span>{maskProfanity(item.quote)}</span><small>Точное место не определено</small></blockquote>;
     return (
       <button
         className="evidence-link"
@@ -421,7 +422,7 @@ function EvidenceItems({ evidence, fallbackQuotes, onActivate }: { evidence: Ana
           wordEndIndex: item.word_end_index
         })}
       >
-        <span>{speaker && <small className="evidence-speaker">{speaker}</small>}{item.quote}</span><time>{time}</time>
+        <span>{speaker && <small className="evidence-speaker">{speaker}</small>}{maskProfanity(item.quote)}</span><time>{time}</time>
       </button>
     );
   })}</>;

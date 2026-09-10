@@ -1,6 +1,12 @@
 import type {
   AggregateAnalysisResponse,
   AdminCapabilitiesResponse,
+  AssistantCapabilities,
+  AssistantDraft,
+  AssistantChat,
+  AssistantMessage,
+  AssistantRun,
+  ContentSearchResponse,
   AdminCompaniesResponse,
   AdminSubscriptionResponse,
   AdminUsersResponse,
@@ -686,6 +692,18 @@ function privacyPolicyPath(scope: PrivacyPolicyScope) {
 }
 
 export const api = {
+  assistantCapabilities(companyId: string) { return request<AssistantCapabilities>(`/assistant/capabilities?company_uuid=${encodeURIComponent(companyId)}`); },
+  contentSearch(companyId: string, query: string, filters: {call_uuids?:string[];folder_uuids?:string[];from?:string;to?:string} = {}) { return request<ContentSearchResponse>(`/calls/content-search${queryString({company_uuid:companyId||undefined,q:query,limit:20,...filters,call_uuids:filters.call_uuids?.join(","),folder_uuids:filters.folder_uuids?.join(",")})}`); },
+  listAssistantChats(companyId: string) { return request<{items:AssistantChat[]}>(`/assistant/chats?company_uuid=${encodeURIComponent(companyId)}`); },
+  createAssistantChat(companyId: string, responseDetail: "brief"|"auto"|"detailed" = "auto") { return request<AssistantChat>("/assistant/chats", {method:"POST", body:JSON.stringify({company_uuid:companyId,response_detail:responseDetail})}); },
+  deleteAssistantChat(chatId:string) { return request<void>(`/assistant/chats/${encodeURIComponent(chatId)}`,{method:"DELETE"}); },
+  exportAssistantChat(chatId:string) { return requestBlob(`/assistant/chats/${encodeURIComponent(chatId)}/export`); },
+  getAssistantDraft(companyId:string,chatId?:string) { return request<AssistantDraft>(`/assistant/draft${queryString({company_uuid:companyId||undefined,chat_uuid:chatId})}`); },
+  saveAssistantDraft(input:{company_uuid:string;chat_uuid?:string;text:string;context:AssistantDraft["context"];lock_version:number}) { return request<AssistantDraft>("/assistant/draft",{method:"PATCH",body:JSON.stringify(input)}); },
+  deleteAssistantDraft(companyId:string,chatId?:string) { return request<void>(`/assistant/draft${queryString({company_uuid:companyId||undefined,chat_uuid:chatId})}`,{method:"DELETE"}); },
+  listAssistantMessages(chatId: string) { return request<{items:AssistantMessage[]}>(`/assistant/chats/${encodeURIComponent(chatId)}/messages`); },
+  createAssistantMessage(chatId:string,input:{company_uuid:string;text:string;response_detail:string;idempotency_key:string;client_message_id:string;call_uuids?:string[];folder_uuids?:string[];context_labels?:string[];from?:string;to?:string}) { return request<AssistantRun>(`/assistant/chats/${encodeURIComponent(chatId)}/messages`,{method:"POST",body:JSON.stringify(input)}); },
+  getAssistantRun(runId:string) { return request<AssistantRun>(`/assistant/runs/${encodeURIComponent(runId)}`); },
   getCall(callId: string) {
     return request<CallResponse>(`/calls/${encodeURIComponent(callId)}`);
   },

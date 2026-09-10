@@ -1875,3 +1875,15 @@ export interface QualityReviewAppeal {
   resolved_at?: string;
   lock_version: number;
 }
+
+export interface AssistantCapabilities { search_enabled:boolean; chat_enabled:boolean; aggregate_enabled:boolean; export_enabled:boolean; company_uuid:string; role:string; department_uuids:string[]; reason_code?:string }
+export interface ContentSearchItem { chunk_uuid:string; call_uuid:string; title:string; quote:string; speaker?:string; start_seconds?:number; end_seconds?:number; created_at:string; updated_at:string; transcription_revision:number; score:number; retrieval_mode:string }
+export interface ContentSearchResponse { items:ContentSearchItem[]; retrieval_mode:string; evaluated_calls:number; index_ready_calls:number; warnings:string[] }
+export interface AssistantSource { id:string; call_uuid:string; call_title:string; quote:string; start_seconds?:number; end_seconds?:number; transcription_revision:number }
+export interface AssistantBlock { type:string; text?:string; artifact_id?:string; data?:{labels?:string[]} }
+export interface AssistantArtifactRow { call_uuid:string; label:string; count:number; percentage:number }
+export interface AssistantArtifact { id:string; message_uuid:string; type:"chart"|"table"; title:string; schema_version:number; data:{kind:string;basis:string;total:number;evaluated_calls:number;indexed_calls:number;items:AssistantArtifactRow[]}; created_at:string }
+export interface AssistantMessage { id:string; chat_uuid:string; sequence:number; role:"user"|"assistant"; status:string; text:string; blocks?:AssistantBlock[]; sources:AssistantSource[]; artifacts?:AssistantArtifact[]; created_at:string; completed_at?:string }
+export interface AssistantChat { id:string; company_uuid:string; title:string; response_detail:"brief"|"auto"|"detailed"; created_at:string; updated_at:string }
+export interface AssistantRun { id:string; chat_uuid:string; state:string; request_received_at:string; data_snapshot_at?:string; assistant_message?:AssistantMessage; error_code?:string }
+export interface AssistantDraft { text:string; context:{items?:Array<{kind:"call"|"folder"|"chat";id:string;label:string;callIds?:string[]}>;period?:{from:string;to:string}|null}; lock_version:number; updated_at:string }

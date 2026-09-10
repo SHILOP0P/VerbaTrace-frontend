@@ -17,6 +17,7 @@ import type {
 import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import { splitRedactedWord, wordNeedsLeadingSpace } from "../lib/transcript";
+import { maskProfanity } from "../lib/display-text";
 
 import {
   activeCallProcess,
@@ -387,7 +388,7 @@ const TranscriptWord = memo(function TranscriptWord({ word, index, firstInBlock,
           </Fragment>)}
         </span>
         {redaction.after}
-      </> : word.text}
+      </> : maskProfanity(word.text)}
     </span>
   </>;
 });

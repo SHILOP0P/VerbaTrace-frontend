@@ -6428,7 +6428,8 @@ label small {
   gap: 8px;
 }
 
-.evidence-quotes blockquote {
+.evidence-quotes blockquote,
+.criterion-evidence blockquote {
   margin: 0;
   padding: 9px 12px;
   color: var(--app-text, #4c3f36);
@@ -6438,12 +6439,14 @@ label small {
   line-height: 1.45;
 }
 
-.evidence-quotes blockquote small {
+.evidence-quotes blockquote small,
+.criterion-evidence blockquote small {
   display: block;
   margin-top: 4px;
   color: var(--muted);
   font-size: 11px;
 }
+.criterion-evidence blockquote > span{display:block}
 
 .evidence-link {
   display: grid;

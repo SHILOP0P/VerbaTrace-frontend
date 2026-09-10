@@ -223,7 +223,18 @@ function App() {
         if (cancelled) return;
 
         const refreshedCalls = Array.isArray(response) ? response : response.items;
-        setCalls(refreshedCalls);
+        setCalls((current) => {
+          const previousById = new Map(current.map((call) => [call.id, call]));
+          return refreshedCalls.map((call) => {
+            const previous = previousById.get(call.id);
+            if (!previous) return call;
+            return {
+              ...previous,
+              ...call,
+              privacy: call.privacy ?? previous.privacy
+            };
+          });
+        });
         setCallTimelines((current) =>
           refreshedCalls.reduce<Record<string, CallStatus[]>>((timelines, call) => {
             timelines[call.id] = nextTimelineStatuses(
@@ -718,13 +729,13 @@ function App() {
           instructions={instructions}
           loading={loadingWorkspace}
           onNavigate={navigate}
-          onUploaded={(call) => {
-            setCalls((current) => [call, ...current]);
+          onUploaded={(call, open) => {
+            setCalls((current) => current.some((item) => item.id === call.id) ? current : [call, ...current]);
             setCallTimelines((current) => ({
               ...current,
               [call.id]: timelineFromStatus(call.status)
             }));
-            openCallPage(call.id);
+            if (open) openCallPage(call.id);
           }}
         />
       )}

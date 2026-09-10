@@ -114,7 +114,7 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
       </div>
       {companyId && data.can_manage_visibility && <label className="credit-visibility-setting"><input type="checkbox" checked={data.visible_to_members !== false} disabled={visibilitySaving} onChange={(event) => void updateVisibility(event.target.checked)} /><span><strong>Показывать лимиты участникам</strong><small>По умолчанию сотрудники компании видят лимиты, активность и историю. Отключите, чтобы скрыть весь раздел от участников.</small></span></label>}
       <CreditActivityChart key={scope} activity={data.activity} />
-      <div className={`credit-wallet-histories${integrationAccess ? " has-sandbox" : ""}`}><WalletHistory title="История основного кошелька" entries={data.wallet_entries} timeZone={session.user.timezone}/>{integrationAccess ? <WalletHistory title="История тестового кошелька" entries={sandboxWallet?.entries ?? []} timeZone={session.user.timezone} sandbox/> : <div className="credit-history-reserved" aria-hidden="true"/>}</div>
+      <div className={`credit-wallet-histories${integrationAccess ? " has-sandbox" : ""}`}><WalletHistory title="История кредитов" entries={data.wallet_entries} timeZone={session.user.timezone}/>{integrationAccess ? <WalletHistory title="История тестового кошелька" entries={sandboxWallet?.entries ?? []} timeZone={session.user.timezone} sandbox/> : <div className="credit-history-reserved" aria-hidden="true"/>}</div>
     </>}
   </section>;
 }
@@ -132,7 +132,7 @@ function WalletHistory({ title, entries, timeZone, sandbox = false }: { title: s
   const resolvedTimeZone = validTimeZone(timeZone) ? timeZone! : Intl.DateTimeFormat().resolvedOptions().timeZone;
   return <section className={`credit-wallet-history${sandbox ? " is-sandbox" : ""}`}>
     <header><h3>{sandbox && <FlaskConical size={17}/>} {title}</h3><span title={`Время операций: ${resolvedTimeZone}`}>{timeZoneLabel(resolvedTimeZone)}</span></header>
-    {entries.length === 0 ? <p className="credit-history-empty">{sandbox ? "Операций с тестовыми кредитами пока нет." : "Операций с дополнительными кредитами пока нет."}</p> : <div className={`credit-wallet-entry-list${entries.length > 8 ? " is-scrollable" : ""}`}>{entries.map((entry) => {
+    {entries.length === 0 ? <p className="credit-history-empty">{sandbox ? "Операций с тестовыми кредитами пока нет." : "Операций с кредитами пока нет."}</p> : <div className={`credit-wallet-entry-list${entries.length > 8 ? " is-scrollable" : ""}`}>{entries.map((entry) => {
       const kind = walletEntryKind(entry);
       const Icon = kind === "credit" ? ArrowDownLeft : kind === "debit" ? ArrowUpRight : RefreshCw;
       return <article className={`credit-wallet-entry is-${kind}`} key={entry.transaction_uuid}>
@@ -197,6 +197,10 @@ function localizedUtcOffset(timeZone: string) {
 }
 
 function walletReason(reason: string, sandbox: boolean) {
+  if (!sandbox && reason === "transcription") return "Транскрибация звонка";
+  if (!sandbox && reason === "analysis") return "Анализ звонка";
+  if (!sandbox && reason === "deep_analysis") return "Глубокий анализ звонка";
+  if (!sandbox && reason === "assistant_generation") return "Ответ помощника по звонкам";
   if (!sandbox && reason === "sandbox wallet add") return "Тестовое пополнение основного кошелька";
   if (!sandbox && reason === "mock payment checkout") return "Тестовое пополнение основного кошелька";
   if (!sandbox) return reason;

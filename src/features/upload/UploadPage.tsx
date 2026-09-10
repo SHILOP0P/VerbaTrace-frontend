@@ -71,7 +71,7 @@ export function UploadPage({
   instructions: AnalysisInstruction[];
   loading: boolean;
   onNavigate: (page: AppPage) => void;
-  onUploaded: (call: CallResponse) => void;
+  onUploaded: (call: CallResponse, open: boolean) => void;
 }) {
   const [uploadMode, setUploadMode] = useState<UploadMode>(readStoredUploadMode);
   const [title, setTitle] = useState("");
@@ -376,7 +376,7 @@ export function UploadPage({
       };
       if (uploadMode === "single" && media) {
         const created = await api.createCall({ ...sharedInput, title: title.trim(), media });
-        onUploaded(created);
+        onUploaded(created, true);
       } else {
         const queue = [...batchItems];
         const results: boolean[] = [];
@@ -384,7 +384,7 @@ export function UploadPage({
           updateBatchItem(item.id, { status: "uploading", error: undefined });
           try {
             const created = await api.createCall({ ...sharedInput, title: item.title.trim() || undefined, media: item.file });
-            onUploaded(created);
+            onUploaded(created, false);
             updateBatchItem(item.id, { status: "success" });
             return true;
           } catch (uploadError) {
@@ -403,6 +403,7 @@ export function UploadPage({
         }));
         const failed = results.filter((result) => !result).length;
         if (failed > 0) setError(`Не удалось загрузить ${failed} из ${batchItems.length} звонков. Их можно повторить.`);
+        else onNavigate("calls");
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Не удалось загрузить звонок");

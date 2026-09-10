@@ -10,6 +10,7 @@ import {
   Menu,
   Moon,
   Search,
+  SearchCheck,
   CheckCheck,
   Settings,
   UsersRound,
@@ -36,6 +37,8 @@ import { Logo } from "../../shared/ui/primitives";
 import { useDismissibleLayer } from "../../shared/ui/dismissible-layer";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { notificationPresentation } from "../../shared/ui/notification-presentation";
+import { ToolButton } from "../assistant/AssistantControls";
+import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
 
 const WORKSPACE_COMPANY_STORAGE_KEY = "verbatrace.activeWorkspaceCompanyId";
 const LEGACY_WORKSPACE_COMPANY_STORAGE_KEY = "calllens.activeWorkspaceCompanyId";
@@ -84,6 +87,7 @@ export function AuthenticatedShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [teamOpen, setTeamOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [assistantOpen,setAssistantOpen]=useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -120,6 +124,8 @@ export function AuthenticatedShell({
   const selectedCompanySubscription = selectedCompany?.id ? companySubscriptions[selectedCompany.id] : null;
   const recentNotifications = notifications.filter((notification) => isRecentNotification(notification.created_at));
   const recentUnreadNotifications = recentNotifications.filter((notification) => !notification.read_at).length;
+
+  useEffect(() => { setAssistantOpen(false); }, [activePage]);
 
   function navigateFromMobileBar(nextPage: AppPage) {
     const currentMobilePage = isSettingsPage(activePage) ? "settings" : activePage;
@@ -632,6 +638,7 @@ export function AuthenticatedShell({
             )}
             {notificationsOpen && <CustomScrollbar targetRef={notificationListRef} className="notifications-scroll-thumb" />}
           </div>
+          <ToolButton label="Поиск и помощник по звонкам" className={`icon-button assistant-header-launcher ${assistantOpen?"active":""}`} aria-expanded={assistantOpen} onClick={()=>setAssistantOpen(v=>!v)}><SearchCheck size={20}/></ToolButton>
           <button className="icon-button theme-toggle" type="button" onClick={onToggleTheme} aria-label={themeLabel}>
             <Moon size={19} fill={theme === "dark" ? "currentColor" : "none"} />
           </button>
@@ -690,7 +697,7 @@ export function AuthenticatedShell({
                   key={item.page}
                   className={activeSidebarPage === item.page ? "active" : ""}
                   type="button"
-                  onClick={() => onNavigate(item.page)}
+                  onClick={() => { setAssistantOpen(false); onNavigate(item.page); }}
                 >
                   <span>
                     {item.icon}
@@ -749,6 +756,7 @@ export function AuthenticatedShell({
           </button>
         ))}
       </nav>
+      <AssistantWorkspace open={assistantOpen} setOpen={setAssistantOpen} companies={companies} companyId={selectedCompanyId} onOpenCall={onOpenCall} />
     </div>
   );
 }

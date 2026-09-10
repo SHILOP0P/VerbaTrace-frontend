@@ -11,7 +11,6 @@ import {
   PhoneCall,
   Trash2,
   WandSparkles
-  , ShieldCheck
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -478,7 +477,6 @@ export function CallDetailPanel({
             {formatDate(call.created_at)} · {formatDuration(call.duration_seconds)} ·{" "}
             {contextLabel(call, companies, departments)}
           </small>
-          {call.privacy?.protected && <span className="call-privacy-chip"><ShieldCheck size={14} />Данные защищены{call.privacy.policy_version ? ` · политика v${call.privacy.policy_version}` : ""}</span>}
           {!call.is_test && score.score !== null && (
             <span className="call-score-chip">Оценка {formatScore(score.percent)} / 100</span>
           )}

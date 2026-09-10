@@ -67,7 +67,7 @@ html[data-theme="light"] .app-shell {
 .app-shell .app-header {
   position: sticky;
   top: var(--app-header-top);
-  z-index: 90;
+  z-index: 120;
   display: grid;
   grid-template-columns: minmax(330px, auto) minmax(420px, 1fr) auto;
   gap: 22px;
@@ -210,6 +210,7 @@ html[data-theme="light"] .app-shell :is(.global-search input, .entity-search inp
   right: 0;
   left: auto;
   min-width: 196px;
+  z-index: 140;
   background: rgba(23, 19, 15, 0.96);
   backdrop-filter: blur(18px) saturate(1.04);
   -webkit-backdrop-filter: blur(18px) saturate(1.04);

@@ -22,7 +22,7 @@ import type {
   VisibilityScope
 } from "../../types";
 
-import { isAnalysisDone } from "../../shared/lib/analysis";
+import { analysisProgress, isAnalysisDone } from "../../shared/lib/analysis";
 import { AnalysisStructuredView } from "../../shared/ui/analysis";
 import { StatusChip, StatusTimeline } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
@@ -336,7 +336,7 @@ export function AnalysisPage({
         {error && <div className="form-error">{error}</div>}
         {deleteError && <div className="form-error">{deleteError}</div>}
         {selectedCall && (
-          <StatusTimeline transcriptionOnly={Boolean(selectedCall.transcription_only && !analysis)} current={selectedCall.status} statuses={selectedCallTimeline} analysisStatus={analysis?.status} />
+          <StatusTimeline transcriptionOnly={Boolean(selectedCall.transcription_only && !analysis)} current={selectedCall.status} statuses={selectedCallTimeline} analysisProgress={analysisProgress(analysis)} analysisStatus={analysis?.status} />
         )}
         {selectedCall && <ReportExportPanel call={selectedCall} analysis={analysis} />}
         <div className="analysis-content-grid">
@@ -349,7 +349,7 @@ export function AnalysisPage({
             </div>
             {loadingDetails || (loading && !selectedCall) ? (
               <AnalysisResultSkeleton />
-            ) : !isAnalysisDone(analysis) ? (
+            ) : !isAnalysisDone(analysis) && !analysisProgress(analysis) ? (
               <div className="empty-state compact analysis-result-empty">
                 {resultState.thinking
                   ? "Производится анализ транскрипции. Результат появится после завершения обработки."
@@ -359,10 +359,10 @@ export function AnalysisPage({
               </div>
             ) : (
               <div className="analysis-user-summary">
-                <div className={`analysis-full-text expandable-content ${showFullAnalysis ? "expanded" : "collapsed"}`}>
+                <div className={`analysis-full-text expandable-content ${showFullAnalysis || !isAnalysisDone(analysis) ? "expanded" : "collapsed"}`}>
                   <AnalysisStructuredView analysis={analysis} />
                 </div>
-                <button
+                {isAnalysisDone(analysis) && <button
                   className={`analysis-toggle-button ${showFullAnalysis ? "expanded" : ""}`}
                   type="button"
                   aria-expanded={showFullAnalysis}
@@ -372,7 +372,7 @@ export function AnalysisPage({
                   <span className="analysis-toggle-icon">
                     <ChevronRight size={18} />
                   </span>
-                </button>
+                </button>}
               </div>
             )}
           </div>}
@@ -416,9 +416,15 @@ function analysisResultState(
   tone: "ok" | "warn" | "bad";
   thinking?: boolean;
 } {
-  if (analysis?.status === "failed" || call?.status === "failed") {
+  if (analysis?.status === "failed") {
     return { label: "Ошибка анализа", tone: "bad" };
   }
+
+	const progress = analysisProgress(analysis);
+	if (progress && analysis?.status !== "done") {
+		const label = { inventory: "Находим вопросы", answers: `Готово ${progress.items_done} из ${progress.items_total}`, validation: "Проверяем и подводим итог", complete: "Сохраняем итог" }[progress.stage];
+		return { label, tone: "warn", thinking: true };
+	}
 
   if (call?.status === "transcribed" || analysis?.status === "pending" || analysis?.status === "processing") {
     return { label: "Производится анализ транскрипции", tone: "warn", thinking: true };

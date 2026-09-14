@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type {
   AnalysisResponse,
+  AnalysisProgress,
   CallStatus,
   MediaSeekTarget,
   TranscriptionResponse,
@@ -50,14 +51,17 @@ export function StatusChip({
 export function StatusTimeline({
   current,
   statuses,
+  analysisProgress,
   analysisStatus,
   transcriptionOnly = false
 }: {
   transcriptionOnly?: boolean;
   current: CallStatus;
   statuses?: CallStatus[];
+  analysisProgress?: AnalysisProgress;
   analysisStatus?: AnalysisResponse["status"];
 }) {
+  if (!transcriptionOnly) return <AnalysisTimeline current={current} analysisStatus={analysisStatus} progress={analysisProgress} />;
   const steps = visibleTimelineSteps(current, statuses).filter((step) => !transcriptionOnly || step !== "analyzed");
   const currentIndex = steps.indexOf(current);
 
@@ -84,6 +88,23 @@ export function StatusTimeline({
       ))}
     </div>
   );
+}
+
+function AnalysisTimeline({ current, analysisStatus, progress }: { current: CallStatus; analysisStatus?: string; progress?: AnalysisProgress }) {
+  const steps = ["Загрузка", "Транскрипция", "Поиск вопросов", "Разбор ответов", "Проверка и итог"];
+  const finished = analysisStatus === "done" || (current === "analyzed" && !analysisStatus);
+  const failed = analysisStatus === "failed" || current === "failed";
+  const active = finished ? 4 : progress ? ({ inventory: 2, answers: 3, validation: 4, complete: 4 }[progress.stage]) : current === "new" ? 0 : current === "processing" || (current === "failed" && !analysisStatus) ? 1 : 2;
+  return <div className="status-timeline analysis-stage-timeline" style={{ "--timeline-steps": steps.length } as CSSProperties} aria-label="Этапы обработки звонка">
+    {steps.map((label, index) => {
+      const ready = finished || index < active;
+      const ongoing = !finished && index === active;
+      const caption = ready ? "готово" : ongoing ? failed ? "не завершено" : index === 2 && progress ? `${progress.questions_found} вопросов` : index === 3 && progress ? `${progress.items_done} из ${progress.items_total}` : index === 0 ? "в очереди" : "выполняется" : "ожидает";
+      return <div key={label} className={`timeline-step ${ready ? "ready" : ongoing ? failed ? "danger current" : "processing current" : ""}`} aria-current={ongoing ? "step" : undefined}>
+        <span>{ready ? <Check size={19} /> : index === 0 ? <CloudUpload size={19} /> : index === 1 ? <RefreshCw size={19} /> : <FileText size={19} />}</span><strong>{label}</strong><small>{caption}</small>
+      </div>;
+    })}
+  </div>;
 }
 
 function visibleTimelineSteps(current: CallStatus, statuses?: CallStatus[]) {
@@ -271,10 +292,11 @@ export function TranscriptPreview({
   }
 
   useEffect(() => {
-    if (selectedEvidence?.wordStartIndex === undefined) return;
+    if (!expanded || selectedEvidence?.wordStartIndex === undefined) return;
     pendingEvidenceScrollRef.current = true;
-    scrollToWord(selectedEvidence.wordStartIndex);
-  }, [selectedEvidence]);
+    const frame = requestAnimationFrame(() => scrollToWord(selectedEvidence.wordStartIndex!));
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, selectedEvidence]);
 
   useEffect(() => {
     if (pendingEvidenceScrollRef.current) {

@@ -34,7 +34,7 @@ import type {
 } from "../../types";
 import { api } from "../../api";
 
-import { analysisNextStep, analysisScore100, formatScore, isAnalysisDone } from "../../shared/lib/analysis";
+import { analysisProgress, analysisNextStep, analysisScore100, formatScore, isAnalysisDone } from "../../shared/lib/analysis";
 import { contextLabel, formatDate, formatDuration } from "../../shared/lib/formatters";
 import { AnalysisPreview } from "../../shared/ui/analysis";
 import { CallMediaPlayer } from "../../shared/ui/audio";
@@ -321,8 +321,21 @@ export function CallDetailPanel({
   const transcriptionOnly = Boolean(call.transcription_only && !analysis && call.status !== "analyzed");
 
   function openEvidence(target: MediaSeekTarget) {
+    const words = localTranscription?.words ?? [];
+    let wordStartIndex = target.wordStartIndex;
+    if (wordStartIndex === undefined && words.length > 0) {
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      words.forEach((word, index) => {
+        if (typeof word.start_seconds !== "number") return;
+        const distance = Math.abs(word.start_seconds - target.startSeconds);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          wordStartIndex = index;
+        }
+      });
+    }
     setShowFullTranscript(true);
-    setSeekTarget({ ...target });
+    setSeekTarget({ ...target, wordStartIndex, wordEndIndex: target.wordEndIndex ?? wordStartIndex });
   }
 
   function toggleExpandedCard(
@@ -488,7 +501,7 @@ export function CallDetailPanel({
         seekTarget={seekTarget}
         onActiveWordChange={setActiveWordIndex}
       />
-      {!call.is_test && <StatusTimeline transcriptionOnly={transcriptionOnly} current={call.status} statuses={timelineStatuses} analysisStatus={analysis?.status} />}
+      {!call.is_test && <StatusTimeline transcriptionOnly={transcriptionOnly} current={call.status} statuses={timelineStatuses} analysisProgress={analysisProgress(analysis)} analysisStatus={analysis?.status} />}
       {(showReports || transcriptionOnly) && !call.is_test && <ReportExportPanel call={call} analysis={analysis} transcription={localTranscription} />}
       {transcriptionOnly && <div className="transcription-analysis-entry"><div><strong>Нужен анализ разговора?</strong><p>Запустите его по готовой транскрипции, когда понадобится.</p></div><button className="primary-button" disabled={analysisBusy || localTranscription?.status !== "transcribed"} onClick={() => void runAnalysis()}><WandSparkles size={18} />{analysisBusy ? "Запускаю…" : "Анализировать"}</button>{analysisRunError && <div className="form-error">{analysisRunError}</div>}</div>}
       <div className={`detail-grid${call.is_test || transcriptionOnly ? " is-test-call" : ""}`}>
@@ -555,6 +568,13 @@ export function CallDetailPanel({
             actionVariant="analysis"
             expanded={showFullAnalysis}
           >
+            {showFullAnalysis && isAnalysisDone(analysis) && <TranscriptCollapseIsland
+              cardRef={analysisCardRef}
+              kind="analysis"
+              label="Свернуть анализ"
+              blockedByVisibleSelector='.transcript-collapse-island[data-collapse-kind="transcript"]'
+              onCollapse={() => toggleExpandedCard(true, setShowFullAnalysis, analysisCardRef)}
+            />}
             <AnalysisPreview
               analysis={displayedAnalysis}
               expanded={showFullAnalysis}
@@ -646,7 +666,7 @@ function transcriptionCardState(
   call: CallResponse,
   transcription?: TranscriptionResponse
 ): CardProcessState {
-  if (call.status === "failed" || transcription?.status === "failed") {
+  if (transcription?.status === "failed") {
     return { label: "Ошибка", tone: "bad" };
   }
 
@@ -665,6 +685,18 @@ function applyEffectiveAnalysis(analysis: AnalysisResponse | undefined, effectiv
   if (!analysis || !effective || !analysis.result_json || typeof analysis.result_json !== "object" || Array.isArray(analysis.result_json)) return analysis;
   const source = analysis.result_json as Record<string, unknown>;
   const criteriaByKey = new Map(effective.criteria.map((item) => [item.criterion_key, item]));
+  if (source.schema_version === 3 && Array.isArray(source.items)) {
+    const items = source.items.map((value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+      const item = value as Record<string, unknown>;
+      const key = typeof item.id === "string" ? item.id : "";
+      const replacement = criteriaByKey.get(key);
+      if (!replacement) return value;
+      const max = replacement.score_max && replacement.score_max > 0 ? replacement.score_max : 100;
+      return {...item,status:replacement.not_applicable?"not_applicable":item.status,score:replacement.effective_score===undefined?null:replacement.effective_score/max*100,effective_source:replacement.effective_source};
+    });
+    return {...analysis,result_json:{...source,overall_score:effective.total_score,score:effective.total_score,score_scale:100,effective_source:effective.source,items}};
+  }
   const criteria = Array.isArray(source.criteria_results)
     ? source.criteria_results.map((value) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) return value;
@@ -704,10 +736,11 @@ function analysisCardState(
     return { label: "Ошибка анализа", tone: "bad" };
   }
 
-  if (call.status === "failed") {
-    return { label: "Ошибка", tone: "bad" };
+  const progress = analysisProgress(analysis);
+  if (progress && analysis?.status !== "done") {
+    const label = { inventory: "Находим вопросы", answers: `Готово ${progress.items_done} из ${progress.items_total}`, validation: "Проверяем и подводим итог", complete: "Сохраняем итог" }[progress.stage];
+    return { label, tone: "warn", thinking: true };
   }
-
   if (call.status === "transcribed" || analysis?.status === "pending" || analysis?.status === "processing") {
     return { label: "Производится анализ транскрипции", tone: "warn", thinking: true };
   }

@@ -4,9 +4,12 @@ import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 import { transcriptIslandLayout } from "./transcript-island-layout";
 
-export function TranscriptCollapseIsland({ cardRef, onCollapse }: {
+export function TranscriptCollapseIsland({ cardRef, onCollapse, label = "Свернуть расшифровку", kind = "transcript", blockedByVisibleSelector }: {
   cardRef: RefObject<HTMLDivElement | null>;
   onCollapse: () => void;
+  label?: string;
+  kind?: "transcript" | "analysis";
+  blockedByVisibleSelector?: string;
 }) {
   const islandRef = useRef<HTMLDivElement>(null);
 
@@ -23,6 +26,12 @@ export function TranscriptCollapseIsland({ cardRef, onCollapse }: {
     let buttonHeight = 42;
 
     const updatePosition = () => {
+      const blocker = blockedByVisibleSelector ? document.querySelector<HTMLElement>(blockedByVisibleSelector) : null;
+      if (blocker && !blocker.hidden && blocker.getClientRects().length > 0) {
+        island.hidden = true;
+        island.removeAttribute("data-positioned");
+        return;
+      }
       const viewport = window.visualViewport;
       const clip = {
         left: viewport?.offsetLeft ?? 0,
@@ -103,9 +112,9 @@ export function TranscriptCollapseIsland({ cardRef, onCollapse }: {
       mainToggle.classList.remove("is-island-receiving");
       mainToggle.style.removeProperty("--island-collision");
     };
-  }, [cardRef]);
+  }, [blockedByVisibleSelector, cardRef]);
 
-  return createPortal(<div ref={islandRef} className="transcript-collapse-island" hidden>
-    <button type="button" aria-expanded="true" onClick={onCollapse}><ChevronUp size={18} />Свернуть расшифровку</button>
+  return createPortal(<div ref={islandRef} className="transcript-collapse-island" data-collapse-kind={kind} hidden>
+    <button type="button" aria-expanded="true" onClick={onCollapse}><ChevronUp size={18} />{label}</button>
   </div>, document.body);
 }

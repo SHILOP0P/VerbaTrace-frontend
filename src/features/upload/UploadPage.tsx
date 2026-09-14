@@ -493,7 +493,7 @@ export function UploadPage({
               <span className="ghost-button file-dropzone-button">Выбрать файлы</span>
             </label>
           )}
-          <small>Аудио: MP3, WAV, M4A, OGG. Видео: MP4, MOV, WEBM, MKV. Максимальный размер: 100 МБ.</small>
+          <small>Аудио: MP3, WAV, M4A, OGG. Видео: MP4, MOV, WEBM, MKV. Максимальный размер: 500 МБ.</small>
           {uploadMode === "multiple" && batchItems.length > 0 && (
             <div className="batch-upload-list">
               {batchItems.map((item) => (

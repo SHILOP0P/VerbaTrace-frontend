@@ -1,4 +1,4 @@
-import { Activity, ArrowDownLeft, ArrowUpRight, FlaskConical, RefreshCw, TrendingDown, WalletCards } from "lucide-react";
+import { Activity, ArrowDownLeft, ArrowUpRight, ChevronDown, FlaskConical, RefreshCw, TrendingDown, WalletCards } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { CompanyResponse, CreditDashboardResponse, CreditWalletEntry, SandboxWalletDashboard, SessionState } from "../../types";
@@ -130,17 +130,20 @@ function CreditDashboardSkeleton() {
 
 function WalletHistory({ title, entries, timeZone, sandbox = false }: { title: string; entries: CreditWalletEntry[]; timeZone?: string | null; sandbox?: boolean }) {
   const resolvedTimeZone = validTimeZone(timeZone) ? timeZone! : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [expandedEntry, setExpandedEntry] = useState("");
   return <section className={`credit-wallet-history${sandbox ? " is-sandbox" : ""}`}>
     <header><h3>{sandbox && <FlaskConical size={17}/>} {title}</h3><span title={`Время операций: ${resolvedTimeZone}`}>{timeZoneLabel(resolvedTimeZone)}</span></header>
     {entries.length === 0 ? <p className="credit-history-empty">{sandbox ? "Операций с тестовыми кредитами пока нет." : "Операций с кредитами пока нет."}</p> : <div className={`credit-wallet-entry-list${entries.length > 8 ? " is-scrollable" : ""}`}>{entries.map((entry) => {
       const kind = walletEntryKind(entry);
       const Icon = kind === "credit" ? ArrowDownLeft : kind === "debit" ? ArrowUpRight : RefreshCw;
-      return <article className={`credit-wallet-entry is-${kind}`} key={entry.transaction_uuid}>
+      const grouped = Boolean(entry.details?.length);
+      return <div className={`credit-wallet-entry-group${expandedEntry === entry.transaction_uuid ? " is-open" : ""}`} key={entry.transaction_uuid}><article className={`credit-wallet-entry is-${kind}`}>
         <span className="credit-wallet-entry-icon" aria-hidden="true"><Icon size={17}/></span>
         <time dateTime={entry.created_at}>{formatWalletDateTime(entry.created_at, resolvedTimeZone)}</time>
         <strong>{entry.credits>0?"+":""}{entry.credits.toLocaleString("ru-RU")}</strong>
-        <small>{walletReason(entry.reason, sandbox)}</small>
-      </article>;
+        <small>{walletReason(entry.reason, sandbox)}{grouped ? ` · ${entry.details!.length} этапов` : ""}</small>
+        {grouped && <button className="credit-wallet-entry-expand" type="button" aria-label="Показать этапы анализа" aria-expanded={expandedEntry === entry.transaction_uuid} onClick={()=>setExpandedEntry(current=>current===entry.transaction_uuid?"":entry.transaction_uuid)}><ChevronDown size={17}/></button>}
+      </article>{grouped && <div className="credit-wallet-entry-details">{entry.details!.map((detail,index)=><div key={detail.transaction_uuid}><span>Этап {index+1}</span><time dateTime={detail.created_at}>{formatWalletDateTime(detail.created_at,resolvedTimeZone)}</time><strong>{detail.credits.toLocaleString("ru-RU")}</strong></div>)}</div>}</div>;
     })}</div>}
   </section>;
 }

@@ -809,6 +809,7 @@ export interface CreditWalletEntry {
   credits: number;
   reason: string;
   created_at: string;
+  details?: CreditWalletEntry[];
 }
 
 export interface CreditDashboardResponse {
@@ -1876,10 +1877,41 @@ export interface QualityReviewAppeal {
   lock_version: number;
 }
 
+export type AnalysisV3Status = "met" | "mostly_met" | "partially_met" | "minimally_met" | "missed" | "not_applicable" | "unclear" | "conflict" | "not_assessed";
+export interface AnalysisV3Gap { text: string; basis: "instruction" | "explicit_question"; explanation: string; affects_score: boolean; }
+export interface AnalysisProgress {
+  stage: "inventory" | "answers" | "validation" | "complete";
+  windows_done: number; windows_total: number;
+  items_done: number; items_total: number; questions_found: number;
+}
+export interface AnalysisV3Item {
+  processing_status?: "pending" | "ready";
+  question_parts?: string[];
+  id: string; kind: "question" | "episode" | "requirement"; title: string; topic: string; order: number; question_speaker?: string;
+  asked: boolean | null; information_status: "complete" | "partial" | "absent" | "declined" | "conflicting" | "unclear" | null;
+  fulfilled_earlier: boolean; answer_summary: string | null; status: AnalysisV3Status; weight: number; score: number | null;
+  explanation: string; strengths: string[]; gaps: AnalysisV3Gap[];
+  improvement_kind: "grounded_answer" | "advice" | "clarification_needed" | "not_needed";
+  improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[];
+}
+export interface AnalysisV3Recommendation {
+  id: string; title: string; action: string; reason: string; expected_result: string; item_ids: string[];
+  affects_score: boolean; importance: number; impact: number | null; repetition: number;
+  priority_score: number | null; priority: "high" | "medium" | "low" | "unresolved";
+}
+export interface AnalysisV3Result {
+  progress?: AnalysisProgress;
+  schema_version: 3; prompt_version: string; conversation_types: string[]; purpose: string | null;
+  summary: string; outcome: string | null; strengths: string[]; work_on: string[];
+  coverage: { status: "complete" | "partial"; actual_question_count: number; analyzed_actual_question_count: number; required_question_count: number; complete_without_separate_question: number; limitations: string[]; };
+  overall_score: number | null; overall_score_label: string; items: AnalysisV3Item[];
+  recommendations: AnalysisV3Recommendation[]; priority_recommendation_ids: string[];
+}
+
 export interface AssistantCapabilities { search_enabled:boolean; chat_enabled:boolean; aggregate_enabled:boolean; export_enabled:boolean; company_uuid:string; role:string; department_uuids:string[]; reason_code?:string }
-export interface ContentSearchItem { chunk_uuid:string; call_uuid:string; title:string; quote:string; speaker?:string; start_seconds?:number; end_seconds?:number; created_at:string; updated_at:string; transcription_revision:number; score:number; retrieval_mode:string }
+export interface ContentSearchItem { chunk_uuid:string; call_uuid:string; title:string; quote:string; speaker?:string; start_seconds?:number; end_seconds?:number; created_at:string; updated_at:string; transcription_revision:number; score:number; retrieval_mode:string; source_kind:"transcription"|"analysis" }
 export interface ContentSearchResponse { items:ContentSearchItem[]; retrieval_mode:string; evaluated_calls:number; index_ready_calls:number; warnings:string[] }
-export interface AssistantSource { id:string; call_uuid:string; call_title:string; quote:string; start_seconds?:number; end_seconds?:number; transcription_revision:number }
+export interface AssistantSource { id:string; call_uuid:string; call_title:string; quote:string; start_seconds?:number; end_seconds?:number; transcription_revision:number; source_kind:"transcription"|"analysis" }
 export interface AssistantBlock { type:string; text?:string; artifact_id?:string; data?:{labels?:string[]} }
 export interface AssistantArtifactRow { call_uuid:string; label:string; count:number; percentage:number }
 export interface AssistantArtifact { id:string; message_uuid:string; type:"chart"|"table"; title:string; schema_version:number; data:{kind:string;basis:string;total:number;evaluated_calls:number;indexed_calls:number;items:AssistantArtifactRow[]}; created_at:string }

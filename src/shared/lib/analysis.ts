@@ -3,7 +3,9 @@ import type {
   AnalysisResponse,
   AnalysisV2CriteriaResult,
   AnalysisV2Question,
-  AnalysisV2Result
+  AnalysisV2Result,
+  AnalysisV3Result,
+  AnalysisProgress
 } from "../../types";
 
 export function evidenceList(value: unknown): AnalysisEvidence[] {
@@ -243,6 +245,51 @@ export function analysisV2Result(analysis?: AnalysisResponse): AnalysisV2Result 
     evidence_quotes: stringList(record.evidence_quotes),
     evidence: evidenceList(record.evidence),
     confidence: stringValue(record.confidence) ?? ""
+  };
+}
+
+export function analysisProgress(analysis?: AnalysisResponse): AnalysisProgress | undefined {
+  const raw = analysisRecord(analysis).progress;
+  if (!isPlainRecord(raw) || !["inventory", "answers", "validation", "complete"].includes(String(raw.stage))) return undefined;
+  const count = (key: string) => Math.max(0, integerValue(raw[key]) ?? 0);
+  return { stage: raw.stage as AnalysisProgress["stage"], windows_done: count("windows_done"), windows_total: count("windows_total"), items_done: count("items_done"), items_total: count("items_total"), questions_found: count("questions_found") };
+}
+
+export function analysisV3Result(analysis?: AnalysisResponse): AnalysisV3Result | null {
+  const record = analysisRecord(analysis);
+  if (numberValue(record.schema_version) !== 3 || !Array.isArray(record.items)) return null;
+  const items = record.items.flatMap((raw): AnalysisV3Result["items"] => {
+    if (!isPlainRecord(raw)) return [];
+    const id = stringValue(raw.id), title = stringValue(raw.title), kind = stringValue(raw.kind);
+    if (!id || !title || !["question", "episode", "requirement"].includes(kind ?? "")) return [];
+    const gaps = Array.isArray(raw.gaps) ? raw.gaps.flatMap((gap) => {
+      if (!isPlainRecord(gap)) return [];
+      const text = stringValue(gap.text), basis = stringValue(gap.basis);
+      return text && (basis === "instruction" || basis === "explicit_question") ? [{text, basis: basis as "instruction" | "explicit_question", explanation:stringValue(gap.explanation) ?? "", affects_score:Boolean(gap.affects_score)}] : [];
+    }) : [];
+    return [{
+      processing_status: raw.processing_status === "pending" ? "pending" : "ready", question_parts: stringList(raw.question_parts),
+      id, kind: kind as AnalysisV3Result["items"][number]["kind"], title, topic:stringValue(raw.topic) ?? "", order:integerValue(raw.order) ?? 0, question_speaker:stringValue(raw.question_speaker),
+      asked:typeof raw.asked === "boolean" ? raw.asked : null,
+      information_status:(stringValue(raw.information_status) as AnalysisV3Result["items"][number]["information_status"]) ?? null,
+      fulfilled_earlier:Boolean(raw.fulfilled_earlier), answer_summary:stringValue(raw.answer_summary) ?? null,
+      status:(stringValue(raw.status) as AnalysisV3Result["items"][number]["status"]) ?? "not_assessed",
+      weight:finiteNumber(raw.weight) ?? 1, score:finiteNumber(raw.score), explanation:stringValue(raw.explanation) ?? "", strengths:stringList(raw.strengths), gaps,
+      improvement_kind:(stringValue(raw.improvement_kind) as AnalysisV3Result["items"][number]["improvement_kind"]) ?? "not_needed",
+      improvement:stringValue(raw.improvement) ?? null, evidence:evidenceList(raw.evidence), instruction_sources:stringList(raw.instruction_sources)
+    }];
+  }).sort((a,b)=>a.order-b.order);
+  const coverage = recordField(record,"coverage");
+  const recommendations = Array.isArray(record.recommendations) ? record.recommendations.flatMap((raw): AnalysisV3Result["recommendations"] => {
+    if (!isPlainRecord(raw) || !stringValue(raw.id) || !stringValue(raw.title)) return [];
+    return [{id:stringValue(raw.id)!, title:stringValue(raw.title)!, action:stringValue(raw.action) ?? "", reason:stringValue(raw.reason) ?? "", expected_result:stringValue(raw.expected_result) ?? "", item_ids:stringList(raw.item_ids), affects_score:Boolean(raw.affects_score), importance:finiteNumber(raw.importance) ?? 1, impact:finiteNumber(raw.impact), repetition:finiteNumber(raw.repetition) ?? 1, priority_score:finiteNumber(raw.priority_score), priority:(stringValue(raw.priority) as AnalysisV3Result["recommendations"][number]["priority"]) ?? "unresolved"}];
+  }) : [];
+  return {
+    progress: analysisProgress(analysis),
+    schema_version:3, prompt_version:stringValue(record.prompt_version) ?? "", conversation_types:stringList(record.conversation_types), purpose:stringValue(record.purpose) ?? null,
+    summary:stringValue(record.summary) ?? "", outcome:stringValue(record.outcome) ?? null, strengths:stringList(record.strengths), work_on:stringList(record.work_on),
+    coverage:{status:coverage?.status === "complete" ? "complete" : "partial", actual_question_count:integerValue(coverage?.actual_question_count) ?? 0, analyzed_actual_question_count:integerValue(coverage?.analyzed_actual_question_count) ?? 0, required_question_count:integerValue(coverage?.required_question_count) ?? 0, complete_without_separate_question:integerValue(coverage?.complete_without_separate_question) ?? 0, limitations:stringList(coverage?.limitations)},
+    overall_score:finiteNumber(record.overall_score), overall_score_label:stringValue(record.overall_score_label) ?? "", items, recommendations, priority_recommendation_ids:stringList(record.priority_recommendation_ids)
   };
 }
 

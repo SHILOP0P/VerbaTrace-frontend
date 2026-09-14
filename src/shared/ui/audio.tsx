@@ -9,7 +9,8 @@ import { isVideoCall, mediaDownloadName } from "../lib/media";
 
 const playbackRates = [0.75, 1, 1.25, 1.5, 2];
 const emptyTranscriptWords: TranscriptionWordResponse[] = [];
-const waveformBars = 72;
+const waveformBars = 240;
+const waveformBarPitch = 8;
 const fallbackWaveform = Array.from({ length: waveformBars }, (_, index) => {
   const wave = Math.sin(index * 0.68) * 0.22 + Math.sin(index * 1.73) * 0.14;
   return Math.max(0.2, Math.min(0.9, 0.54 + wave));
@@ -220,6 +221,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const [loadingWaveform, setLoadingWaveform] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [waveform, setWaveform] = useState<number[]>([]);
+  const [visibleWaveformBars, setVisibleWaveformBars] = useState(72);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(call.duration_seconds || 0);
@@ -284,6 +286,16 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [call.duration_seconds, source]);
+
+  useEffect(() => {
+    const element = waveformRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const update = () => setVisibleWaveformBars(Math.max(24, Math.min(waveformBars, Math.floor(element.clientWidth / waveformBarPitch))));
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    update();
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -482,6 +494,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const effectiveDuration = duration > 0 ? duration : call.duration_seconds;
   const progressPercent = effectiveDuration > 0 ? Math.min(100, Math.max(0, (currentTime / effectiveDuration) * 100)) : 0;
   const waveformReady = waveform.length > 0;
+  const displayedWaveform = useMemo(() => resampleWaveform(waveformReady ? waveform : fallbackWaveform, visibleWaveformBars), [waveform, waveformReady, visibleWaveformBars]);
   const showAudioSkeleton = loadingAudio || (loadingWaveform && !waveformReady);
   const currentTimeLabel = formatDuration(Math.round(currentTime));
   const audioDisabled = !audioUrl || loadingAudio || Boolean(audioError);
@@ -518,8 +531,8 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
               if (event.buttons === 1) handleWaveformPointer(event);
             }}
           >
-            {(waveformReady ? waveform : fallbackWaveform).map((peak, index) => {
-              const barProgress = waveform.length > 1 ? index / (waveform.length - 1) : 0;
+            {displayedWaveform.map((peak, index) => {
+              const barProgress = displayedWaveform.length > 1 ? index / (displayedWaveform.length - 1) : 0;
               const active = barProgress * 100 <= progressPercent;
               return (
                 <span
@@ -605,6 +618,15 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
       </div>
     </div>
   );
+}
+
+function resampleWaveform(peaks: number[], count: number) {
+  if (peaks.length <= count) return peaks;
+  return Array.from({ length: count }, (_, index) => {
+    const start = Math.floor(index * peaks.length / count);
+    const end = Math.max(start + 1, Math.floor((index + 1) * peaks.length / count));
+    return Math.max(...peaks.slice(start, end));
+  });
 }
 
 function resetAudioElement(audio: HTMLAudioElement | null) {

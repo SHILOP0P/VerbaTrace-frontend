@@ -3175,6 +3175,19 @@ html[data-theme="light"] .app-shell button.call-filter-toggle.active {
   border-color: rgba(223, 79, 39, 0.38);
 }
 
+html[data-theme="light"] .app-shell .call-filter-chips button {
+  color: #5f5148;
+  background: #fff0e7;
+  border-color: rgba(223, 79, 39, 0.26);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+html[data-theme="light"] .app-shell .call-filter-chips button:hover,
+html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
+  color: var(--app-accent-strong);
+  border-color: rgba(223, 79, 39, 0.46);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .call-filters-reveal {
     transition-duration: 1ms;

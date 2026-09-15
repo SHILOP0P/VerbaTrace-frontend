@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ApiError, api } from "../../api";
+import { api } from "../../api";
 import type {
   AnalysisResponse,
   AnalysisInstruction,
@@ -72,7 +72,6 @@ type CallsURLFilters = {
   participant: string;
   source: "all" | "manual" | "generic_api" | "bitrix24";
   connection: string;
-  folder: string;
   occurredFrom: string;
   occurredTo: string;
   durationMin: string;
@@ -102,7 +101,6 @@ function initialCallsURLFilters(): CallsURLFilters {
     participant: query.get("participant_user_uuid") || "all",
     source: oneOf("source_provider", ["all", "manual", "generic_api", "bitrix24"] as const, "all"),
     connection: query.get("connection_uuid") || "all",
-    folder: query.get("folder_uuid") || "",
     occurredFrom: query.get("occurred_from") || "",
     occurredTo: query.get("occurred_to") || "",
     durationMin: query.get("duration_min_seconds") || "",
@@ -192,7 +190,6 @@ export function CallsPage({
   const [callFolders, setCallFolders] = useState<CallFolderResponse[]>([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [folderError, setFolderError] = useState("");
-  const [selectedFolderId, setSelectedFolderId] = useState(initialURLFilters.folder);
   const [editingFolderId, setEditingFolderId] = useState("");
   const [folderEditorOpen, setFolderEditorOpen] = useState(false);
   const [folderBusyId, setFolderBusyId] = useState("");
@@ -277,7 +274,6 @@ export function CallsPage({
     uploaded_by_user_uuid: managerFilter === "all" ? undefined : managerFilter,
     source_provider: sourceFilter === "all" ? undefined : sourceFilter,
     connection_uuid: connectionFilter === "all" ? undefined : connectionFilter,
-    folder_uuid: selectedFolderId || undefined,
     occurred_from: occurredFrom || periodStart(periodFilter),
     occurred_to: occurredTo || undefined,
     duration_min_seconds: durationMin === "" ? undefined : Number(durationMin),
@@ -415,7 +411,6 @@ export function CallsPage({
     participantFilter !== "all" ||
     sourceFilter !== "all" ||
     connectionFilter !== "all" ||
-    Boolean(selectedFolderId) ||
     Boolean(occurredFrom || occurredTo || durationMin || durationMax) ||
     analysisFilter !== "all" ||
     actionsFilter !== "all" ||
@@ -434,7 +429,6 @@ export function CallsPage({
     participantFilter !== "all",
     sourceFilter !== "all",
     connectionFilter !== "all",
-    Boolean(selectedFolderId),
     Boolean(occurredFrom || occurredTo),
     Boolean(durationMin || durationMax),
     analysisFilter !== "all",
@@ -452,7 +446,6 @@ export function CallsPage({
   if (departmentFilter !== "all") activeFilterChips.push({ key: "department", label: `Отдел: ${departments.find((item) => item.id === departmentFilter)?.name || "выбран"}`, clear: () => setDepartmentFilter("all") });
   if (sourceFilter !== "all") activeFilterChips.push({ key: "source", label: `Источник: ${{ manual: "ручная загрузка", generic_api: "API", bitrix24: "Bitrix24" }[sourceFilter]}`, clear: () => setSourceFilter("all") });
   if (connectionFilter !== "all") activeFilterChips.push({ key: "connection", label: `Подключение: ${connectionOptions.find((item) => item.id === connectionFilter)?.name || "выбрано"}`, clear: () => setConnectionFilter("all") });
-  if (selectedFolderId) activeFilterChips.push({ key: "folder", label: `Папка: ${callFolders.find((item) => item.id === selectedFolderId)?.name || "выбрана"}`, clear: () => setSelectedFolderId("") });
   if (periodFilter !== "all") activeFilterChips.push({ key: "period", label: periodFilter === "7d" ? "Последние 7 дней" : "Последние 30 дней", clear: () => setPeriodFilter("all") });
   if (occurredFrom || occurredTo) activeFilterChips.push({ key: "occurred", label: `Разговор: ${occurredFrom || "…"} — ${occurredTo || "…"}`, clear: () => { setOccurredFrom(""); setOccurredTo(""); } });
   if (durationMin || durationMax) activeFilterChips.push({ key: "duration", label: `Длительность: ${durationMin || "0"}–${durationMax || "∞"} сек.`, clear: () => { setDurationMin(""); setDurationMax(""); } });
@@ -461,14 +454,7 @@ export function CallsPage({
   if (processingErrorOnly) activeFilterChips.push({ key: "errors", label: "Только ошибки", clear: () => setProcessingErrorOnly(false) });
   if (favoriteOnly) activeFilterChips.push({ key: "favorite", label: "Только избранные", clear: () => setFavoriteOnly(false) });
   if (sortFilter !== "occurred_at" || sortOrder !== "desc") activeFilterChips.push({ key: "sort", label: `Сортировка: ${{ occurred_at: "время разговора", created_at: "время импорта", duration: "длительность" }[sortFilter]}, ${sortOrder === "desc" ? "по убыванию" : "по возрастанию"}`, clear: () => { setSortFilter("occurred_at"); setSortOrder("desc"); } });
-  const selectedCallVisibleInFolderFilter = Boolean(
-    selectedFolderId &&
-    selectedCall &&
-    (folderCallsById[selectedFolderId] ?? []).some((call) => call.id === selectedCall.id)
-  );
-  const selectedCallActionFolderId = selectedCall
-    ? (selectedCallVisibleInFolderFilter ? selectedFolderId : callFolderActionByCall[selectedCall.id]) || ""
-    : "";
+  const selectedCallActionFolderId = selectedCall ? callFolderActionByCall[selectedCall.id] || "" : "";
   const selectedCallActionFolder = selectedCallActionFolderId
     ? callFolders.find((folder) => folder.id === selectedCallActionFolderId)
     : undefined;
@@ -494,7 +480,6 @@ export function CallsPage({
     setSortFilter("occurred_at");
     setSortOrder("desc");
     setSearchQuery("");
-    setSelectedFolderId("");
     setServerCalls(null);
     setNextCallsCursor(null);
     setFiltersError("");
@@ -525,13 +510,9 @@ export function CallsPage({
     try {
       const loadedFolders = await loadCallFoldersForContext(companies, departments);
       setCallFolders(loadedFolders);
-      setSelectedFolderId((current) =>
-        current && loadedFolders.some((folder) => folder.id === current) ? current : ""
-      );
     } catch (error) {
       setFolderError(error instanceof Error ? error.message : "Не удалось загрузить папки");
       setCallFolders([]);
-      setSelectedFolderId("");
     } finally {
       setFoldersLoading(false);
     }
@@ -597,7 +578,6 @@ export function CallsPage({
     setFolderBusyId(folder.id);
     try {
       await api.deleteCallFolder(folder.id);
-      if (selectedFolderId === folder.id) setSelectedFolderId("");
       if (editingFolderId === folder.id) cancelFolderEdit();
       await refreshFolders();
     } catch (error) {
@@ -653,9 +633,6 @@ export function CallsPage({
         ...current,
         [folderId]: (current[folderId] ?? []).filter((call) => call.id !== callId)
       }));
-      if (selectedFolderId === folderId) {
-        setSelectedFolderId("");
-      }
       await refreshFolders();
     } catch (error) {
       setFolderError(error instanceof Error ? error.message : "Не удалось убрать звонок из папки");
@@ -887,13 +864,11 @@ export function CallsPage({
   }
 
   function selectFolderCall(callId: string, folderId: string) {
-    setSelectedFolderId(folderId);
     setCallFolderActionByCall((current) => ({ ...current, [callId]: folderId }));
     onSelectCall(callId);
   }
 
   function selectUnfiledCall(callId: string) {
-    setSelectedFolderId("");
     setCallFolderActionByCall((current) => {
       if (!current[callId]) return current;
       const next = { ...current };
@@ -966,7 +941,6 @@ export function CallsPage({
       participant_user_uuid: participantFilter === "all" ? undefined : participantFilter,
       source_provider: sourceFilter === "all" ? undefined : sourceFilter,
       connection_uuid: connectionFilter === "all" ? undefined : connectionFilter,
-      folder_uuid: selectedFolderId || undefined,
       occurred_from: occurredFrom || undefined,
       occurred_to: occurredTo || undefined,
       duration_min_seconds: durationMin || undefined,
@@ -983,7 +957,7 @@ export function CallsPage({
       else url.searchParams.set(key, value);
     }
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, selectedFolderId, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder]);
+  }, [searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder]);
 
   useEffect(() => {
     if (filterValidationError) {
@@ -1008,12 +982,8 @@ export function CallsPage({
             setNextCallsCursor(Array.isArray(response) ? null : response.next_cursor ?? null);
           }
         })
-        .catch((error) => {
+        .catch(() => {
           if (cancelled) return;
-          if (error instanceof ApiError && error.code === "call_folder_not_found") {
-            setSelectedFolderId("");
-            void refreshFolders();
-          }
           setServerCalls([]);
           setFiltersError("Не удалось применить фильтры. Проверьте значения и повторите.");
         })
@@ -1027,7 +997,7 @@ export function CallsPage({
 	  controller.abort();
       window.clearTimeout(timer);
     };
-  }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, selectedFolderId, callsRefreshKey]);
+  }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, callsRefreshKey]);
 
   function renderSidebarCallRow(call: CallResponse, folderId?: string) {
     const selected = selectedCallId === call.id;

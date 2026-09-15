@@ -41,7 +41,6 @@ import { ToolButton } from "../assistant/AssistantControls";
 import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
 
 const WORKSPACE_COMPANY_STORAGE_KEY = "verbatrace.activeWorkspaceCompanyId";
-const LEGACY_WORKSPACE_COMPANY_STORAGE_KEY = "calllens.activeWorkspaceCompanyId";
 const PERSONAL_WORKSPACE_VALUE = "__personal__";
 const MOBILE_NAV_PAGES: AppPage[] = ["overview", "calls", "actions", "reports"];
 
@@ -775,14 +774,7 @@ function profileInitial(value: string) {
 
 function readStoredWorkspaceCompanyId() {
   try {
-    let value = window.localStorage.getItem(WORKSPACE_COMPANY_STORAGE_KEY);
-    if (value === null) {
-      value = window.localStorage.getItem(LEGACY_WORKSPACE_COMPANY_STORAGE_KEY);
-      if (value !== null) {
-        window.localStorage.setItem(WORKSPACE_COMPANY_STORAGE_KEY, value);
-        window.localStorage.removeItem(LEGACY_WORKSPACE_COMPANY_STORAGE_KEY);
-      }
-    }
+    const value = window.localStorage.getItem(WORKSPACE_COMPANY_STORAGE_KEY);
     if (value === null) return null;
     return value === PERSONAL_WORKSPACE_VALUE ? "" : value;
   } catch {

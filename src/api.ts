@@ -102,11 +102,9 @@ const configuredBase =
 const apiRoot = `${configuredBase}/api/v1`;
 const authRefreshPath = "/auth/refresh";
 const sessionExpiredEvent = "verbatrace:session-expired";
-const legacySessionExpiredEvent = "calllens:session-expired";
 
 function notifySessionExpired() {
   window.dispatchEvent(new Event(sessionExpiredEvent));
-  window.dispatchEvent(new Event(legacySessionExpiredEvent));
 }
 
 export class ApiError extends Error {

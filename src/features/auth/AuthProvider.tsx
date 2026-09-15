@@ -27,10 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const clearExpiredSession = () => setSession(null);
     window.addEventListener("verbatrace:session-expired", clearExpiredSession);
-    window.addEventListener("calllens:session-expired", clearExpiredSession);
     return () => {
       window.removeEventListener("verbatrace:session-expired", clearExpiredSession);
-      window.removeEventListener("calllens:session-expired", clearExpiredSession);
     };
   }, []);
 

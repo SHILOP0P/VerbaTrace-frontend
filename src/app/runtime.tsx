@@ -17,7 +17,6 @@ import type {
 } from "../types";
 
 export const THEME_KEY = "verbatrace.theme.v1";
-const LEGACY_THEME_KEY = "calllens.theme.v1";
 
 export type AppTheme = "light" | "dark";
 
@@ -34,20 +33,8 @@ export function getSystemTheme(): AppTheme {
 }
 
 export function readThemePreference(): ThemePreference {
-  const storedTheme = migrateLocalStorageValue(THEME_KEY, LEGACY_THEME_KEY);
+  const storedTheme = localStorage.getItem(THEME_KEY);
   return storedTheme === "light" || storedTheme === "dark" ? storedTheme : "system";
-}
-
-function migrateLocalStorageValue(currentKey: string, legacyKey: string) {
-  const currentValue = localStorage.getItem(currentKey);
-  if (currentValue !== null) return currentValue;
-
-  const legacyValue = localStorage.getItem(legacyKey);
-  if (legacyValue === null) return null;
-
-  localStorage.setItem(currentKey, legacyValue);
-  localStorage.removeItem(legacyKey);
-  return legacyValue;
 }
 
 export const pageRoutes: Record<AppPage, string> = {

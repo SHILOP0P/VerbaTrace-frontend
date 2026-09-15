@@ -1,7 +1,6 @@
 import type { AuthResponse, UserResponse } from "../../types";
 
 const refreshLockName = "verbatrace.auth.refresh";
-const legacyRefreshLockName = "calllens.auth.refresh";
 let inTabRefresh: Promise<AuthResponse> | null = null;
 
 type RefreshActions = {
@@ -12,10 +11,7 @@ type RefreshActions = {
 
 async function runWithBrowserLock<T>(task: () => Promise<T>): Promise<T> {
   if (typeof navigator === "undefined" || !navigator.locks) return task();
-  return navigator.locks.request(
-    legacyRefreshLockName,
-    () => navigator.locks.request(refreshLockName, task)
-  );
+  return navigator.locks.request(refreshLockName, task);
 }
 
 export function coordinateRefresh(actions: RefreshActions): Promise<AuthResponse> {

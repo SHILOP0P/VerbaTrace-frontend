@@ -17,6 +17,22 @@ const hiddenMetrics: ThumbMetrics = {
   trackHeight: 0
 };
 
+function visibleRange(target: HTMLElement, rect: DOMRect): [number, number] {
+  let top = Math.max(rect.top, 0);
+  let bottom = Math.min(rect.bottom, window.innerHeight);
+  for (let node: HTMLElement | null = target; node && node !== document.body; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    if (node !== target && style.overflowY !== "visible") {
+      const box = node.getBoundingClientRect();
+      top = Math.max(top, box.top);
+      bottom = Math.min(bottom, box.bottom);
+    }
+    // Ancestors above a fixed element (e.g. the mobile call drawer) do not clip it.
+    if (style.position === "fixed") break;
+  }
+  return [top, bottom];
+}
+
 export function CustomScrollbar({
   targetRef,
   className = "",
@@ -47,18 +63,21 @@ export function CustomScrollbar({
 
       const rect = target.getBoundingClientRect();
       const maxScroll = target.scrollHeight - target.clientHeight;
-      if (maxScroll <= 1 || rect.height <= 0 || rect.bottom <= 0 || rect.top >= window.innerHeight) {
+      // A target nested in a scrolling page is only partly visible; keep the
+      // fixed thumb inside the part that its clipping ancestors still show.
+      const [visibleTop, visibleBottom] = visibleRange(target, rect);
+      const trackHeight = Math.max(0, visibleBottom - visibleTop - inset * 2);
+      if (maxScroll <= 1 || trackHeight < 56) {
         metricsRef.current = hiddenMetrics;
         thumb.style.opacity = "0";
         thumb.style.pointerEvents = "none";
         return;
       }
 
-      const trackHeight = Math.max(0, rect.height - inset * 2);
       const height = Math.max(56, trackHeight * (target.clientHeight / target.scrollHeight));
       const travel = Math.max(0, trackHeight - height);
       const left = (alignToViewport ? window.innerWidth : rect.right) - rightOffset;
-      const top = rect.top + inset + travel * (target.scrollTop / maxScroll);
+      const top = visibleTop + inset + travel * (target.scrollTop / maxScroll);
 
       metricsRef.current = { visible: true, left, top, height, trackHeight };
       thumb.style.height = `${height}px`;
@@ -103,7 +122,9 @@ export function CustomScrollbar({
 
     resizeObserver.observe(target);
     mutationObserver.observe(target, { childList: true, subtree: true });
-    target.addEventListener("scroll", update, { passive: true });
+    // Scroll does not bubble; capturing on document also follows ancestors
+    // that move a nested target, not only the target itself.
+    document.addEventListener("scroll", update, { capture: true, passive: true });
     window.addEventListener("resize", update);
     shell?.addEventListener("transitionrun", startTransition);
     shell?.addEventListener("transitionend", stopTransition);
@@ -115,7 +136,7 @@ export function CustomScrollbar({
       window.cancelAnimationFrame(transitionFrame);
       resizeObserver.disconnect();
       mutationObserver.disconnect();
-      target.removeEventListener("scroll", update);
+      document.removeEventListener("scroll", update, { capture: true });
       window.removeEventListener("resize", update);
       shell?.removeEventListener("transitionrun", startTransition);
       shell?.removeEventListener("transitionend", stopTransition);

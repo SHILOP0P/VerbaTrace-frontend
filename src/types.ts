@@ -809,7 +809,6 @@ export interface CreditWalletEntry {
   credits: number;
   reason: string;
   created_at: string;
-  details?: CreditWalletEntry[];
 }
 
 export interface CreditDashboardResponse {

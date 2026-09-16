@@ -419,6 +419,14 @@
      squeezed into a column of single letters. */
   .app-shell .company-mini-card:has(.panel-actions) { align-items: stretch; flex-direction: column; }
 
+  /* The indent that lines this button up with the text next to it on a desktop
+     pushes it past the card once the button spans the full width. */
+  .app-shell .next-step-actions .no-action-button { margin-left: 0; }
+
+  /* The admin tabs turn into a scrolling row here; without this they shrink
+     instead and their labels spill out of the buttons. */
+  .app-shell .admin-nav > button { flex: 0 0 auto; }
+
   .app-shell :is(.primary-button, .ghost-button, .text-button, .report-format-button, .deep-report-format-button) {
     min-width: 0;
     max-width: 100%;

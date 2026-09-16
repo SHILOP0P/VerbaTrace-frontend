@@ -184,6 +184,8 @@ export function CallsPage({
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialURLFilters.order);
   // Bumped after a restore so the list picks the call back up.
   const [restoredCallsToken, setRestoredCallsToken] = useState(0);
+  // Bumped after a delete so the bin panel shows the call straight away.
+  const [deletedCallsToken, setDeletedCallsToken] = useState(0);
   const [serverCalls, setServerCalls] = useState<CallResponse[] | null>(null);
   const [nextCallsCursor, setNextCallsCursor] = useState<string | null>(null);
   const [loadingMoreCalls, setLoadingMoreCalls] = useState(false);
@@ -715,6 +717,8 @@ export function CallsPage({
       delete next[callId];
       return next;
     });
+    // The call is now in the bin, so the bin panel has to load it without a reload.
+    setDeletedCallsToken((value) => value + 1);
     await refreshFolders();
   }
 
@@ -1322,6 +1326,7 @@ export function CallsPage({
           </div>
         </section>
         <CallsBinPanel
+          reloadToken={deletedCallsToken}
           onRestored={() => {
             setRestoredCallsToken((value) => value + 1);
             void refreshFolders();

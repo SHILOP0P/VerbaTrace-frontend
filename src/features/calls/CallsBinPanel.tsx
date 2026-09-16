@@ -8,7 +8,14 @@ import { formatDate } from "../../shared/lib/formatters";
  * CallsBinPanel lists calls waiting out their 30 days in the bin. Only the
  * people who may restore them see anything here, so an empty bin stays hidden.
  */
-export function CallsBinPanel({ onRestored }: { onRestored: () => void }) {
+export function CallsBinPanel({
+  reloadToken = 0,
+  onRestored,
+}: {
+  /** Bumped by the page after a delete so the bin does not wait for a reload. */
+  reloadToken?: number;
+  onRestored: () => void;
+}) {
   const [items, setItems] = useState<DeletedCallResponse[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [busyId, setBusyId] = useState("");
@@ -25,7 +32,7 @@ export function CallsBinPanel({ onRestored }: { onRestored: () => void }) {
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, reloadToken]);
 
   async function restore(item: DeletedCallResponse) {
     setBusyId(item.call.id);

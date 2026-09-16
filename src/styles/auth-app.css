@@ -8429,6 +8429,19 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   min-width: 0;
 }
 
+/* The middle header column is sized by the grid, and below roughly 1500px the
+   search and the date picker no longer fit side by side: the picker ended up
+   over the profile block. The search is the control that gives way. */
+@media (max-width: 1500px) {
+  .app-shell .app-header-center .global-search {
+    width: 240px;
+  }
+
+  .app-shell .app-header-center .global-search input {
+    min-width: 0;
+  }
+}
+
 /* A company member is name / role / actions: one column fewer than a department
    member, and the action set is wider. */
 .company-member-row {

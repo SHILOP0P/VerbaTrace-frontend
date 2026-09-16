@@ -3427,9 +3427,11 @@ html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 0.7fr);
 }
 
+/* The form sits in a side card, so the field and the button share a row only
+   while both fit: otherwise the field was squeezed under its own input. */
 .create-company-form.compact {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
   align-items: end;
 }
@@ -3958,7 +3960,10 @@ html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
   width: 68px;
 }
 
-@media (max-width:760px) {
+/* Below this width the 430px form column leaves the instruction cards too
+   little room: their footers overflowed and the scope label collapsed to one
+   letter per line. The list moves under the form instead. */
+@media (max-width:1180px) {
   .app-shell .collapsible-instructions-layout,
   .app-shell .collapsible-instructions-layout.call-list-collapsed {
     grid-template-columns:minmax(0,1fr);
@@ -7293,7 +7298,10 @@ html[data-theme="light"] .confirm-dialog-actions .ghost-button:focus-visible {
   min-width: 0;
 }
 
-@media (max-width: 1180px) {
+/* Up to this width a side by side list and overview leave the overview under
+   530px, where the player clock, the stage timeline and the export buttons
+   overflow. The two stack instead. */
+@media (max-width: 1320px) {
   .app-shell:has(:is(
     .calls-layout,
     .analysis-layout,
@@ -8429,6 +8437,39 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   min-width: 0;
 }
 
+/* The overview column is too narrow for a title and four buttons on one line
+   until the screen is really wide: the title wrapped to two lines while the
+   buttons stacked next to it. The title takes its own row instead. */
+@media (max-width: 1440px) {
+  .app-shell .call-overview > .panel-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .app-shell .call-overview > .panel-heading > .panel-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Between the stacked layout and a wide desktop the 430px list still squeezed
+   the overview, so it keeps the narrower width there. */
+@media (min-width: 1321px) and (max-width: 1440px) {
+  .app-shell .calls-layout > .calls-sidebar,
+  .app-shell .analysis-layout > .calls-sidebar {
+    width: 360px;
+  }
+}
+
+/* While the layout is stacked the list kept its fixed width and left a gap
+   beside it, so it spans the row instead. */
+@media (min-width: 761px) and (max-width: 1320px) {
+  .app-shell .calls-layout > .calls-sidebar,
+  .app-shell .analysis-layout > .calls-sidebar {
+    width: auto;
+  }
+}
+
 /* The middle header column is sized by the grid, and below roughly 1500px the
    search and the date picker no longer fit side by side: the picker ended up
    over the profile block. The search is the control that gives way. */
@@ -8442,23 +8483,48 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   }
 }
 
-/* A company member is name / role / actions: one column fewer than a department
-   member, and the action set is wider. */
-.company-member-row {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+/* Narrower still, even a shrunken search does not leave the date picker room:
+   it goes away here, one step earlier than the team switcher does. */
+@media (min-width: 1121px) and (max-width: 1280px) {
+  .app-shell .app-header .date-range-control {
+    display: none;
+  }
 }
 
-/* Three management buttons do not fit beside a name on a narrow desktop or a
-   tablet, so the actions take their own row before the mobile rules apply. */
+/* Two columns of company panels only work once the workspace is wide: below
+   this the member rows had to stack their buttons one per line. */
 @media (max-width: 1180px) {
-  .company-member-row {
-    grid-template-columns: minmax(0, 1fr) auto;
+  .app-shell .company-workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
+}
 
-  .company-member-row .panel-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
+/* Between 761 and 1024 the header wraps onto two rows, but the assistant panel
+   kept the offset for a single row header and slid under it. */
+@media (min-width: 761px) and (max-width: 1024px) {
+  .app-shell .assistant-workspace {
+    top: 154px;
   }
+}
+
+/* The name next to the avatar is the last thing the header can spare before it
+   switches to its narrow arrangement at 1120px. */
+@media (min-width: 1121px) and (max-width: 1180px) {
+  .app-shell .profile-block .header-profile-link strong {
+    display: none;
+  }
+}
+
+/* A company member is a name, a role and up to three management buttons. Side
+   by side the auto sized action column took the whole row and left the name at
+   zero width, one letter per line, so the actions always take their own row. */
+.company-member-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.company-member-row > .panel-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
 }
 
 .department-member-main {
@@ -8502,4 +8568,15 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
 /* An inline notice inside a panel does not need the page level margin. */
 .admin-action-inline-notice {
   margin: 0;
+}
+/* The wallet history also appears inside the narrow company column, where the
+   five column row left the description at zero width, one letter per line. The
+   row reflows by the width of the list itself, not of the window. */
+.credit-wallet-entry-list { container-type: inline-size; }
+
+@container (max-width: 520px) {
+  .credit-wallet-entry { grid-template-columns: 32px minmax(0, 1fr) auto; }
+  .credit-wallet-entry time { grid-column: 2; }
+  .credit-wallet-entry strong { grid-column: 3; grid-row: 1; }
+  .credit-wallet-entry small { grid-column: 2 / -1; }
 }

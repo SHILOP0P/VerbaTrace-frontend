@@ -56,3 +56,11 @@
 html[data-theme="light"] .app-shell .assistant-header-launcher,
 html[data-theme="light"] .app-shell .assistant-header-launcher .assistant-tool-icon,
 html[data-theme="light"] .app-shell .assistant-header-launcher svg{color:#17120f;stroke:#17120f}
+
+/* Between 761 and 1024 the app header wraps onto two rows, and the panel kept
+   the offset for a one row header, so it started underneath it. */
+@media (min-width:761px) and (max-width:1024px){
+  .assistant-workspace{top:154px;height:min(680px,calc(100dvh - 174px))}
+  .assistant-workspace.is-expanded,
+  .sidebar-collapsed .assistant-workspace.is-expanded{inset:154px 12px 20px;height:auto}
+}

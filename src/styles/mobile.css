@@ -434,7 +434,9 @@
     overflow-wrap: anywhere;
   }
 
-  .app-shell :is(input, textarea, select, .custom-select, .select-trigger) { width: 100%; min-width: 0; max-width: 100%; }
+  /* Checkboxes and radios keep their own size: stretched to the full width they
+     pushed the label text next to them down to zero. */
+  .app-shell :is(input:not([type="checkbox"]):not([type="radio"]), textarea, select, .custom-select, .select-trigger) { width: 100%; min-width: 0; max-width: 100%; }
 
   .app-shell :is(
     h1, h2, h3, h4, p, strong, small, span, label, blockquote, .status-chip, .chip,
@@ -878,9 +880,13 @@
 
   .app-shell :is(
     .dashboard-kpi-grid, .monitoring-kpi-grid, .reports-kpi-grid, .settings-card-grid,
-    .profile-settings-grid, .company-grid, .company-workspace-grid, .company-limits-grid,
+    .profile-settings-grid, .company-grid, .company-limits-grid,
     .company-summary-stats, .analytics-insight-grid, .metrics-row
   ) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* Unlike the metric grids this one carries full panels — forms, member rows,
+     credit history — and half a tablet is not enough for them. */
+  .app-shell .company-workspace-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (min-width: 1025px) {

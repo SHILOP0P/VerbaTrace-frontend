@@ -1758,3 +1758,14 @@ export interface AssistantMessage { id:string; chat_uuid:string; sequence:number
 export interface AssistantChat { id:string; company_uuid:string; title:string; response_detail:"brief"|"auto"|"detailed"; created_at:string; updated_at:string }
 export interface AssistantRun { id:string; chat_uuid:string; state:string; request_received_at:string; data_snapshot_at?:string; assistant_message?:AssistantMessage; error_code?:string }
 export interface AssistantDraft { text:string; context:{items?:Array<{kind:"call"|"folder"|"chat";id:string;label:string;callIds?:string[]}>;period?:{from:string;to:string}|null}; lock_version:number; updated_at:string }
+
+export interface SupportAccessJournalEntry {
+  id: string;
+  event_type: string;
+  resource: string;
+  command: string;
+  actor_username: string;
+  reason: string;
+  access_expires_at?: string;
+  created_at: string;
+}

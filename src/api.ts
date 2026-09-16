@@ -74,6 +74,7 @@ import type {
   ReportResponse,
   ReportStatus,
   ReportsResponse,
+  SupportAccessJournalEntry,
   SearchResponse,
   Subscription,
   SubscriptionUsageResponse,
@@ -1811,6 +1812,12 @@ export const api = {
 
   getSupportAccessRequest(requestId: string) {
     return request<import("./types").SupportAccessRequest>(`/support-access-requests/${encodeURIComponent(requestId)}`);
+  },
+
+  listCompanySupportJournal(companyId: string, limit = 100) {
+    return request<{ items: SupportAccessJournalEntry[] }>(
+      `/companies/${encodeURIComponent(companyId)}/support-journal${queryString({ limit })}`,
+    );
   },
 
   approveSupportAccessRequest(requestId: string, lockVersion: number, comment: string) {

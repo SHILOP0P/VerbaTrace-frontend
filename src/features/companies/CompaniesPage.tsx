@@ -28,6 +28,8 @@ import { CallListSkeleton } from "../../shared/ui/loading";
 import { ProfileField, SelectControl } from "../../shared/ui/primitives";
 import { InvitationCreatePanel } from "../invitations/InvitationsPage";
 import { CompanyMembersPanel } from "./CompanyMembersPanel";
+import { CompanyLifecyclePanel } from "./CompanyLifecyclePanel";
+import { CreditLimitsPanel } from "./CreditLimitsPanel";
 import { OwnershipOffersPanel } from "./OwnershipOffersPanel";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { AnalysisPersonalizationCard } from "../analysis-context/AnalysisPersonalizationCard";
@@ -523,6 +525,9 @@ export function CompanyWorkspace({
           session={session}
           isOwner={isManager}
         />
+        {/* Hidden from members who do not run the company or a department. */}
+        <CompanyLifecyclePanel companyId={company.id} isOwner={isManager} />
+        <CreditLimitsPanel companyId={company.id} isOwner={isManager} />
 
         {canInvite ? (
           <InvitationCreatePanel

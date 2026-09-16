@@ -33,6 +33,8 @@ import type {
   CallStatus,
   CallsListResponse,
   DeletedCallsListResponse,
+  CompanyCreditForecast,
+  CompanyLifecycle,
   CompanyResponse,
   CreditDashboardResponse,
   CreatedIntegrationKey,
@@ -2023,21 +2025,6 @@ export const api = {
     );
   },
 
-  mockPurchaseCredits(input: {
-    owner_type: "user" | "company";
-    owner_uuid?: string;
-    credits: number;
-  }) {
-    return request<{ credited: number; payment_mode: "mock" }>(
-      "/credits/purchases/mock",
-      {
-        method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify(input),
-      },
-    );
-  },
-
   listDepartments(companyId: string) {
     return request<DepartmentResponse[]>(
       `/companies/${encodeURIComponent(companyId)}/departments`,
@@ -2466,6 +2453,49 @@ export const api = {
   }) {
     return request<AnalyticsOverviewResponse>(
       `/analytics/overview${queryString(filters)}`,
+    );
+  },
+
+  setCompanyCreditLimit(companyId: string, limitCredits: number | null) {
+    return request<void>(
+      `/companies/${encodeURIComponent(companyId)}/credit-limit`,
+      { method: "PUT", body: JSON.stringify({ limit_credits: limitCredits }) },
+    );
+  },
+
+  setDepartmentCreditLimit(
+    companyId: string,
+    departmentId: string,
+    limitCredits: number | null,
+  ) {
+    return request<void>(
+      `/companies/${encodeURIComponent(companyId)}/departments/${encodeURIComponent(departmentId)}/credit-limit`,
+      { method: "PUT", body: JSON.stringify({ limit_credits: limitCredits }) },
+    );
+  },
+
+  getCompanyCreditForecast(companyId: string) {
+    return request<CompanyCreditForecast>(
+      `/companies/${encodeURIComponent(companyId)}/credit-forecast`,
+    );
+  },
+
+  getCompanyLifecycle(companyId: string) {
+    return request<CompanyLifecycle>(
+      `/companies/${encodeURIComponent(companyId)}/lifecycle`,
+    );
+  },
+
+  freezeCompany(companyId: string) {
+    return request<void>(`/companies/${encodeURIComponent(companyId)}/freeze`, {
+      method: "POST",
+    });
+  },
+
+  activateCompany(companyId: string) {
+    return request<void>(
+      `/companies/${encodeURIComponent(companyId)}/activate`,
+      { method: "POST" },
     );
   },
 

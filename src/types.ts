@@ -1302,6 +1302,32 @@ export interface AnalysisRerunRequest {
   updated_at: string;
 }
 
+export interface CreditSpending {
+  id: string;
+  name: string;
+  limit_credits: number | null;
+  used_credits: number;
+  forecast_credits: number;
+  period_start: string;
+  period_end: string;
+}
+
+export interface CompanyCreditForecast {
+  company?: CreditSpending;
+  departments: CreditSpending[];
+}
+
+export type CompanyLifecycleState = "active" | "frozen" | "soft_deleted";
+
+export interface CompanyLifecycle {
+  company_uuid: string;
+  state: CompanyLifecycleState;
+  frozen_at?: string;
+  soft_deleted_at?: string;
+  purge_after?: string;
+  restore_used: boolean;
+}
+
 export interface ProcessingMonitoringResponse {
   queue: {
     pending: number;

@@ -14,7 +14,6 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
   const [data, setData] = useState<CreditDashboardResponse | null>(null);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
-  const [purchasing, setPurchasing] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [hiddenByManager, setHiddenByManager] = useState(false);
   const [integrationAccess, setIntegrationAccess] = useState(false);
@@ -73,12 +72,6 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
     return () => { active = false; };
   }, [scope, refresh]);
 
-  async function mockPurchase() {
-    setPurchasing(true); setError("");
-    try { await api.mockPurchaseCredits({ owner_type: scope === "personal" ? "user" : "company", owner_uuid: scope === "personal" ? undefined : scope, credits: 25_000 }); setRefresh((value) => value + 1); }
-    catch { setError("Не удалось выполнить тестовое пополнение."); }
-    finally { setPurchasing(false); }
-  }
 
   async function updateVisibility(visible: boolean) {
     if (!companyId || !data?.can_manage_visibility) return;
@@ -109,7 +102,7 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
     {data && <>
       <div className={`credit-limit-row${integrationAccess ? " has-sandbox" : ""}`}>
         <div className="credit-balance-summary"><CreditLimitRing percent={data.allowance_remaining_percent} /><div className="credit-limit-copy"><strong>{data.days_until_reset} дн. до сброса лимита</strong><small>Сброс {new Date(data.resets_at).toLocaleDateString("ru-RU")}</small><p className="credit-limit-values"><strong>{data.allowance_remaining.toLocaleString("ru-RU")}</strong><span>из {data.allowance_credits.toLocaleString("ru-RU")} кредитов</span></p></div></div>
-        <section className="credit-main-wallet credit-summary-card" aria-label="Основной кошелёк"><header><span><WalletCards size={17}/></span><div><strong>Основной кошелёк</strong><small>Купленные кредиты</small></div></header><p><strong>{data.wallet_credits === null ? "—" : data.wallet_credits.toLocaleString("ru-RU")}</strong>{data.wallet_credits !== null && <span>кредитов</span>}</p>{!companyId && <button className="ghost-button small credit-mock-purchase" type="button" disabled={purchasing} onClick={()=>void mockPurchase()}>{purchasing?"Пополняю…":"Тестово пополнить 25 000"}</button>}</section>
+        <section className="credit-main-wallet credit-summary-card" aria-label="Основной кошелёк"><header><span><WalletCards size={17}/></span><div><strong>Основной кошелёк</strong><small>Купленные кредиты</small></div></header><p><strong>{data.wallet_credits === null ? "—" : data.wallet_credits.toLocaleString("ru-RU")}</strong>{data.wallet_credits !== null && <span>кредитов</span>}</p>{!companyId && <small className="credit-wallet-note">Пополнение появится вместе с оплатой.</small>}</section>
         {forecast && <section className="credit-forecast credit-summary-card" aria-label="Прогноз расхода"><header><span><TrendingDown size={17}/></span><div><strong>Прогноз расхода</strong><small>По текущему темпу</small></div></header><dl><div><dt>Потрачено</dt><dd>{forecast.used.toLocaleString("ru-RU")}</dd></div><div><dt>В среднем за день</dt><dd>{forecast.daily.toLocaleString("ru-RU")}</dd></div><div><dt>Останется к сбросу</dt><dd>{forecast.atReset.toLocaleString("ru-RU")}</dd></div><div><dt>Лимита хватит</dt><dd>{forecast.depletion}</dd></div></dl></section>}
         {integrationAccess && <section className="credit-sandbox-wallet credit-summary-card" aria-label="Тестовый кошелёк"><header><span><FlaskConical size={17}/></span><div><strong>Тестовый кошелёк</strong><small>{sandboxWalletError ? "Не удалось загрузить баланс" : sandboxWallet?.application_name ?? "Тестовое приложение не создано"}</small></div></header><p><strong>{sandboxWalletError ? "—" : (sandboxWallet?.balance_credits ?? 0).toLocaleString("ru-RU")}</strong>{!sandboxWalletError && <span>кредитов</span>}</p><small>{sandboxWalletError ? "Обновите страницу или проверьте интеграцию" : "Не влияет на основной лимит"}</small></section>}
       </div>

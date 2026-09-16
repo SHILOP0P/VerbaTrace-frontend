@@ -8580,3 +8580,13 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   .credit-wallet-entry strong { grid-column: 3; grid-row: 1; }
   .credit-wallet-entry small { grid-column: 2 / -1; }
 }
+/* The company rows also live in a narrow side panel, where the progress column
+   took everything and left the company name at zero width. They reflow by the
+   width of the list, not of the window. */
+.company-limit-list { container-type: inline-size; }
+
+@container (max-width: 460px) {
+  .company-limit-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .company-limit-row .company-limit-progress { grid-column: 1 / -1; }
+  .company-limit-row.empty-slot { grid-template-columns: minmax(0, 1fr); }
+}

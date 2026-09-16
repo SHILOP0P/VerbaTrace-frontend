@@ -427,6 +427,10 @@
      instead and their labels spill out of the buttons. */
   .app-shell .admin-nav > button { flex: 0 0 auto; }
 
+  /* The role chip no longer fits beside the workspace title: it was cut off at
+     the right edge, so it sits under the title instead. */
+  .app-shell .company-workspace-title { align-items: flex-start; flex-direction: column; gap: 10px; }
+
   .app-shell :is(.primary-button, .ghost-button, .text-button, .report-format-button, .deep-report-format-button) {
     min-width: 0;
     max-width: 100%;

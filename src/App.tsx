@@ -773,12 +773,7 @@ function App() {
       )}
 
       {page === "reports" && (
-        <AiReportsPage
-          calls={calls}
-          analyses={analyses}
-          companies={companies}
-          departments={departments}
-        />
+        <AiReportsPage calls={calls} analyses={analyses} />
       )}
 
       {page === "contacts" && <ContactsPage />}

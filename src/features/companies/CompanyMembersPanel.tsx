@@ -2,6 +2,7 @@ import { ShieldCheck, UserMinus, UserRoundCog } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type {
+  AnalysisRerunRequest,
   CompanyMemberListItemResponse,
   DepartmentResponse,
   DepartmentTransferRequest,
@@ -37,6 +38,7 @@ export function CompanyMembersPanel({
   const [members, setMembers] = useState<CompanyMemberListItemResponse[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [transfers, setTransfers] = useState<DepartmentTransferRequest[]>([]);
+  const [reruns, setReruns] = useState<AnalysisRerunRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyUser, setBusyUser] = useState("");
   const [error, setError] = useState("");
@@ -48,14 +50,16 @@ export function CompanyMembersPanel({
   const reload = useCallback(async () => {
     setError("");
     try {
-      const [membersResponse, invitationList, transferList] = await Promise.all([
+      const [membersResponse, invitationList, transferList, rerunList] = await Promise.all([
         api.listCompanyMembers(companyId, { status: "active", limit: 100 }),
         api.listCompanyInvitations(companyId, "pending").catch(() => [] as Invitation[]),
         api.listDepartmentTransfers(companyId, "pending").catch(() => ({ items: [] as DepartmentTransferRequest[] })),
+        api.listAnalysisRerunRequests(companyId).catch(() => ({ items: [] as AnalysisRerunRequest[] })),
       ]);
       setMembers(membersResponse.members);
       setInvitations(invitationList);
       setTransfers(transferList.items);
+      setReruns(rerunList.items);
     } catch (loadError) {
       if (loadError instanceof ApiError && (loadError.status === 403 || loadError.status === 404)) {
         setVisible(false);
@@ -117,6 +121,19 @@ export function CompanyMembersPanel({
     setError("");
     try {
       await api.decideDepartmentTransfer(companyId, request.id, approve);
+      await reload();
+    } catch (decideError) {
+      setError(decideError instanceof Error ? decideError.message : "Не удалось принять решение");
+    } finally {
+      setBusyUser("");
+    }
+  }
+
+  async function decideRerun(request: AnalysisRerunRequest, approve: boolean) {
+    setBusyUser(request.id);
+    setError("");
+    try {
+      await api.decideAnalysisRerunRequest(request.id, approve);
       await reload();
     } catch (decideError) {
       setError(decideError instanceof Error ? decideError.message : "Не удалось принять решение");
@@ -246,6 +263,38 @@ export function CompanyMembersPanel({
                   type="button"
                   disabled={busyUser === invitation.id}
                   onClick={() => void decideInvitation(invitation, false)}
+                >
+                  Отклонить
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {reruns.length > 0 && (
+        <div className="company-mini-list">
+          <h3>Запросы на повторный анализ</h3>
+          {reruns.map((request) => (
+            <article className="company-mini-card" key={request.id}>
+              <div>
+                <strong>{memberName(request.requested_by_user_uuid)}</strong>
+                <small>{request.reason?.trim() || "Без пояснения"} · {formatDate(request.created_at)}</small>
+              </div>
+              <div className="panel-actions">
+                <button
+                  className="primary-button small"
+                  type="button"
+                  disabled={busyUser === request.id}
+                  onClick={() => void decideRerun(request, true)}
+                >
+                  Перезапустить
+                </button>
+                <button
+                  className="ghost-button small"
+                  type="button"
+                  disabled={busyUser === request.id}
+                  onClick={() => void decideRerun(request, false)}
                 >
                   Отклонить
                 </button>

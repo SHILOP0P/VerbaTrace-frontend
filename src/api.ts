@@ -1,5 +1,4 @@
 import type {
-  AggregateAnalysisResponse,
   AdminCapabilitiesResponse,
   AssistantCapabilities,
   AssistantDraft,
@@ -10,7 +9,6 @@ import type {
   AdminCompaniesResponse,
   AdminSubscriptionResponse,
   AdminUsersResponse,
-  AggregateReportResponse,
   AnalysisInstruction,
   AnalysisInstructionVersion,
   AnalysisPersonalization,
@@ -29,6 +27,7 @@ import type {
   CallResponse,
   CallAction,
   CallActionsResponse,
+  AnalysisRerunRequest,
   CallActionAssigneesResponse,
   CreateCallActionRequest,
   CallStatus,
@@ -42,8 +41,6 @@ import type {
   CompanyMembersResponse,
   DepartmentMemberResponse,
   CreateCallFolderRequest,
-  CreateDeepAnalysisRequest,
-  CreateAggregateReportRequest,
   CreateGlobalReportRequest,
   CreateReportRequest,
   DepartmentResponse,
@@ -52,9 +49,6 @@ import type {
   InvitationDepartmentRole,
   InvitationStatus,
   InstructionScope,
-  ListAggregateAnalysesResponse,
-  ListAggregateReportsResponse,
-  ListDeepAnalysesQuery,
   LoginRequest,
   NotificationResponse,
   NotificationsResponse,
@@ -209,30 +203,6 @@ const apiErrorMessages: Record<string, string> = {
   failed_to_delete_call_folder: "Не удалось удалить папку звонков",
   failed_to_assign_call_folder: "Не удалось добавить звонок в папку",
   failed_to_remove_call_folder: "Не удалось убрать звонок из папки",
-  invalid_deep_analysis_input: "Некорректные параметры глубокого анализа",
-  aggregate_analysis_not_found: "Глубокий анализ не найден",
-  no_analyzed_calls_for_deep_analysis:
-    "За выбранный период нет звонков с готовым анализом.",
-  deep_analysis_limit_exceeded:
-    "Лимит глубокого анализа на эту неделю исчерпан.",
-  failed_to_create_deep_analysis: "Не удалось создать глубокий анализ",
-  failed_to_list_deep_analyses: "Не удалось загрузить глубокие анализы",
-  failed_to_get_deep_analysis: "Не удалось получить глубокий анализ",
-  aggregate_report_not_found: "Отчет глубокого анализа не найден",
-  invalid_aggregate_report_input:
-    "Некорректные параметры отчета глубокого анализа",
-  invalid_aggregate_analysis_status:
-    "Отчет можно создать только после готового глубокого анализа.",
-  aggregate_report_file_not_found:
-    "Файл отчета глубокого анализа недоступен или срок хранения истек.",
-  failed_to_create_aggregate_report:
-    "Не удалось создать отчет глубокого анализа",
-  failed_to_list_aggregate_reports:
-    "Не удалось загрузить отчеты глубокого анализа",
-  failed_to_download_aggregate_report:
-    "Не удалось скачать отчет глубокого анализа",
-  failed_to_delete_aggregate_report:
-    "Не удалось удалить отчет глубокого анализа",
   quality_review_invalid_input: "Проверьте заполненные поля анализа",
   quality_review_forbidden:
     "Оспорить можно только анализ собственного корпоративного звонка",
@@ -247,6 +217,15 @@ const apiErrorMessages: Record<string, string> = {
     "Нельзя переоценивать собственный корпоративный звонок или собственную опубликованную версию",
   quality_review_limit_reached:
     "Две независимые человеческие оценки уже опубликованы. Дальнейшая переоценка недоступна",
+  analysis_rerun_forbidden:
+    "Перезапустить анализ может лидер отдела, заместитель или владелец",
+  analysis_rerun_request_not_found: "Запрос на повторный анализ не найден",
+  analysis_rerun_request_pending:
+    "Запрос на повторный анализ уже отправлен",
+  transcription_locked_by_review:
+    "Транскрипцию нельзя менять, пока идёт проверка качества",
+  quality_review_appeal_ceiling_reached:
+    "Оценку заместителя и владельца обжаловать нельзя",
   quality_review_reviewer_must_differ:
     "Повторную оценку должен выполнить другой проверяющий",
   quality_review_active_appeal_exists:
@@ -1481,7 +1460,7 @@ export const api = {
 
   mutateAdminAction(
     actionId: string,
-    operation: "complete" | "cancel" | "reschedule" | "reassign" | "reopen",
+    operation: "complete" | "cancel" | "reschedule" | "reassign",
     input: Record<string, unknown>,
   ) {
     return request<CallAction>(
@@ -1520,12 +1499,56 @@ export const api = {
   mutateAction(
     actionId: string,
     operation:
-      "start" | "complete" | "cancel" | "reschedule" | "reassign" | "reopen",
+      | "start"
+      | "complete"
+      | "cancel"
+      | "reschedule"
+      | "reassign"
+      | "revert-status",
     input: Record<string, unknown>,
   ) {
     return request<CallAction>(
       `/actions/${encodeURIComponent(actionId)}/${operation}`,
       { method: "POST", body: JSON.stringify(input) },
+    );
+  },
+
+  editAction(
+    actionId: string,
+    input: {
+      expected_lock_version: number;
+      title: string;
+      description: string;
+      reason?: string;
+    },
+  ) {
+    return request<CallAction>(`/actions/${encodeURIComponent(actionId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  },
+
+  requestAnalysisRerun(callId: string, reason = "") {
+    return request<AnalysisRerunRequest>(
+      `/calls/${encodeURIComponent(callId)}/analysis-rerun-requests`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+    );
+  },
+
+  listAnalysisRerunRequests(companyId: string, status = "pending") {
+    return request<{ items: AnalysisRerunRequest[] }>(
+      `/companies/${encodeURIComponent(companyId)}/analysis-rerun-requests${queryString({ status })}`,
+    );
+  },
+
+  decideAnalysisRerunRequest(
+    requestId: string,
+    approve: boolean,
+    comment = "",
+  ) {
+    return request<AnalysisRerunRequest>(
+      `/analysis-rerun-requests/${encodeURIComponent(requestId)}/${approve ? "approve" : "reject"}`,
+      { method: "POST", body: JSON.stringify({ comment }) },
     );
   },
 
@@ -2443,76 +2466,6 @@ export const api = {
   }) {
     return request<AnalyticsOverviewResponse>(
       `/analytics/overview${queryString(filters)}`,
-    );
-  },
-
-  createDeepAnalysis(input: CreateDeepAnalysisRequest) {
-    return request<AggregateAnalysisResponse>("/analytics/deep-analyses", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  },
-
-  listDeepAnalyses(input?: ListDeepAnalysesQuery) {
-    return request<ListAggregateAnalysesResponse>(
-      `/analytics/deep-analyses${queryString(input)}`,
-    );
-  },
-
-  getDeepAnalysis(id: string) {
-    return request<AggregateAnalysisResponse>(
-      `/analytics/deep-analyses/${encodeURIComponent(id)}`,
-    );
-  },
-
-  getDeepAnalysisEventsUrl(analysisId: string) {
-    return `${apiRoot}/analytics/deep-analyses/${encodeURIComponent(analysisId)}/events`;
-  },
-
-  createAggregateReport(analysisId: string, format: ReportFormat) {
-    const input: CreateAggregateReportRequest = { format };
-    return request<AggregateReportResponse>(
-      `/analytics/deep-analyses/${encodeURIComponent(analysisId)}/reports`,
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    );
-  },
-
-  listAggregateReports(analysisId: string) {
-    return request<ListAggregateReportsResponse>(
-      `/analytics/deep-analyses/${encodeURIComponent(analysisId)}/reports`,
-    );
-  },
-
-  downloadAggregateReport(report: AggregateReportResponse) {
-    if (report.status !== "ready") {
-      throw new ApiError(
-        409,
-        "Отчет глубокого анализа еще формируется",
-        "report_not_ready",
-      );
-    }
-
-    if (report.download_url) {
-      const downloadUrl = report.download_url;
-      if (/^https?:\/\//i.test(downloadUrl) || downloadUrl.startsWith("/")) {
-        return requestAssetBlob(absoluteApiAssetUrl(downloadUrl));
-      }
-
-      return requestBlob(apiPathFromUrl(downloadUrl));
-    }
-
-    return requestBlob(
-      `/analytics/deep-analysis-reports/${encodeURIComponent(report.id)}/download`,
-    );
-  },
-
-  deleteAggregateReport(reportId: string) {
-    return request<void>(
-      `/analytics/deep-analysis-reports/${encodeURIComponent(reportId)}`,
-      { method: "DELETE" },
     );
   },
 

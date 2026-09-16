@@ -32,7 +32,7 @@ import type {
   TranscriptionSpeakerAssignment
   , TranscriptionRevisionSummary
 } from "../../types";
-import { api } from "../../api";
+import { ApiError, api } from "../../api";
 
 import { analysisProgress, analysisNextStep, analysisScore100, formatScore, isAnalysisDone } from "../../shared/lib/analysis";
 import { contextLabel, formatDate, formatDuration } from "../../shared/lib/formatters";
@@ -104,6 +104,8 @@ export function CallDetailPanel({
   const [deleting, setDeleting] = useState(false);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisRunError, setAnalysisRunError] = useState("");
+  const [rerunRequestOpen, setRerunRequestOpen] = useState(false);
+  const [rerunReason, setRerunReason] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [folderMenuOpen, setFolderMenuOpen] = useState(false);
   const [activeWordIndex, setActiveWordIndex] = useState(-1);
@@ -209,7 +211,29 @@ export function CallDetailPanel({
       const result = await api.analyzeCall(call.id);
       onAnalysisReady?.(call.id, result);
     } catch (cause) {
+      // Re-running the analysis of a company call belongs to the leader, the
+      // deputy and the owner. An employee sends them a request instead.
+      if (cause instanceof ApiError && cause.code === "analysis_rerun_forbidden") {
+        setRerunRequestOpen(true);
+        setAnalysisRunError("");
+        return;
+      }
       setAnalysisRunError(cause instanceof Error ? cause.message : "Не удалось запустить анализ");
+    } finally {
+      setAnalysisBusy(false);
+    }
+  }
+
+  async function requestAnalysisRerun() {
+    if (!call || analysisBusy) return;
+    setAnalysisBusy(true);
+    try {
+      await api.requestAnalysisRerun(call.id, rerunReason.trim());
+      setRerunRequestOpen(false);
+      setRerunReason("");
+      setAnalysisRunError("Запрос на повторный анализ отправлен руководителю.");
+    } catch (cause) {
+      setAnalysisRunError(cause instanceof Error ? cause.message : "Не удалось отправить запрос");
     } finally {
       setAnalysisBusy(false);
     }
@@ -641,7 +665,7 @@ export function CallDetailPanel({
         }}
         onConfirm={() => void deleteSelectedCall()}
       />
-      {challengeOpen && createPortal(<div className="quality-challenge-backdrop" role="presentation" onMouseDown={() => !qualityReviewBusy && setChallengeOpen(false)}><section className="quality-challenge-dialog" role="dialog" aria-modal="true" aria-labelledby="quality-challenge-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Пересмотр анализа</span><h2 id="quality-challenge-title">Что вас не устроило?</h2><p>Опишите, с какими выводами, оценками или формулировками ИИ вы не согласны. Сообщение увидит специалист по проверке качества.</p><label><span>Сопроводительное сообщение</span><textarea autoFocus maxLength={5000} value={challengeReason} placeholder="Например: в анализе неверно указано, что я не уточнил следующий шаг…" onChange={(event) => setChallengeReason(event.target.value)} /><small>{challengeReason.trim().length}/5000 · минимум 10 символов</small></label><div className="quality-challenge-dialog-actions"><button className="ghost-button" type="button" disabled={qualityReviewBusy} onClick={() => setChallengeOpen(false)}>Отмена</button><button className="primary-button" type="button" disabled={qualityReviewBusy || challengeReason.trim().length < 10} onClick={() => void challengeAnalysis()}>{qualityReviewBusy ? "Отправляю…" : "Отправить на пересмотр"}</button></div></section></div>, document.body)}
+      {rerunRequestOpen && createPortal(<div className="quality-challenge-backdrop" role="presentation" onMouseDown={() => !analysisBusy && setRerunRequestOpen(false)}><section className="quality-challenge-dialog" role="dialog" aria-modal="true" aria-labelledby="analysis-rerun-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Повторный анализ</span><h2 id="analysis-rerun-title">Нужен запрос руководителю</h2><p>Перезапустить анализ звонка компании может лидер отдела, заместитель или владелец. Опишите, почему анализ стоит сделать заново — запрос увидят они.</p><label><span>Причина</span><textarea autoFocus maxLength={2000} value={rerunReason} placeholder="Например: транскрипция была исправлена, выводы устарели" onChange={(event) => setRerunReason(event.target.value)} /></label><div className="quality-challenge-dialog-actions"><button className="ghost-button" type="button" disabled={analysisBusy} onClick={() => setRerunRequestOpen(false)}>Отмена</button><button className="primary-button" type="button" disabled={analysisBusy} onClick={() => void requestAnalysisRerun()}>{analysisBusy ? "Отправляю…" : "Отправить запрос"}</button></div></section></div>, document.body)}      {challengeOpen && createPortal(<div className="quality-challenge-backdrop" role="presentation" onMouseDown={() => !qualityReviewBusy && setChallengeOpen(false)}><section className="quality-challenge-dialog" role="dialog" aria-modal="true" aria-labelledby="quality-challenge-title" onMouseDown={(event) => event.stopPropagation()}><span className="eyebrow">Пересмотр анализа</span><h2 id="quality-challenge-title">Что вас не устроило?</h2><p>Опишите, с какими выводами, оценками или формулировками ИИ вы не согласны. Сообщение увидит специалист по проверке качества.</p><label><span>Сопроводительное сообщение</span><textarea autoFocus maxLength={5000} value={challengeReason} placeholder="Например: в анализе неверно указано, что я не уточнил следующий шаг…" onChange={(event) => setChallengeReason(event.target.value)} /><small>{challengeReason.trim().length}/5000 · минимум 10 символов</small></label><div className="quality-challenge-dialog-actions"><button className="ghost-button" type="button" disabled={qualityReviewBusy} onClick={() => setChallengeOpen(false)}>Отмена</button><button className="primary-button" type="button" disabled={qualityReviewBusy || challengeReason.trim().length < 10} onClick={() => void challengeAnalysis()}>{qualityReviewBusy ? "Отправляю…" : "Отправить на пересмотр"}</button></div></section></div>, document.body)}
     </>
   );
 }

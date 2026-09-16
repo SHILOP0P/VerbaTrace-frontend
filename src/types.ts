@@ -181,10 +181,6 @@ export type LostReason =
   | "unclear";
 export type SignalLevel = "high" | "medium" | "low" | "unclear";
 export type AnalysisConfidence = "low" | "medium" | "high";
-export type DeepAnalysisScope = VisibilityScope | "folder";
-export type AggregateAnalysisStatus =
-  "pending" | "processing" | "done" | "failed";
-
 export interface UserResponse {
   id: string;
   email: string;
@@ -842,7 +838,6 @@ export interface CreditActivityDay {
   credits: number;
   transcription: number;
   analysis: number;
-  deep_analysis: number;
   calls: number;
 }
 
@@ -1289,247 +1284,22 @@ export interface AssignCallToFolderRequest {
   call_uuid: string;
 }
 
-export interface CreateDeepAnalysisRequest {
-  scope: DeepAnalysisScope;
-  company_uuid?: string | null;
-  department_uuid?: string | null;
-  folder_uuid?: string | null;
-  period_from: string;
-  period_to: string;
-  force: boolean;
-}
+export type AnalysisRerunRequestStatus =
+  "pending" | "approved" | "rejected" | "canceled";
 
-export type AggregateSeverity = "low" | "medium" | "high" | string;
-export type AggregatePriority = "low" | "medium" | "high" | string;
-export type AggregateConfidence = "low" | "medium" | "high" | string;
-
-/**
- * Deep-analysis JSON is generated asynchronously and may contain older result
- * versions. Optional fields deliberately keep the renderer tolerant of partial
- * historical payloads.
- */
-export interface AggregateSourceSummary {
-  analyzed_calls?: number;
-  included_in_statistics?: number;
-  representative_calls?: number;
-  all_analyzed_calls_used?: boolean;
-  source_set_hash?: string;
-}
-
-export interface AggregateFrequency {
-  code?: string;
-  title?: string;
-  count?: number;
-  share?: number;
-  sample_call_uuids?: string[];
-}
-
-export interface AggregateScoreSummary {
-  calls_with_score?: number;
-  average?: number | null;
-  min?: number | null;
-  max?: number | null;
-  low_count?: number;
-  medium_count?: number;
-  high_count?: number;
-}
-
-export interface AggregateCriterionMetric {
-  code?: string;
-  title?: string;
-  applicable_calls?: number;
-  weak_calls?: number;
-  weak_share?: number;
-  average_points_share?: number | null;
-  missed_calls?: number;
-  partially_met_calls?: number;
-  unclear_calls?: number;
-  sample_call_uuids?: string[];
-}
-
-export interface AggregateNextStepSummary {
-  calls_with_next_step?: number;
-  calls_with_specific_next_step?: number;
-  calls_missing_next_step?: number;
-  calls_missing_specific_step?: number;
-  missing_next_step_share?: number;
-  missing_specific_step_share?: number;
-}
-
-export interface AggregateCallEvidence {
-  call_uuid?: string;
-  created_at?: string;
-  title?: string;
-  score?: number | null;
-  summary?: string;
-  issue_codes?: string[];
-}
-
-export interface AggregateStatistics {
-  score_summary?: AggregateScoreSummary;
-  issue_coverage?: AggregateFrequency[];
-  weak_criteria?: AggregateCriterionMetric[];
-  business_outcomes?: AggregateFrequency[];
-  lost_reasons?: AggregateFrequency[];
-  customer_objections?: AggregateFrequency[];
-  risks?: AggregateFrequency[];
-  topics?: AggregateFrequency[];
-  next_step_summary?: AggregateNextStepSummary;
-  attention_calls?: AggregateCallEvidence[];
-  strong_calls?: AggregateCallEvidence[];
-}
-
-export interface AggregateFinding {
-  title?: string;
-  description?: string;
-  severity?: AggregateSeverity;
-  evidence_call_uuids?: string[];
-  affected_calls_count?: number;
-  affected_share?: number;
-}
-
-export interface AggregateRecurringIssue {
-  code?: string;
-  title?: string;
-  count?: number;
-  recommendation?: string;
-  affected_share?: number;
-  sample_call_uuids?: string[];
-}
-
-export interface AggregateIssueDetail {
-  code?: string;
-  title?: string;
-  description?: string;
-  affected_calls_count?: number;
-  affected_share?: number;
-  severity?: AggregateSeverity;
-  evidence_call_uuids?: string[];
-  sample_call_uuids?: string[];
-  recommendation?: string;
-  business_impact?: string;
-  reason?: string;
-  count?: number;
-}
-
-export interface AggregateMetricDetail {
-  code?: string;
-  title?: string;
-  affected_calls_count?: number;
-  affected_share?: number;
-  explanation?: string;
-  recommendation?: string;
-  evidence_call_uuids?: string[];
-}
-
-export interface AggregatePriorityAction {
-  title?: string;
-  priority?: AggregatePriority;
-  expected_effect?: string;
-}
-
-export interface AggregateDetailedReport {
-  methodology?: string;
-  quality_overview?: string;
-  issue_analysis?: string;
-  customer_loss_analysis?: string;
-  training_plan?: string;
-  data_limitations?: string;
-}
-
-export interface AggregateAnalysisResult {
-  summary: string;
-  aggregate_schema_version?: number;
-  executive_summary?: string;
-  overall_assessment?: string;
-  source_summary?: AggregateSourceSummary;
-  aggregate_statistics?: AggregateStatistics;
-  coverage_note?: string;
-  key_findings: AggregateFinding[];
-  recurring_issues: AggregateRecurringIssue[];
-  systemic_issues?: AggregateIssueDetail[];
-  single_call_observations?: AggregateIssueDetail[];
-  weak_criteria?: AggregateMetricDetail[];
-  client_objections?: AggregateMetricDetail[];
-  loss_and_risk_patterns?: AggregateIssueDetail[];
-  strengths: string[];
-  risks: string[];
-  priority_actions: AggregatePriorityAction[];
-  manager_recommendations: string[];
-  confidence: AggregateConfidence;
-  detailed_report?: AggregateDetailedReport;
-}
-
-export interface AggregateAnalysisResponse {
+export interface AnalysisRerunRequest {
   id: string;
-  scope: DeepAnalysisScope | string;
-  user_uuid?: string | null;
-  company_uuid: string | null;
-  department_uuid: string | null;
-  folder_uuid: string | null;
-  period_from: string;
-  period_to: string;
-  status: AggregateAnalysisStatus | string;
-  provider: string;
-  model: string | null;
-  source_calls_count: number;
-  result_json:
-    AggregateAnalysisResult | Record<string, unknown> | unknown[] | null;
-  result_text: string | null;
-  error_message: string | null;
-  created_by_user_uuid: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AggregateAnalysisStatusEvent {
-  analysis_id: string;
-  status: AggregateAnalysisStatus | string;
-  terminal: boolean;
-  timestamp: string;
-}
-
-export interface ListAggregateAnalysesResponse {
-  items: AggregateAnalysisResponse[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-export interface ListDeepAnalysesQuery {
-  scope?: DeepAnalysisScope;
-  company_uuid?: string;
+  call_uuid: string;
+  company_uuid: string;
   department_uuid?: string;
-  folder_uuid?: string;
-  from?: string;
-  to?: string;
-  status?: AggregateAnalysisStatus;
-  limit?: number;
-  offset?: number;
-}
-
-export interface CreateAggregateReportRequest {
-  format: ReportFormat;
-}
-
-export interface AggregateReportResponse {
-  id: string;
-  aggregate_analysis_uuid: string;
   requested_by_user_uuid: string;
-  format: ReportFormat | string;
-  status: ReportStatus | string;
-  file_name: string;
-  content_type: string;
-  size_bytes: number;
-  error_message: string | null;
-  download_url: string | null;
+  reason?: string;
+  status: AnalysisRerunRequestStatus;
+  decided_by_user_uuid?: string;
+  decided_at?: string;
+  comment?: string;
   created_at: string;
   updated_at: string;
-  expires_at: string;
-}
-
-export interface ListAggregateReportsResponse {
-  reports: AggregateReportResponse[];
 }
 
 export interface ProcessingMonitoringResponse {
@@ -1624,7 +1394,8 @@ export interface CallActionCapabilities {
   can_reassign: boolean;
   can_request_transfer: boolean;
   can_resolve_transfer: boolean;
-  can_reopen: boolean;
+  can_edit_fields: boolean;
+  can_revert_status: boolean;
 }
 export interface CallAction {
   id: string;

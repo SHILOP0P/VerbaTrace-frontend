@@ -416,12 +416,11 @@
   ) { max-width: 100%; }
 
   /* A mini card that carries buttons has to stack: side by side the actions get
-     squeezed into a column of single letters. */
-  .app-shell .company-mini-card:has(.panel-actions) { align-items: stretch; flex-direction: column; }
+     squeezed into a column of single letters. Written without :has() so it also
+     works in older browsers. */
+  .app-shell .company-mini-card { flex-wrap: wrap; }
+  .app-shell .company-mini-card > .panel-actions { width: 100%; }
 
-  /* The indent that lines this button up with the text next to it on a desktop
-     pushes it past the card once the button spans the full width. */
-  .app-shell .next-step-actions .no-action-button { margin-left: 0; }
 
   /* The admin tabs turn into a scrolling row here; without this they shrink
      instead and their labels spill out of the buttons. */

@@ -8492,9 +8492,11 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
 }
 
 /* Two columns of company panels only work once the workspace is wide: below
-   this the member rows had to stack their buttons one per line. */
+   this the member rows had to stack their buttons one per line, and the
+   summary panel squeezed its heading to a single letter per line. */
 @media (max-width: 1180px) {
-  .app-shell .company-workspace-grid {
+  .app-shell .company-workspace-grid,
+  .app-shell .company-summary-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -8570,26 +8572,38 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   margin: 0;
 }
 /* The wallet history also appears inside the narrow company column, where the
-   five column row left the description at zero width, one letter per line. The
-   row reflows by the width of the list itself, not of the window. */
-.credit-wallet-entry-list { container-type: inline-size; }
-
-@container (max-width: 520px) {
-  .credit-wallet-entry { grid-template-columns: 32px minmax(0, 1fr) auto; }
-  .credit-wallet-entry time { grid-column: 2; }
-  .credit-wallet-entry strong { grid-column: 3; grid-row: 1; }
-  .credit-wallet-entry small { grid-column: 2 / -1; }
+   five column row left the description at zero width, one letter per line.
+   A wrapping row needs no container query: the description keeps its place
+   while it has room and drops to a second line as soon as it does not. */
+.credit-wallet-entry {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 2px;
 }
+
+.credit-wallet-entry > .credit-wallet-entry-icon { flex: 0 0 32px; }
+.credit-wallet-entry > time { flex: 0 0 auto; min-width: 112px; }
+.credit-wallet-entry > strong { flex: 0 0 auto; min-width: 72px; }
+.credit-wallet-entry > small { flex: 1 1 220px; min-width: 0; }
 /* The company rows also live in a narrow side panel, where the progress column
-   took everything and left the company name at zero width. They reflow by the
-   width of the list, not of the window. */
-.company-limit-list { container-type: inline-size; }
-
-@container (max-width: 460px) {
-  .company-limit-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .company-limit-row .company-limit-progress { grid-column: 1 / -1; }
-  .company-limit-row.empty-slot { grid-template-columns: minmax(0, 1fr); }
+   took everything and left the company name at zero width. Wrapping flex rows
+   reflow in any column width without a container query. */
+.company-limit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 14px;
 }
+
+.company-limit-row > .company-limit-main { flex: 1 1 190px; min-width: 0; }
+.company-limit-row > .company-limit-progress { flex: 1 1 190px; min-width: 0; }
+.company-limit-row > :last-child { flex: 0 0 auto; }
+/* The free slot pairs a description with a create form. Side by side one of
+   them always ended up cramped or wrapped away, leaving a hole next to the
+   text, so the form simply sits under the description. */
+.company-limit-row.empty-slot { align-items: stretch; flex-direction: column; }
+.company-limit-row.empty-slot > * { flex: 0 0 auto; min-width: 0; }
+.company-limit-row.empty-slot small { overflow: visible; white-space: normal; text-overflow: clip; }
 /* The QA row keeps three fixed minimums (150 + 240 + 190), which is wider than
    the workspace on a tablet: the whole page then overflowed to the right. The
    later unprefixed rule was winning over the media query meant to handle it. */

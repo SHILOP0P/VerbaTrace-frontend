@@ -1020,7 +1020,7 @@ html[data-theme="dark"] .app-shell .applied-instructions-card,html[data-theme="d
 }
 
 .step-icon.is-complete { color: #74d67a; background: color-mix(in srgb, #42b84b 18%, transparent); border-color: color-mix(in srgb, #42b84b 42%, var(--app-border)); }
-.next-step-actions .no-action-button { margin-left: 28px; }
+/* No indent: the actions stack into one column, where it pushed the button past the card. */
 .date-time-picker { position: relative; min-width: 0; }
 .date-time-picker-value { position: absolute; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; opacity: 0; pointer-events: none; }
 .date-time-trigger { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 9px; width: 100%; min-height: 46px; padding: 10px 12px; color: var(--app-text); font: inherit; text-align: left; background: var(--app-panel-soft); border: 1px solid var(--app-border); border-radius: 12px; cursor: pointer; }

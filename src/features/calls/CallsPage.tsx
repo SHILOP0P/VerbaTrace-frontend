@@ -49,6 +49,7 @@ import { CallListSkeleton } from "../../shared/ui/loading";
 import { SelectControl } from "../../shared/ui/primitives";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { MobileCallDrawerTrigger } from "../../shared/ui/mobile-call-drawer-trigger";
+import { CallsBinPanel } from "./CallsBinPanel";
 import { CallDetailPanel } from "./CallDetailPanel";
 import {
   callSearchText,
@@ -181,6 +182,8 @@ export function CallsPage({
   const [processingErrorOnly, setProcessingErrorOnly] = useState(initialURLFilters.processingError);
   const [sortFilter, setSortFilter] = useState<"occurred_at" | "created_at" | "duration">(initialURLFilters.sort);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialURLFilters.order);
+  // Bumped after a restore so the list picks the call back up.
+  const [restoredCallsToken, setRestoredCallsToken] = useState(0);
   const [serverCalls, setServerCalls] = useState<CallResponse[] | null>(null);
   const [nextCallsCursor, setNextCallsCursor] = useState<string | null>(null);
   const [loadingMoreCalls, setLoadingMoreCalls] = useState(false);
@@ -997,7 +1000,7 @@ export function CallsPage({
 	  controller.abort();
       window.clearTimeout(timer);
     };
-  }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, callsRefreshKey]);
+  }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, callsRefreshKey, restoredCallsToken]);
 
   function renderSidebarCallRow(call: CallResponse, folderId?: string) {
     const selected = selectedCallId === call.id;
@@ -1086,7 +1089,7 @@ export function CallsPage({
       }
       : {
         title: "Удалить звонок?",
-        message: `Звонок «${pendingDelete.call.title}» будет удален без возможности восстановления.`
+        message: `Звонок «${pendingDelete.call.title}» попадёт в корзину на 30 дней. После этого запись и файлы удаляются безвозвратно.`
       }
     : null;
   const pendingDeleteBusy = pendingDelete
@@ -1318,6 +1321,12 @@ export function CallsPage({
             )}
           </div>
         </section>
+        <CallsBinPanel
+          onRestored={() => {
+            setRestoredCallsToken((value) => value + 1);
+            void refreshFolders();
+          }}
+        />
         <p className="muted-title">Без папки</p>
         <div className="call-list">
           {(loading || filtersLoading || folderCallsLoading) && <CallListSkeleton count={4} />}

@@ -33,6 +33,7 @@ import type {
   CreateCallActionRequest,
   CallStatus,
   CallsListResponse,
+  DeletedCallsListResponse,
   CompanyResponse,
   CreditDashboardResponse,
   CreatedIntegrationKey,
@@ -1317,6 +1318,19 @@ export const api = {
     return request<void>(`/calls/${encodeURIComponent(callId)}`, {
       method: "DELETE",
     });
+  },
+
+  listDeletedCalls(input?: { limit?: number; offset?: number }) {
+    return request<DeletedCallsListResponse>(
+      `/calls-bin${queryString({ limit: input?.limit, offset: input?.offset })}`,
+    );
+  },
+
+  restoreCall(callId: string) {
+    return request<CallResponse>(
+      `/calls/${encodeURIComponent(callId)}/restore`,
+      { method: "POST" },
+    );
   },
 
   listAppliedInstructions(analysisId: string) {

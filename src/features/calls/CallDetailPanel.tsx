@@ -633,7 +633,7 @@ export function CallDetailPanel({
         open={deleteConfirmOpen}
         variant="danger"
         title="Удалить звонок?"
-        message={`Звонок «${call.title}» будет удален без возможности восстановления.`}
+        message={`Звонок «${call.title}» попадёт в корзину на 30 дней. После этого запись и файлы удаляются безвозвратно.`}
         confirmLabel="Удалить"
         busy={deleting}
         onCancel={() => {

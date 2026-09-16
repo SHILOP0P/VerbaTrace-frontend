@@ -367,6 +367,20 @@ export interface CallsListResponse {
   next_cursor?: string;
 }
 
+export interface DeletedCallResponse {
+  call: CallResponse;
+  deleted_at: string;
+  purge_after: string;
+  deleted_by_user_uuid?: string;
+}
+
+export interface DeletedCallsListResponse {
+  items: DeletedCallResponse[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface CallFilterOptionsResponse {
   statuses: string[];
   scopes: string[];

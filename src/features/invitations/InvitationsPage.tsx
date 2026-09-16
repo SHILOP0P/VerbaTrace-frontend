@@ -8,7 +8,7 @@ import {
   X
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import type {
   CompanyResponse,
   DepartmentResponse,
@@ -18,6 +18,7 @@ import type {
 } from "../../types";
 
 import { formatDate, invitationRoleLabel } from "../../shared/lib/formatters";
+import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { CallListSkeleton } from "../../shared/ui/loading";
 import { SelectControl } from "../../shared/ui/primitives";
 
@@ -112,18 +113,27 @@ export function InvitationCard({
 }) {
   const [busyAction, setBusyAction] = useState<"accept" | "decline" | null>(null);
   const [error, setError] = useState("");
+  const [transferPrompt, setTransferPrompt] = useState("");
 
   const companyName = companies.find((company) => company.id === invitation.company_uuid)?.name;
   const departmentName = departments.find((department) => department.id === invitation.department_uuid)?.name;
   const isDepartmentInvitation = Boolean(invitation.department_uuid);
 
-  async function acceptInvitation() {
+  async function acceptInvitation(confirmTransfer = false) {
     setError("");
     setBusyAction("accept");
     try {
-      const accepted = await api.acceptInvitation(invitation.id);
+      const accepted = await api.acceptInvitation(invitation.id, confirmTransfer);
+      setTransferPrompt("");
       await onAccepted(accepted);
     } catch (acceptError) {
+      // Joining a new company means leaving the current one, so the move is
+      // confirmed explicitly instead of happening behind the user's back.
+      if (acceptError instanceof ApiError && acceptError.code === "company_membership_conflict") {
+        const current = (acceptError.details?.current_company_name as string) || "текущей компании";
+        setTransferPrompt(current);
+        return;
+      }
       setError(acceptError instanceof Error ? acceptError.message : "Не удалось принять приглашение");
     } finally {
       setBusyAction(null);
@@ -162,7 +172,7 @@ export function InvitationCard({
         {error && <div className="form-error">{error}</div>}
       </div>
       <div className="invitation-actions">
-        <button className="primary-button small" onClick={acceptInvitation} disabled={Boolean(busyAction)}>
+        <button className="primary-button small" onClick={() => void acceptInvitation()} disabled={Boolean(busyAction)}>
           <Check size={16} />
           {busyAction === "accept" ? "Принимаю..." : "Принять"}
         </button>
@@ -171,6 +181,17 @@ export function InvitationCard({
           {busyAction === "decline" ? "Отклоняю..." : "Отклонить"}
         </button>
       </div>
+      <ConfirmDialog
+        open={Boolean(transferPrompt)}
+        title="Перейти в другую компанию?"
+        message={`Вы сейчас работаете в компании «${transferPrompt}». Если продолжить, вы покинете её и потеряете доступ к её звонкам, отделам и инструкциям.`}
+        confirmLabel="Перейти"
+        cancelLabel="Остаться"
+        variant="danger"
+        busy={busyAction === "accept"}
+        onCancel={() => setTransferPrompt("")}
+        onConfirm={() => void acceptInvitation(true)}
+      />
     </article>
   );
 }
@@ -198,6 +219,8 @@ export function InvitationCreatePanel({
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [engagedPrompt, setEngagedPrompt] = useState(false);
+  const [transferTarget, setTransferTarget] = useState("");
   const availableDepartments = departments.filter((department) => department.company_uuid === companyId && (!allowedDepartmentIds || allowedDepartmentIds.includes(department.id)));
   const selectedCompany = companies.find((company) => company.id === companyId);
   const canInviteDepartmentLeader = selectedCompany?.manager_user_uuid === session.user.id;
@@ -224,6 +247,27 @@ export function InvitationCreatePanel({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await sendInvitation();
+  }
+
+  async function requestTransfer() {
+    if (!transferTarget || !companyId || !departmentId) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.requestDepartmentTransfer(companyId, departmentId, transferTarget);
+      setTransferTarget("");
+      setSuccess("Запрос на перевод отправлен заместителю.");
+      setUsername("");
+    } catch (transferError) {
+      setError(transferError instanceof Error ? transferError.message : "Не удалось отправить запрос на перевод");
+      setTransferTarget("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendInvitation(acknowledge = false) {
     setError("");
     setSuccess("");
 
@@ -246,12 +290,30 @@ export function InvitationCreatePanel({
     try {
       const created =
         mode === "company"
-          ? await api.createCompanyInvitation(companyId, username.trim())
-          : await api.createDepartmentInvitation(companyId, departmentId, username.trim(), departmentRole);
+          ? await api.createCompanyInvitation(companyId, username.trim(), acknowledge)
+          : await api.createDepartmentInvitation(companyId, departmentId, username.trim(), departmentRole, acknowledge);
       onInvitationCreated(created);
-      setSuccess("Приглашение отправлено.");
+      setEngagedPrompt(false);
+      setSuccess(
+        created.approval_status === "pending"
+          ? "Приглашение отправлено на одобрение заместителю."
+          : "Приглашение отправлено."
+      );
       setUsername("");
     } catch (createError) {
+      // The person already works somewhere, so inviting them is a move and the
+      // sender confirms it first.
+      if (createError instanceof ApiError && createError.code === "target_already_engaged") {
+        setEngagedPrompt(true);
+        return;
+      }
+      // A leader cannot take a colleague from another department: that move is
+      // a request addressed to the deputy.
+      if (createError instanceof ApiError && createError.code === "department_transfer_required") {
+        const userId = createError.details?.user_uuid;
+        setTransferTarget(typeof userId === "string" ? userId : "");
+        return;
+      }
       setError(createError instanceof Error ? createError.message : "Не удалось отправить приглашение");
     } finally {
       setBusy(false);
@@ -326,6 +388,26 @@ export function InvitationCreatePanel({
         <Plus size={18} />
         {busy ? "Отправляю..." : "Отправить приглашение"}
       </button>
+      <ConfirmDialog
+        open={engagedPrompt}
+        title="Пользователь уже состоит в компании"
+        message="Этот человек уже работает в компании или отделе. Если он примет приглашение, он покинет прежнее место. Точно отправить приглашение?"
+        confirmLabel="Отправить"
+        cancelLabel="Отмена"
+        busy={busy}
+        onCancel={() => setEngagedPrompt(false)}
+        onConfirm={() => void sendInvitation(true)}
+      />
+      <ConfirmDialog
+        open={Boolean(transferTarget)}
+        title="Сотрудник уже в другом отделе"
+        message="Забрать сотрудника из другого отдела может только владелец компании или его заместитель. Отправить им запрос на перевод?"
+        confirmLabel="Отправить запрос"
+        cancelLabel="Отмена"
+        busy={busy}
+        onCancel={() => setTransferTarget("")}
+        onConfirm={() => void requestTransfer()}
+      />
     </form>
   );
 }

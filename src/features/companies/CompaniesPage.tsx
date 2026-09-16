@@ -27,6 +27,8 @@ import { departmentRoleText, formatDate, membershipStatusText } from "../../shar
 import { CallListSkeleton } from "../../shared/ui/loading";
 import { ProfileField, SelectControl } from "../../shared/ui/primitives";
 import { InvitationCreatePanel } from "../invitations/InvitationsPage";
+import { CompanyMembersPanel } from "./CompanyMembersPanel";
+import { OwnershipOffersPanel } from "./OwnershipOffersPanel";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { AnalysisPersonalizationCard } from "../analysis-context/AnalysisPersonalizationCard";
 import { CreditUsagePanel } from "../tariffs/CreditUsagePanel";
@@ -169,6 +171,8 @@ export function CompaniesPage({
           <ProfileField label="Подписка" value="По компаниям" />
         </div>
       </section>
+
+      <OwnershipOffersPanel companies={companies} onOwnershipAccepted={() => window.location.reload()} />
 
       <div className="company-limits-grid">
         <section className="company-list-panel glass-panel">
@@ -512,6 +516,14 @@ export function CompanyWorkspace({
           )}
         </section>
 
+        {/* The panel hides itself for members who do not run the company. */}
+        <CompanyMembersPanel
+          companyId={company.id}
+          departments={departments}
+          session={session}
+          isOwner={isManager}
+        />
+
         {canInvite ? (
           <InvitationCreatePanel
             companies={[company]}
@@ -797,7 +809,6 @@ export function DepartmentMemberRow({
             disabled={busy}
           >
             <option value="active">Активен</option>
-            <option value="suspended">Приостановлен</option>
             <option value="left">Покинул отдел</option>
           </SelectControl>
         </>

@@ -43,9 +43,9 @@ export interface AnalysisPersonalization {
 }
 export type InvitationStatus =
   "pending" | "accepted" | "declined" | "canceled" | "expired";
-export type CompanyRole = "employee";
+export type CompanyRole = "employee" | "company_deputy" | "company_manager";
 export type DepartmentRole = "employee" | "department_leader";
-export type MembershipStatus = "active" | "suspended" | "left";
+export type MembershipStatus = "active" | "left";
 export type InvitationCompanyRole = CompanyRole;
 export type InvitationDepartmentRole = DepartmentRole;
 export type PlanType = "personal" | "business";
@@ -304,11 +304,13 @@ export interface UserPreferencesResponse {
   active_company_uuid: string | null;
   theme: "system" | "light" | "dark";
   date_range: PreferencesDateRange;
+  invitations_muted?: boolean;
 }
 
 export interface UpdatePreferencesRequest {
   active_company_uuid?: string | null;
   theme?: "system" | "light" | "dark";
+  invitations_muted?: boolean;
   date_range?: PreferencesDateRange;
 }
 
@@ -738,10 +740,37 @@ export interface Invitation {
   company_role: CompanyRole;
   department_role: DepartmentRole | null;
   status: InvitationStatus;
+  approval_status?: "not_required" | "pending" | "approved" | "rejected";
   expires_at: string;
   responded_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DepartmentTransferRequest {
+  id: string;
+  company_uuid: string;
+  user_uuid: string;
+  from_department_uuid: string | null;
+  to_department_uuid: string;
+  requested_by_user_uuid: string;
+  reason?: string | null;
+  status: "pending" | "approved" | "rejected" | "canceled" | "expired";
+  decided_by_user_uuid?: string | null;
+  decision_comment?: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface CompanyOwnershipTransfer {
+  id: string;
+  company_uuid: string;
+  from_user_uuid: string;
+  to_user_uuid: string;
+  status: "pending" | "accepted" | "declined" | "canceled" | "expired";
+  reason?: string | null;
+  created_at: string;
+  expires_at: string;
 }
 
 export interface AnalysisInstruction {

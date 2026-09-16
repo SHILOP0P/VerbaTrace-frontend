@@ -96,8 +96,7 @@ export function departmentRoleText(role: InvitationDepartmentRole) {
 
 export function membershipStatusText(status: MembershipStatus) {
   if (status === "active") return "Активен";
-  if (status === "suspended") return "Приостановлен";
-  return "Покинул отдел";
+  return "Покинул компанию";
 }
 
 export function speakerLabel(speaker: string) {

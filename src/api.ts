@@ -24,6 +24,8 @@ import type {
   CallFilterOptionsResponse,
   CallFoldersListResponse,
   CallFolderResponse,
+  CompanyOwnershipTransfer,
+  DepartmentTransferRequest,
   CallResponse,
   CallAction,
   CallActionsResponse,
@@ -2035,8 +2037,8 @@ export const api = {
   listCompanyMembers(
     companyId: string,
     filters?: {
-      status?: "active" | "suspended" | "left";
-      role?: "employee" | "company_manager" | "department_leader";
+      status?: "active" | "left";
+      role?: "employee" | "company_manager" | "company_deputy" | "department_leader";
       department_uuid?: string;
       q?: string;
       limit?: number;
@@ -2048,16 +2050,111 @@ export const api = {
     );
   },
 
-  updateCompanyMemberStatus(
+  removeCompanyMember(companyId: string, userId: string, reason?: string) {
+    return request<CompanyMemberListItemResponse>(
+      `/companies/${encodeURIComponent(companyId)}/members/${encodeURIComponent(userId)}`,
+      {
+        method: "DELETE",
+        body: JSON.stringify({ reason: reason ?? "" }),
+      },
+    );
+  },
+
+  updateCompanyMemberRole(
     companyId: string,
     userId: string,
-    status: "active" | "suspended" | "left",
+    role: "employee" | "company_deputy",
   ) {
     return request<CompanyMemberListItemResponse>(
-      `/companies/${encodeURIComponent(companyId)}/members/${encodeURIComponent(userId)}/status`,
+      `/companies/${encodeURIComponent(companyId)}/members/${encodeURIComponent(userId)}/role`,
       {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ role }),
+      },
+    );
+  },
+
+  offerCompanyOwnership(companyId: string, userId: string, reason?: string) {
+    return request<CompanyOwnershipTransfer>(
+      `/companies/${encodeURIComponent(companyId)}/ownership-transfers`,
+      {
+        method: "POST",
+        body: JSON.stringify({ user_uuid: userId, reason: reason ?? "" }),
+      },
+    );
+  },
+
+  listIncomingOwnershipTransfers() {
+    return request<{ items: CompanyOwnershipTransfer[] }>(
+      "/ownership-transfers/incoming",
+    );
+  },
+
+  decideCompanyOwnership(transferId: string, accept: boolean) {
+    return request<CompanyOwnershipTransfer>(
+      `/ownership-transfers/${encodeURIComponent(transferId)}/${accept ? "accept" : "decline"}`,
+      { method: "POST" },
+    );
+  },
+
+  cancelCompanyOwnershipOffer(transferId: string) {
+    return request<CompanyOwnershipTransfer>(
+      `/ownership-transfers/${encodeURIComponent(transferId)}/cancel`,
+      { method: "POST" },
+    );
+  },
+
+  listCompanyInvitations(companyId: string, status?: InvitationStatus) {
+    const query = status ? `?${new URLSearchParams({ status }).toString()}` : "";
+    return request<Invitation[]>(
+      `/companies/${encodeURIComponent(companyId)}/invitations${query}`,
+    );
+  },
+
+  decideInvitationApproval(
+    companyId: string,
+    invitationId: string,
+    approve: boolean,
+  ) {
+    return request<Invitation>(
+      `/companies/${encodeURIComponent(companyId)}/invitations/${encodeURIComponent(invitationId)}/${approve ? "approve" : "reject"}`,
+      { method: "POST" },
+    );
+  },
+
+  requestDepartmentTransfer(
+    companyId: string,
+    departmentId: string,
+    userId: string,
+    reason?: string,
+  ) {
+    return request<DepartmentTransferRequest>(
+      `/companies/${encodeURIComponent(companyId)}/departments/${encodeURIComponent(departmentId)}/transfer-requests`,
+      {
+        method: "POST",
+        body: JSON.stringify({ user_uuid: userId, reason: reason ?? "" }),
+      },
+    );
+  },
+
+  listDepartmentTransfers(companyId: string, status?: string) {
+    const query = status ? `?${new URLSearchParams({ status }).toString()}` : "";
+    return request<{ items: DepartmentTransferRequest[] }>(
+      `/companies/${encodeURIComponent(companyId)}/department-transfers${query}`,
+    );
+  },
+
+  decideDepartmentTransfer(
+    companyId: string,
+    requestId: string,
+    approve: boolean,
+    comment?: string,
+  ) {
+    return request<DepartmentTransferRequest>(
+      `/companies/${encodeURIComponent(companyId)}/department-transfers/${encodeURIComponent(requestId)}/${approve ? "approve" : "reject"}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ comment: comment ?? "" }),
       },
     );
   },
@@ -2106,7 +2203,7 @@ export const api = {
     companyId: string,
     departmentId: string,
     userId: string,
-    status: "active" | "suspended" | "left",
+    status: "active" | "left",
   ) {
     return request<DepartmentMemberResponse>(
       `/companies/${encodeURIComponent(companyId)}/departments/${encodeURIComponent(departmentId)}/members/${encodeURIComponent(userId)}/status`,
@@ -2117,12 +2214,20 @@ export const api = {
     );
   },
 
-  createCompanyInvitation(companyId: string, username: string) {
+  createCompanyInvitation(
+    companyId: string,
+    username: string,
+    acknowledgeCurrentMembership = false,
+  ) {
     return request<Invitation>(
       `/companies/${encodeURIComponent(companyId)}/invitations`,
       {
         method: "POST",
-        body: JSON.stringify({ username, role: "employee" }),
+        body: JSON.stringify({
+          username,
+          role: "employee",
+          acknowledge_current_membership: acknowledgeCurrentMembership,
+        }),
       },
     );
   },
@@ -2132,12 +2237,17 @@ export const api = {
     departmentId: string,
     username: string,
     role: InvitationDepartmentRole,
+    acknowledgeCurrentMembership = false,
   ) {
     return request<Invitation>(
       `/companies/${encodeURIComponent(companyId)}/departments/${encodeURIComponent(departmentId)}/invitations`,
       {
         method: "POST",
-        body: JSON.stringify({ username, role }),
+        body: JSON.stringify({
+          username,
+          role,
+          acknowledge_current_membership: acknowledgeCurrentMembership,
+        }),
       },
     );
   },
@@ -2149,11 +2259,12 @@ export const api = {
     return request<Invitation[]>(`/invitations${query}`);
   },
 
-  acceptInvitation(invitationId: string) {
+  acceptInvitation(invitationId: string, confirmTransfer = false) {
     return request<Invitation>(
       `/invitations/${encodeURIComponent(invitationId)}/accept`,
       {
         method: "POST",
+        body: JSON.stringify({ confirm_transfer: confirmTransfer }),
       },
     );
   },

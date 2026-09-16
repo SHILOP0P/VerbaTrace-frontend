@@ -127,6 +127,7 @@ export function ProfilePage({
             <ProfileDataRow label={`Телефон: ${session.user.phone || "не указан"}`} note="Личные данные профиля" />
             <ProfileDataRow label={`Часовой пояс: ${session.user.timezone || "не указан"}`} note="Используется для отображения времени" />
             <ProfileDataRow label="Уведомления профиля" note="Email, приглашения в компании и события подписки" status="Активно" />
+            <InvitationsMutedRow />
           </div>
         </section>
 
@@ -566,6 +567,59 @@ function formatSessionAvailability(availableAt: string | null, retryAfterSeconds
     return hours > 0 ? `через ${hours} ч ${minutes} мин` : `через ${minutes} мин`;
   }
   return "после подтверждения текущего сеанса";
+}
+
+/**
+ * InvitationsMutedRow is the "do not disturb" switch: with it on nobody can
+ * send this user company or department invitations at all.
+ */
+function InvitationsMutedRow() {
+  const [muted, setMuted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPreferences()
+      .then((preferences) => {
+        if (!cancelled) setMuted(Boolean(preferences.invitations_muted));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function toggle() {
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await api.updatePreferences({ invitations_muted: !muted });
+      setMuted(Boolean(updated.invitations_muted));
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Не удалось изменить настройку");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="profile-data-row">
+      <div>
+        <strong>Приглашения в компании</strong>
+        <small>
+          {muted
+            ? "Никто не может прислать вам приглашение"
+            : "Вы можете получать приглашения в компании и отделы"}
+        </small>
+        {error && <small className="form-error">{error}</small>}
+      </div>
+      <button className="text-button" type="button" onClick={() => void toggle()} disabled={busy}>
+        {muted ? "Разрешить" : "Не беспокоить"}
+      </button>
+    </div>
+  );
 }
 
 function ProfileDataRow({

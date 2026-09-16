@@ -8590,3 +8590,21 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   .company-limit-row .company-limit-progress { grid-column: 1 / -1; }
   .company-limit-row.empty-slot { grid-template-columns: minmax(0, 1fr); }
 }
+/* The QA row keeps three fixed minimums (150 + 240 + 190), which is wider than
+   the workspace on a tablet: the whole page then overflowed to the right. The
+   later unprefixed rule was winning over the media query meant to handle it. */
+@media (max-width: 1024px) {
+  .app-shell .quality-list-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .app-shell .quality-list-row > svg {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell .quality-list-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

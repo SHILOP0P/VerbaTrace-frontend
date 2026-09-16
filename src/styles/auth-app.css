@@ -4555,7 +4555,7 @@ html[data-theme="light"] .app-shell :is(.dashboard-call-row, .company-limit-row,
   border-color: rgba(97, 72, 58, 0.16);
 }
 
-html[data-theme="light"] .app-shell .company-mini-card strong {
+html[data-theme="light"] .app-shell :is(.company-mini-card, .department-member-row) strong {
   color: var(--app-text);
 }
 
@@ -8416,3 +8416,77 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
 .call-duration-control input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .call-duration-arrows { position: absolute; right: 5px; top: 4px; bottom: 4px; display: grid; grid-template-rows: 1fr 1fr; gap: 2px; }
 .app-shell .call-duration-arrows .icon-button { width: 28px; min-width: 28px; height: 100%; min-height: 0; padding: 0; border-radius: 5px; }
+
+/* Bin rows reuse the call row markup without a player or a menu, so the three
+   column call grid would squeeze the title into the 40px play column. */
+.app-shell .call-row.call-row-deleted {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 64px;
+  cursor: default;
+}
+
+.app-shell .call-row.call-row-deleted .call-row-actions {
+  min-width: 0;
+}
+
+/* A company member is name / role / actions: one column fewer than a department
+   member, and the action set is wider. */
+.company-member-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+/* Three management buttons do not fit beside a name on a narrow desktop or a
+   tablet, so the actions take their own row before the mobile rules apply. */
+@media (max-width: 1180px) {
+  .company-member-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .company-member-row .panel-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+.department-member-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* The limit field stands next to its save button, so it must not take the full
+   width the app gives inputs by default. */
+.app-shell .credit-limit-input {
+  width: 128px;
+  min-width: 0;
+  text-align: right;
+}
+
+/* A grouped mini list carries its own heading, and grid gap already spaces it. */
+.company-mini-list > h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* Journal entries are sentences, not titles: they wrap instead of being cut
+   with an ellipsis the way the other mini cards are. */
+.support-journal-entry {
+  align-items: flex-start;
+}
+
+.support-journal-entry small {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.credit-wallet-note {
+  display: block;
+  margin-top: 8px;
+  color: var(--app-muted);
+}
+
+/* An inline notice inside a panel does not need the page level margin. */
+.admin-action-inline-notice {
+  margin: 0;
+}

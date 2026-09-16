@@ -91,6 +91,7 @@ export function CreditLimitsPanel({
           {isOwner && (
             <div className="panel-actions">
               <input
+                className="credit-limit-input"
                 aria-label="Лимит компании"
                 inputMode="numeric"
                 placeholder="без лимита"
@@ -124,6 +125,7 @@ export function CreditLimitsPanel({
               </div>
               <div className="panel-actions">
                 <input
+                  className="credit-limit-input"
                   aria-label={`Лимит отдела ${department.name}`}
                   inputMode="numeric"
                   placeholder="без лимита"

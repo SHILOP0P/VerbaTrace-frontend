@@ -50,7 +50,7 @@ export function SupportJournalPanel({ companyId }: { companyId: string }) {
       ) : (
         <div className="company-mini-list">
           {entries.map((entry) => (
-            <article className="company-mini-card" key={entry.id}>
+            <article className="company-mini-card support-journal-entry" key={entry.id}>
               <div>
                 <strong>{eventLabel(entry.event_type)}</strong>
                 <small>

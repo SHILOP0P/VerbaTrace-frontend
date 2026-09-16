@@ -173,7 +173,7 @@ export function CompanyMembersPanel({
             const isDeputy = member.company_role === "company_deputy";
             const isCompanyOwner = member.company_role === "company_manager";
             return (
-              <article className="department-member-row" key={member.user_uuid}>
+              <article className="department-member-row company-member-row" key={member.user_uuid}>
                 <div className="department-member-main">
                   <strong>{`${member.full_surname} ${member.full_name}`.trim() || member.username}</strong>
                   <small>

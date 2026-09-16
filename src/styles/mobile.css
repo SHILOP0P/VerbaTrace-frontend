@@ -415,6 +415,10 @@
     .panel-actions > *, .deep-create-actions > *, .entity-toolbar > *, .admin-toolbar > *
   ) { max-width: 100%; }
 
+  /* A mini card that carries buttons has to stack: side by side the actions get
+     squeezed into a column of single letters. */
+  .app-shell .company-mini-card:has(.panel-actions) { align-items: stretch; flex-direction: column; }
+
   .app-shell :is(.primary-button, .ghost-button, .text-button, .report-format-button, .deep-report-format-button) {
     min-width: 0;
     max-width: 100%;

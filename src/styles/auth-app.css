@@ -7367,9 +7367,13 @@ html[data-theme="light"] .confirm-dialog-actions .ghost-button:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* The calls and the analysis layouts are not in this list: their columns stay
+     their own scroll areas for as long as the page is bound to the viewport,
+     which is down to 1181 px. Releasing them here while
+     `.calls-layout.atmospheric-page` — one class more specific — kept its
+     `height: calc(100dvh - 120px)` is what let the call card run on past the
+     panel it lives in: the page was 770 px tall and its content 3900. */
   .app-shell :is(
-    .calls-layout,
-    .analysis-layout,
     .contacts-page,
     .reports-page,
     .companies-page,
@@ -7380,14 +7384,6 @@ html[data-theme="light"] .confirm-dialog-actions .ghost-button:focus-visible {
     min-height: 0;
     margin-top: 0;
     overflow: visible;
-  }
-
-  .app-shell .calls-layout > :is(.calls-sidebar, .call-overview),
-  .app-shell .analysis-layout > :is(.calls-sidebar, .analysis-detail) {
-    height: auto;
-    overflow: visible;
-    overscroll-behavior: auto;
-    scrollbar-gutter: auto;
   }
 
   .reports-kpi-grid {
@@ -7409,6 +7405,28 @@ html[data-theme="light"] .confirm-dialog-actions .ghost-button:focus-visible {
 
   .deep-analysis-content-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Below the width where the page stops being bound to the viewport, the calls
+   and analysis layouts hand the scrolling back to the page: the panel grows with
+   its content instead of keeping a height its content does not fit in. The
+   selector carries `.atmospheric-page` because the rule it undoes does. */
+@media (max-width: 1180px) {
+  .app-shell .calls-layout.atmospheric-page,
+  .app-shell .analysis-layout.atmospheric-page {
+    height: auto;
+    min-height: 0;
+    margin-top: 0;
+    overflow: visible;
+  }
+
+  .app-shell .calls-layout > :is(.calls-sidebar, .call-overview),
+  .app-shell .analysis-layout > :is(.calls-sidebar, .analysis-detail) {
+    height: auto;
+    overflow: visible;
+    overscroll-behavior: auto;
+    scrollbar-gutter: auto;
   }
 }
 

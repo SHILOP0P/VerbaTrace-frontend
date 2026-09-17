@@ -9056,11 +9056,18 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
    picker to 200 px and left a hole above the period fields. */
 .admin-audit-toolbar .select-control { flex: 1 1 auto; min-width: 180px; max-width: 320px; }
 /* The period is two of the project's own date pickers rather than native date
-   inputs, so it is a plain row here: the label, then the picker's own control. */
+   inputs, so it is a plain row here: the label, then the picker's own control.
+   The label has a fixed width because "С" and "По" are not the same length and
+   the two pickers have to be. */
 .audit-trail-date { display: flex; flex: 0 1 auto; gap: 8px; align-items: center; min-width: 0; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; }
-.audit-trail-date > span { white-space: nowrap; }
+.audit-trail-date > span { flex: 0 0 26px; white-space: nowrap; }
 .audit-trail-date .date-time-picker { min-width: 0; }
-.audit-trail-date .date-time-trigger { min-height: 44px; }
+.audit-trail-date .date-time-trigger { min-width: 168px; min-height: 44px; }
+/* Show and refresh travel together, whatever the row does, and they take up the
+   rest of the row they land on: a wrapped toolbar otherwise ends with a short
+   row and a screen-wide hole beside it. */
+.audit-trail-actions { display: flex; flex: 1 1 auto; gap: 8px; align-items: center; min-width: 0; }
+.audit-trail-actions > button[type="submit"] { flex: 1 1 auto; min-width: 104px; }
 .audit-trail-reason { display: grid; gap: 6px; margin: 0 18px 4px; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; }
 .audit-trail-reason input { width: 100%; min-height: 40px; padding: 9px 11px; box-sizing: border-box; color: var(--app-text, var(--text)); font: inherit; background: var(--app-panel-soft, var(--surface-2)); border: 1px solid var(--app-border, var(--border)); border-radius: 10px; }
 .audit-trail-resolve { margin-left: auto; white-space: nowrap; }

@@ -503,6 +503,40 @@
   .app-shell .admin-toolbar > button[type="submit"] { grid-column: 1; width: 100%; }
   .app-shell .admin-toolbar > .icon-button { grid-column: 2; width: 44px; height: 44px; }
 
+  /* The two ends of the period belong on one line: "С" over "По" on separate
+     rows read as two unrelated fields. Two even columns carry them, and the two
+     buttons sit in their own group across the full width, so no row ends in
+     half a screen of nothing. */
+  .app-shell .admin-audit-toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .app-shell .admin-audit-toolbar > .select-control { max-width: none; }
+  .app-shell .admin-audit-toolbar > .audit-trail-date { grid-column: auto; min-width: 0; }
+  .app-shell .admin-audit-toolbar > .audit-trail-actions { grid-column: 1 / -1; }
+  .app-shell .audit-trail-actions > button[type="submit"] { flex: 1 1 auto; }
+  .app-shell .audit-trail-actions > .icon-button { flex: 0 0 44px; width: 44px; height: 44px; }
+
+  /* Both pickers are the same length, which they are not if the label in front
+     of them is: "С" is half the width of "По". */
+  .app-shell .audit-trail-date > span { flex: 0 0 26px; }
+  .app-shell .audit-trail-date .date-time-picker { flex: 1 1 auto; min-width: 0; }
+  /* Half a phone row is narrower than the desktop minimum for this control, so
+     here it gives that up and takes the column it is given. */
+  .app-shell .audit-trail-date .date-time-trigger { width: 100%; min-width: 0; }
+
+  /* On the narrowest screens half a row is not enough for a date and a calendar
+     icon both, and a clipped "17.09.20…" is worse than no icon: the label in
+     front already says the field is a date, and tapping it opens the calendar. */
+  @media (max-width: 430px) {
+    .app-shell .audit-trail-date .date-time-trigger { padding-right: 10px; padding-left: 10px; }
+    .app-shell .audit-trail-date .date-time-trigger > svg { display: none; }
+    .app-shell .audit-trail-date > span { flex: 0 0 22px; }
+  }
+  .app-shell .audit-trail-date .date-time-trigger > span {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* A mini card that carries buttons has to stack: side by side the actions get
      squeezed into a column of single letters. Written without :has() so it also
      works in older browsers. */

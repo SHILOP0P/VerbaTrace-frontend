@@ -243,25 +243,30 @@ export function AuditTrailsPanel() {
             the browser's native picker, which looks like another product. */}
         <div className="audit-trail-date">
           <span>С</span>
-          <DateTimePicker mode="date" placement="below" ariaLabel="Начало периода" value={from} onChange={setFrom} />
+          <DateTimePicker mode="date" display="compact" placement="below" ariaLabel="Начало периода" value={from} onChange={setFrom} />
         </div>
         <div className="audit-trail-date">
           <span>По</span>
-          <DateTimePicker mode="date" placement="below" ariaLabel="Конец периода" value={to} onChange={setTo} />
+          <DateTimePicker mode="date" display="compact" placement="below" ariaLabel="Конец периода" value={to} onChange={setTo} />
         </div>
-        <button className="ghost-button small" type="submit">
-          Показать
-        </button>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label="Обновить"
-          aria-busy={loading}
-          disabled={loading}
-          onClick={() => void load()}
-        >
-          <RefreshCw className={loading ? "refresh-icon spinning" : "refresh-icon"} size={17} />
-        </button>
+        {/* The two buttons are one control group: as separate children of the
+            toolbar they drifted to opposite ends of a row, or onto rows of
+            their own, with half a row of nothing between them. */}
+        <div className="audit-trail-actions">
+          <button className="ghost-button small" type="submit">
+            Показать
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Обновить"
+            aria-busy={loading}
+            disabled={loading}
+            onClick={() => void load()}
+          >
+            <RefreshCw className={loading ? "refresh-icon spinning" : "refresh-icon"} size={17} />
+          </button>
+        </div>
       </form>
       <p className="admin-section-summary">Записей: {total}</p>
       {trail === "billing_alerts" && (

@@ -5,6 +5,9 @@ import { createPortal } from "react-dom";
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MONTH_FORMAT = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
 const VALUE_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+// For a trigger that has to fit half of a phone screen: "17 сентября 2026 г."
+// does not, and a truncated date reads as a broken field.
+const COMPACT_VALUE_FORMAT = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 type DateTimePickerProps = {
   value: string;
@@ -14,14 +17,19 @@ type DateTimePickerProps = {
   mode?: "date" | "date-time";
   placement?: "auto" | "right-center" | "below";
   ariaLabel?: string;
+  /** "compact" shows 17.09.2026 instead of 17 сентября 2026 г., for a trigger
+   *  that has to fit half a phone screen. */
+  display?: "long" | "compact";
 };
 
-export function DateTimePicker({ value, onChange, required, id, mode = "date-time", placement = "auto", ariaLabel }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, required, id, mode = "date-time", placement = "auto", ariaLabel, display = "long" }: DateTimePickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const selected = parseValue(value, mode);
   const dateOnly = mode === "date";
+  const compact = display === "compact";
+  const triggerFormat = compact ? COMPACT_VALUE_FORMAT : VALUE_FORMAT;
   const [open, setOpen] = useState(false);
   const [openTimePart, setOpenTimePart] = useState<"hours" | "minutes" | null>(null);
   const [popoverPosition, setPopoverPosition] = useState({ top: 12, left: 12, width: 360 });
@@ -113,7 +121,7 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
   return <div className="date-time-picker" ref={rootRef}>
     <input className="date-time-picker-value" id={id} value={value} readOnly tabIndex={-1} aria-hidden="true" />
     <button className={`date-time-trigger${dateOnly ? " date-time-trigger-date-only" : ""}`} ref={triggerRef} type="button" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-required={required} onClick={() => setOpen((current) => !current)}>
-      {dateOnly ? <><span>{selected ? VALUE_FORMAT.format(selected) : "Выберите дату"}</span><CalendarDays size={18}/></> : <><CalendarDays size={18}/><span>{selected ? VALUE_FORMAT.format(selected) : "Выберите дату"}</span><i/><Clock3 size={17}/><span>{selected ? `${pad(selected.getHours())}:${pad(selected.getMinutes())}` : "--:--"}</span></>}
+      {dateOnly ? <><span>{selected ? triggerFormat.format(selected) : compact ? "Дата" : "Выберите дату"}</span><CalendarDays size={18}/></> : <><CalendarDays size={18}/><span>{selected ? VALUE_FORMAT.format(selected) : "Выберите дату"}</span><i/><Clock3 size={17}/><span>{selected ? `${pad(selected.getHours())}:${pad(selected.getMinutes())}` : "--:--"}</span></>}
     </button>
     {open ? createPortal(<div className={`date-time-popover${dateOnly ? " date-time-popover-date-only" : ""}`} ref={popoverRef} style={popoverPosition} role="dialog" aria-label={dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения"} onWheel={scrollOwningDialog}>
       <div className="date-time-month">

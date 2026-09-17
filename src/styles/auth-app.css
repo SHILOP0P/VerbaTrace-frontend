@@ -8532,13 +8532,13 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   }
 }
 
-/* Narrower still, even a shrunken search does not leave the date picker room:
-   it goes away here, one step earlier than the team switcher does. */
-@media (min-width: 1121px) and (max-width: 1280px) {
-  .app-shell .app-header .date-range-control {
-    display: none;
-  }
-}
+/* The date picker used to be hidden across the whole 1121–1280 band on the
+   assumption that a shrunken search left it no room. Measured, it does fit:
+   with the profile name out of the way the control ends 12 px short of the
+   profile block at 1121, at 1173 and at 1280 alike. The only width it really
+   could not fit was where the name comes back, which the rule below now moves
+   to 1200, so the picker is available from 1121 up — the width at which the
+   header switches to its wide arrangement. */
 
 /* Two columns of company panels only work once the workspace is wide: below
    this the member rows had to stack their buttons one per line, and the
@@ -8559,8 +8559,10 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
 }
 
 /* The name next to the avatar is the last thing the header can spare before it
-   switches to its narrow arrangement at 1120px. */
-@media (min-width: 1121px) and (max-width: 1180px) {
+   switches to its narrow arrangement at 1120px. It stays away up to 1200, not
+   1180: at 1181 the name came back and pushed the profile block onto the date
+   picker by 8 px. The avatar next to it says whose account this is. */
+@media (min-width: 1121px) and (max-width: 1215px) {
   .app-shell .profile-block .header-profile-link strong {
     display: none;
   }

@@ -7839,7 +7839,10 @@ html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row) .status-
     gap: 8px;
   }
 
-  .profile-block strong,
+  /* The name is not in this list any more: capping it to 116 px is what made it
+     appear as "Дмитрий SHIL…" in the very range where the header was already
+     dropping whole controls. Below 1321 the name is not shown at all, so there
+     is nothing here to cap; the other labels in the block still are. */
   .profile-block span {
     max-width: 116px;
   }
@@ -7865,8 +7868,13 @@ html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row) .status-
     padding: 0 22px;
   }
 
-  .team-switcher,
-  .date-range-control {
+  /* Only the team switcher goes here. The period picker used to go with it,
+     which made the order of losses inconsistent: the name beside the avatar
+     survived — clipped to "Дмитрий SHIL…" — while a whole control disappeared.
+     The name is given up first (see the rule further down), and with it out of
+     the way the picker ends 12 px short of the profile block at every width in
+     1025–1120. */
+  .team-switcher {
     display: none;
   }
 
@@ -8558,11 +8566,13 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
   }
 }
 
-/* The name next to the avatar is the last thing the header can spare before it
-   switches to its narrow arrangement at 1120px. It stays away up to 1200, not
-   1180: at 1181 the name came back and pushed the profile block onto the date
-   picker by 8 px. The avatar next to it says whose account this is. */
-@media (min-width: 1121px) and (max-width: 1215px) {
+/* The name next to the avatar is the first thing the single-row header gives
+   up, because the avatar beside it already says whose account this is and the
+   name is the one item that would otherwise survive as a clipped fragment. It
+   goes at 1215, before the team switcher (1120) and before the period picker
+   (1024, where the header changes shape anyway), so the order of losses runs
+   one way as the window narrows. */
+@media (min-width: 1025px) and (max-width: 1320px) {
   .app-shell .profile-block .header-profile-link strong {
     display: none;
   }

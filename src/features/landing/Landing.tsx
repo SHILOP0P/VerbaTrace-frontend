@@ -24,7 +24,7 @@ import type {
 } from "../../types";
 
 import { AppTheme, ThemeToggleEvent, useRevealOnScroll } from "../../app/runtime";
-import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
+import { useDismissibleLayer, useEscapeDismiss } from "../../shared/ui/dismissible-layer";
 import { normalTimelineSteps, statusMeta } from "../../shared/lib/call-status";
 import { comparePlans } from "../../shared/lib/plans";
 import { Logo } from "../../shared/ui/primitives";
@@ -49,8 +49,14 @@ export function Landing({
   const benefitsRef = useRef<HTMLElement | null>(null);
   const workflowRef = useRef<HTMLElement | null>(null);
   const securityRef = useRef<HTMLElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
   useRevealOnScroll<HTMLElement>();
   const themeLabel = theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему";
+  // The menu dismisses like every other layer in the application: a click
+  // anywhere outside the header, or Escape. The whole header is the layer
+  // because the burger lives in it and a click on the burger must toggle
+  // rather than close and reopen.
+  useDismissibleLayer(mobileMenuOpen, headerRef, () => setMobileMenuOpen(false));
 
   useEffect(() => {
     const sections = [benefitsRef.current, workflowRef.current].filter(Boolean) as HTMLElement[];
@@ -161,7 +167,7 @@ export function Landing({
   return (
     <main className="landing">
       <div className="landing-bg" />
-      <header className="landing-header">
+      <header className="landing-header" ref={headerRef}>
         <Logo />
         <nav className={mobileMenuOpen ? "mobile-open" : ""}>
           <a href="#features" onClick={() => setMobileMenuOpen(false)}>Возможности</a>

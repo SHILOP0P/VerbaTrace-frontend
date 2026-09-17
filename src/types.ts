@@ -1845,6 +1845,9 @@ export interface AdminAuditTrailEntry {
   // alert waiting to be closed.
   entry_uuid?: string;
   actor_user_uuid?: string;
+  // Who acted, as a handle. The uuid above is kept for correlation with the raw
+  // tables and is never put on screen.
+  actor_username?: string;
   action: string;
   details?: unknown;
 }

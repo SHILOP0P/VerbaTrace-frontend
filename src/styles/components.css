@@ -1220,8 +1220,14 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
   position: relative;
 }
 
+/* The links never give up their own width: without this the header's flex layout
+   shrinks them until a label such as "Как это работает" breaks into two lines and
+   the nav grows to 60 px inside an 84 px header. Better to keep one line and let
+   the burger take over at the width where the row stops fitting. */
 .landing-header nav a {
+  flex: 0 0 auto;
   padding: 9px 12px;
+  white-space: nowrap;
   border-radius: var(--radius);
   transition:
     color 160ms ease,
@@ -1296,6 +1302,16 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
 
 .overview-actions {
   flex-wrap: wrap;
+}
+
+/* The two buttons in the landing header keep their labels on one line: the header
+   has a fixed height, so a broken label reads as a squashed button rather than as
+   a smaller one. The width at which the nav links collapse into the burger is
+   picked from what these buttons need at full width. */
+.landing-actions .ghost-button,
+.landing-actions .primary-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .panel-actions {
@@ -8993,7 +9009,9 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
 .audit-trail-entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; min-width: 0; }
 .audit-trail-entry-head time { color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .audit-trail-entry-head strong { font-size: 14px; overflow-wrap: anywhere; }
-.audit-trail-actor { color: var(--app-muted, var(--muted)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; overflow-wrap: anywhere; }
+/* A handle, not an identifier, so it is set in the normal face at the same size
+   as the other secondary labels instead of in the monospace used for raw data. */
+.audit-trail-actor { color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .audit-trail-details { margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; color: var(--app-muted, var(--muted)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--app-surface, var(--surface)); border-radius: 10px; }
 
 /* A confirmation that is not a plain yes: handing a company over also asks
@@ -9012,31 +9030,27 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
   border-radius: 8px;
 }
 
-/* A checkbox and its label on one line. The global mobile rule stretches every
-   input to the full width, which would push the label out of the row, so the
-   box keeps its own size here. */
+/* A checkbox and its label, laid out exactly like .integration-checkbox: a fixed
+   column for the box and the rest for the text. The appearance of the box itself
+   is not redefined here — .checkbox-row is listed alongside .integration-checkbox
+   in auth-app.css, so both look the same and change together. A two-column grid
+   rather than flex, because it cannot squeeze the label to one character. */
 .checkbox-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
   min-width: 0;
-  font-size: 0.92rem;
   line-height: 1.35;
   cursor: pointer;
 }
 
-.checkbox-row input[type="checkbox"] {
-  flex: 0 0 auto;
-  width: 18px;
-  min-width: 18px;
-  height: 18px;
-  margin: 1px 0 0;
-  cursor: pointer;
-}
-
-.checkbox-row span {
+.checkbox-row > span {
+  display: grid;
+  gap: 4px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 500;
 }
 
 /* Moving calls and folders into another company: a short form that has to stay
@@ -9047,7 +9061,10 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
   min-width: 0;
 }
 
-.data-transfer-form > label {
+/* A checkbox row is excluded on purpose: ".data-transfer-form > label" is one
+   class and one element, which outranks ".checkbox-row" and would stack the box
+   above its own label. */
+.data-transfer-form > label:not(.checkbox-row) {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -9058,12 +9075,16 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
 }
 
 .company-mini-list h3 {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   font-size: 0.95rem;
 }
 
+.data-transfer-form + .company-mini-list {
+  margin-top: 14px;
+}
+
 /* Choosing which companies keep working when a plan stops covering them all.
-   The list can hold three ids, so it scrolls rather than stretching the card. */
+   The list holds company names, so it scrolls rather than stretching the card. */
 .admin-company-selection {
   display: grid;
   gap: 10px;
@@ -9074,27 +9095,27 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
   border-radius: 8px;
 }
 
+/* The same type scale the rest of the admin panel uses: var(--muted) for the
+   explanation rather than an opacity of its own, and .82rem/500 for small text.
+   A different size or a faded colour here reads as a different font. */
 .admin-company-selection h3 {
   margin: 0;
-  font-size: 0.98rem;
+  font-size: 0.95rem;
 }
 
-.admin-company-selection p {
+.admin-company-selection > p {
   margin: 0;
-  font-size: 0.88rem;
-  opacity: 0.78;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .admin-company-selection-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   max-height: 210px;
   overflow-y: auto;
   min-width: 0;
 }
 
-.admin-company-selection-list .checkbox-row span {
-  font-variant-numeric: tabular-nums;
-  font-size: 0.82rem;
-  word-break: break-all;
-}

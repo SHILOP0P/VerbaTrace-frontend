@@ -26,7 +26,9 @@ export function Logo({ onClick }: { onClick?: () => void }) {
         <i />
         <i />
       </span>
-      <span>VerbaTrace</span>
+      {/* Named so the narrowest headers can drop the wordmark and keep the mark:
+          there the name and the buttons did not both fit and overlapped. */}
+      <span className="logo-word">VerbaTrace</span>
     </>
   );
 

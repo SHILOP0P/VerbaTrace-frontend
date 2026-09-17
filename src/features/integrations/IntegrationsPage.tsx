@@ -143,7 +143,7 @@ function BitrixMappingRow({ user, draft, departments, members, membersLoading, b
 	return <article className={`bitrix-mapping-row is-${user.mapping_status}`}>
 		<div><strong>{user.display_name}</strong><small>Bitrix24 ID {user.external_user_id} · {user.active ? "активен" : "уволен"}{changed ? " · есть несохранённое изменение" : ""}</small></div>
 		<SelectControl disabled={busy || draft.status === "ignored"} aria-label={`Отдел для ${user.display_name}`} value={draft.departmentId} onChange={(event) => onChange({ departmentId: event.target.value, internalUserId: "", status: "unmapped" })}><option value="">Уровень компании — без отдела</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</SelectControl>
-		<SelectControl disabled={busy || membersLoading || draft.status === "ignored"} aria-label={`Пользователь VerbaTrace для ${user.display_name}`} value={draft.internalUserId} onChange={(event) => onChange({ ...draft, internalUserId: event.target.value, status: event.target.value ? "mapped" : "unmapped" })}><option value="">{membersLoading ? "Загружаю участников…" : "Не сопоставлен"}</option>{availableMembers.map((member) => <option key={`${draft.departmentId || "company"}-${member.user_uuid}`} value={member.user_uuid}>{[member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || member.user_uuid}{!draft.departmentId ? " · руководитель компании" : ""}</option>)}</SelectControl>
+		<SelectControl disabled={busy || membersLoading || draft.status === "ignored"} aria-label={`Пользователь VerbaTrace для ${user.display_name}`} value={draft.internalUserId} onChange={(event) => onChange({ ...draft, internalUserId: event.target.value, status: event.target.value ? "mapped" : "unmapped" })}><option value="">{membersLoading ? "Загружаю участников…" : "Не сопоставлен"}</option>{availableMembers.map((member) => <option key={`${draft.departmentId || "company"}-${member.user_uuid}`} value={member.user_uuid}>{[member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || "Участник"}{!draft.departmentId ? " · руководитель компании" : ""}</option>)}</SelectControl>
 		<button className="ghost-button small" type="button" disabled={busy} onClick={() => onChange(draft.status === "ignored" ? { internalUserId: "", departmentId: "", status: "unmapped" } : { internalUserId: "", departmentId: "", status: "ignored" })}>{draft.status === "ignored" ? "Вернуть к выбору" : "Игнорировать"}</button>
 	</article>;
 }
@@ -1681,7 +1681,10 @@ function mappingTargetLabel(userID: string | null | undefined, departmentID: str
 	if (!userID) return "Без сопоставления";
 	const member = members.find((item) => item.user_uuid === userID);
 	const department = departments.find((item) => item.id === departmentID);
-	const name = member ? [member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || userID : userID;
+	// A mapping may point at somebody who has since left the company, or at a
+	// department the page has not loaded. Either way the answer is a word, never
+	// the identifier the record happens to hold.
+	const name = (member && ([member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username)) || "Участник";
 	if (!departmentID) return `${name} · руководитель компании, без отдела`;
-	return `${name} · ${department?.name ?? departmentID}`;
+	return `${name} · ${department?.name ?? "отдел вне списка"}`;
 }

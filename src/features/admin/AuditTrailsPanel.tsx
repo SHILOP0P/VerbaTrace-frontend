@@ -154,7 +154,11 @@ export function AuditTrailsPanel() {
                     {new Date(entry.occurred_at).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" })}
                   </time>
                   <strong>{entry.action}</strong>
-                  {entry.actor_user_uuid && <span className="audit-trail-actor">{entry.actor_user_uuid}</span>}
+                  {entry.actor_user_uuid && (
+                    <span className="audit-trail-actor">
+                      {entry.actor_username ? `@${entry.actor_username}` : "Пользователь без профиля"}
+                    </span>
+                  )}
                   {isOpenAlert(entry) && (
                     <button
                       className="ghost-button small audit-trail-resolve"

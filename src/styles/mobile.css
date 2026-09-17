@@ -65,29 +65,28 @@
   .landing-header .logo-mark { width: 25px; transform: scale(.82); transform-origin: left center; }
   .app-shell .app-header .logo { gap: 7px; font-size: 18px; }
   .app-shell .app-header .logo-mark { width: 21px; transform: scale(.78); transform-origin: left center; }
-  .landing-header nav { display: none; }
+  .landing-actions { gap: 6px; margin-left: 0; }
+  /* A phone header keeps the way in — losing it left no route to the login
+     screen at all — and gives up the long call to action, which the hero states
+     again in full a screen-length below. The button that stays is compact so the
+     row is logo, one button and the burger, the way it is done elsewhere. */
+  .landing-actions .primary-button { display: none; }
 
-  .landing-header nav.mobile-open {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    left: 0;
-    display: grid;
-    gap: 2px;
-    width: 100%;
-    padding: 10px;
-    overflow: hidden;
-    background: rgba(28, 19, 15, .96);
-    border: 1px solid rgba(255, 255, 255, .14);
-    border-radius: 18px;
-    box-shadow: 0 18px 40px rgba(0, 0, 0, .35);
+  .landing .primary-button, .landing .ghost-button { max-width: 100%; white-space: normal; }
+
+  /* After the rule above, which lets the buttons in the page body wrap. */
+  .landing-actions .ghost-button {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
-  .landing-header nav.mobile-open a { width: 100%; padding: 12px 14px; border-radius: 12px; }
-  .landing-actions { gap: 6px; margin-left: 0; }
-  .landing-actions .landing-menu-toggle { display: inline-grid; }
-  .landing-actions .ghost-button, .landing-actions .primary-button { display: none; }
-  .landing .primary-button, .landing .ghost-button { max-width: 100%; white-space: normal; }
+  /* The wordmark is the one thing in the row that can be given up. Measured: the
+     name, the button and the burger need 375 px of viewport exactly, so below
+     400 px the name was overlapped by the button instead of moving. The mark
+     stays, and the accessible name lives on the logo element itself. */
+  .landing-header .logo { min-width: 0; }
 
   .benefits, .landing-section { width: 100%; padding-right: 16px; padding-left: 16px; }
   .landing-hero {
@@ -777,8 +776,18 @@
 }
 
 @media (min-width: 1025px) {
-  .mobile-bottom-nav, .landing-menu-toggle { display: none; }
+  .mobile-bottom-nav { display: none; }
 }
+
+/* The landing burger goes away only where the full row of links actually fits
+   next to both buttons on one line. Measured on the live page: at 1280 px the
+   row was still 74 px too wide, at 1361 px it has room to spare. The pair of
+   thresholds (this one and `max-width: 1360px` below) must always be adjacent,
+   otherwise the header shows the links and the burger at the same time. */
+@media (min-width: 1361px) {
+  .landing-menu-toggle { display: none; }
+}
+
 @media (max-width: 720px) {
   .revision-comparison-grid { grid-template-columns: 1fr; }
   .revision-comparison-heading { display: grid; }
@@ -1024,3 +1033,138 @@
   }
 }
 
+
+/* The landing header collapses its links into the burger for everything below a
+   wide laptop, which is exactly the range where the burger itself is shown
+   (`min-width: 1361px` hides it). The two used to disagree: the links went at
+   760 px while the burger stayed until 1024, so between those widths the header
+   carried the logo, all four links, the burger and both buttons at once — about
+   200 px more than it had, and the buttons ran off the right edge.
+   The threshold is measured, not guessed: logo, links at the tighter 20 px gap
+   and both buttons on one line need about 1354 px, so below 1361 px the links go
+   into the burger instead of squeezing the buttons. */
+@media (max-width: 1360px) {
+  /* A menu of four links does not need the width of the whole header: it hangs
+     under the burger that opened it, and it is opaque, because the hero headline
+     used to read straight through the panel.
+     The panel stays in the layout and is hidden with `visibility` instead of
+     `display`, which is what lets it fade and slide both ways — a display switch
+     cannot be transitioned, so the menu used to vanish instantly. Hidden
+     visibility also keeps the links out of the tab order and off the
+     accessibility tree, exactly as `display: none` did. */
+  .landing-header nav {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    left: auto;
+    z-index: 2;
+    display: grid;
+    gap: 2px;
+    width: min(290px, calc(100vw - 32px));
+    padding: 8px;
+    overflow: hidden;
+    visibility: hidden;
+    background: #1b1311;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 18px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, .45);
+    opacity: 0;
+    transform: translateY(-10px) scale(.97);
+    transform-origin: top right;
+    transition:
+      opacity 180ms ease,
+      transform 220ms cubic-bezier(.2, .9, .25, 1),
+      visibility 220ms;
+    pointer-events: none;
+  }
+
+  .landing-header nav.mobile-open {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .landing-header nav a {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 15px;
+    border-radius: 12px;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition:
+      opacity 160ms ease,
+      transform 200ms cubic-bezier(.2, .9, .25, 1),
+      color 160ms ease,
+      background 160ms ease;
+  }
+
+  /* The rows arrive one after another rather than all at once: four short delays
+     read as the menu unfolding instead of appearing. */
+  .landing-header nav.mobile-open a {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .landing-header nav.mobile-open a:nth-child(1) { transition-delay: 40ms; }
+  .landing-header nav.mobile-open a:nth-child(2) { transition-delay: 75ms; }
+  .landing-header nav.mobile-open a:nth-child(3) { transition-delay: 110ms; }
+  .landing-header nav.mobile-open a:nth-child(4) { transition-delay: 145ms; }
+
+  /* The links keep the accent colour of the desktop header on hover and gain a
+     row highlight, so a touch on a full-width row is visibly a target. */
+  .landing-header nav a:hover,
+  .landing-header nav a:focus-visible {
+    background: rgba(255, 255, 255, .08);
+    backdrop-filter: none;
+  }
+
+  /* The burger is the last thing in the row, next to the panel it opens, even
+     though it comes first in the markup — there it is the first control a screen
+     reader reaches, which is the right order to hear it in. */
+  .landing-actions .landing-menu-toggle { display: inline-grid; order: 5; }
+
+  /* Nothing in the header may push past its own edge, whatever a translation
+     does to the width of a label. */
+  .landing-header { flex-wrap: nowrap; }
+  .landing-actions { flex: 0 1 auto; min-width: 0; }
+}
+
+@media (max-width: 1360px) {
+  html[data-theme="light"] .landing-header nav {
+    background: #fffcf8;
+    border-color: rgba(97, 72, 58, .18);
+    box-shadow: 0 24px 48px rgba(81, 45, 25, .2);
+  }
+
+  html[data-theme="light"] .landing-header nav a:hover,
+  html[data-theme="light"] .landing-header nav a:focus-visible {
+    background: rgba(97, 72, 58, .08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-header nav,
+  .landing-header nav a {
+    transition: none;
+  }
+}
+
+/* See the note next to `.landing-header .logo` above: below this width the row
+   is the mark, the one button and the burger. */
+@media (max-width: 399px) {
+  .landing-header .logo-word { display: none; }
+  .landing-header .logo-mark { transform: scale(.9); }
+}
+
+/* Between the width where the links come back as a row (1361 px) and the width
+   where the designed 42 px gap fits, the nav keeps the tighter gap. The links
+   hold their own width now, so a gap too wide for the row would push the buttons
+   off the right edge instead of wrapping quietly. Measured: 42 px needs about
+   1340 px. The range is closed at the bottom on purpose: below it the same
+   element is the dropdown panel, which spaces its rows itself. */
+@media (min-width: 1361px) and (max-width: 1400px) {
+  .landing-header nav { gap: 20px; }
+}

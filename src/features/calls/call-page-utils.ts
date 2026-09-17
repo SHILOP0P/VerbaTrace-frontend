@@ -43,7 +43,9 @@ export function managerLabel(
     return `${session.user.full_name} ${session.user.full_surname}`.trim() || "Мои звонки";
   }
   const fullName = `${manager.full_name} ${manager.full_surname}`.trim();
-  return fullName || formatUsername(manager.username) || `Пользователь ${manager.id.slice(0, 8)}`;
+  // Not even a piece of a uuid goes on screen: a person without a name and
+  // without a handle is still a person, not an identifier.
+  return fullName || formatUsername(manager.username) || "Пользователь";
 }
 
 export function isWithinPeriod(value: string, period: "all" | "7d" | "30d") {

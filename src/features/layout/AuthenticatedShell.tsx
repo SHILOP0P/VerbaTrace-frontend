@@ -35,13 +35,12 @@ import type {
 import { adminSidebarItem, AppTheme, isSettingsPage, sidebarItems, ThemeToggleEvent } from "../../app/runtime";
 import { Logo } from "../../shared/ui/primitives";
 import { useDismissibleLayer } from "../../shared/ui/dismissible-layer";
+import { readWorkspaceCompanyId, storeWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { notificationPresentation } from "../../shared/ui/notification-presentation";
 import { ToolButton } from "../assistant/AssistantControls";
 import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
 
-const WORKSPACE_COMPANY_STORAGE_KEY = "verbatrace.activeWorkspaceCompanyId";
-const PERSONAL_WORKSPACE_VALUE = "__personal__";
 const MOBILE_NAV_PAGES: AppPage[] = ["overview", "calls", "actions", "reports"];
 
 export function AuthenticatedShell({
@@ -90,7 +89,7 @@ export function AuthenticatedShell({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(() => readStoredWorkspaceCompanyId() ?? "");
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => readWorkspaceCompanyId() ?? "");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -266,7 +265,7 @@ export function AuthenticatedShell({
 
       if (cancelled) return;
       if (preferences) {
-        const storedCompanyId = readStoredWorkspaceCompanyId();
+        const storedCompanyId = readWorkspaceCompanyId();
         const preferenceCompanyId = preferences.active_company_uuid ?? "";
         const nextCompanyId = storedCompanyId ?? preferenceCompanyId;
         setSelectedCompanyId(nextCompanyId);
@@ -817,26 +816,6 @@ function profileInitial(value: string) {
   return trimmed ? trimmed[0].toUpperCase() : "П";
 }
 
-function readStoredWorkspaceCompanyId() {
-  try {
-    const value = window.localStorage.getItem(WORKSPACE_COMPANY_STORAGE_KEY);
-    if (value === null) return null;
-    return value === PERSONAL_WORKSPACE_VALUE ? "" : value;
-  } catch {
-    return null;
-  }
-}
-
-function storeWorkspaceCompanyId(companyId: string) {
-  try {
-    window.localStorage.setItem(
-      WORKSPACE_COMPANY_STORAGE_KEY,
-      companyId || PERSONAL_WORKSPACE_VALUE
-    );
-  } catch {
-    // Local persistence is best-effort; backend preferences are still updated separately.
-  }
-}
 
 function totalMinutes(calls: CallResponse[]) {
   return Math.ceil(calls.reduce((sum, call) => sum + call.duration_seconds, 0) / 60);

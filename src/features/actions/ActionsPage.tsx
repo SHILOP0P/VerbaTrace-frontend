@@ -3,6 +3,7 @@ import { FormEvent, MouseEvent as ReactMouseEvent, useDeferredValue, useEffect, 
 import { ApiError, api } from "../../api";
 import type { ActionExternalSync, ActionExternalSyncPreview, AnalysisResponse, CallAction, CallActionAssignee, CallResponse, CompanyResponse, DepartmentResponse, TranscriptionResponse, TranscriptionSpeakerAssignment } from "../../types";
 import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
+import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { FrozenRegion } from "../../shared/ui/frozen-region";
 import { TranscriptPreview } from "../../shared/ui/call";
 import { DateTimePicker } from "../../shared/ui/DateTimePicker";
@@ -17,7 +18,11 @@ export function ActionsPage({ onOpen }: { onOpen: (id: string) => void }) {
   const deferredQuery = useDeferredValue(query);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  useEffect(() => { let cancelled = false; setLoading(true); api.listActions({ status: status || undefined, q: deferredQuery.trim() || undefined, limit: 100 }).then((result) => { if (!cancelled) { setItems(result.items); setError(""); } }).catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Не удалось загрузить действия"); }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [deferredQuery, status]);
+  // The page is read in the workspace the header points at: a company shows that
+  // company's actions, the personal workspace shows the ones that belong to no
+  // company at all.
+  const workspaceCompanyId = useWorkspaceCompanyId();
+  useEffect(() => { let cancelled = false; setLoading(true); api.listActions({ status: status || undefined, q: deferredQuery.trim() || undefined, company_uuid: workspaceCompanyId || undefined, limit: 100 }).then((result) => { if (!cancelled) { setItems(workspaceCompanyId ? result.items : result.items.filter((item) => !item.company_uuid)); setError(""); } }).catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Не удалось загрузить действия"); }).finally(() => { if (!cancelled) setLoading(false); }); return () => { cancelled = true; }; }, [deferredQuery, status, workspaceCompanyId]);
   return <section className="actions-page atmospheric-page"><header className="actions-hero glass"><div><span className="eyebrow">РАБОЧИЙ ПОТОК</span><h1>Действия</h1><p>Задачи, созданные по итогам разговоров, с ответственными и контролем срока.</p></div></header><div className="actions-toolbar glass"><label className="actions-search"><Search size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Найти действие или ответственного"/></label><select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Статус действия"><option value="">Все статусы</option>{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></div>{error ? <div className="form-error">{error}</div> : null}<div className="actions-list glass">{loading ? <p className="actions-empty">Загружаю действия…</p> : items.length === 0 ? <p className="actions-empty">Подходящих действий пока нет.</p> : items.map((item)=><button className="action-row" type="button" key={item.id} onClick={()=>onOpen(item.id)}><span className={`action-status action-status-${item.status}`}>{statusLabels[item.status] ?? item.status}</span><span className="action-row-main"><strong>{item.title}</strong><small>{usernameLabel(item.assignee_username)} · до {formatDateTime(item.due_at)}</small></span><ChevronRight size={18}/></button>)}</div></section>;
 }
 

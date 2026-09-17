@@ -43,6 +43,7 @@ import { formatDate, formatDuration } from "../../shared/lib/formatters";
 import { activeDepartmentLeaderIds, isCompanyManager } from "../../shared/lib/access";
 import { enterOverlayMode } from "../../shared/lib/page-scroll";
 import { useDrawerLayout } from "../../shared/lib/drawer-layout";
+import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { StatusChip } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { DateTimePicker } from "../../shared/ui/DateTimePicker";
@@ -163,6 +164,11 @@ export function CallsPage({
   onOpenRevisionComparison?: (callId: string, revision?: number) => void;
 }) {
   const [initialURLFilters] = useState(initialCallsURLFilters);
+  // The workspace chosen in the header is the scope this page is read in. A link
+  // that names a company or a scope of its own keeps it: that is the reader's
+  // explicit choice, and only the first render honours it.
+  const workspaceCompanyId = useWorkspaceCompanyId();
+  const appliedWorkspaceRef = useRef<string | null>(null);
   const callsSidebarScrollRef = useRef<HTMLElement | null>(null);
   const callOverviewScrollRef = useRef<HTMLElement | null>(null);
   const [statusFilter, setStatusFilter] = useState<CallStatus | "all">(initialURLFilters.status);
@@ -186,6 +192,31 @@ export function CallsPage({
   const [processingErrorOnly, setProcessingErrorOnly] = useState(initialURLFilters.processingError);
   const [sortFilter, setSortFilter] = useState<"occurred_at" | "created_at" | "duration">(initialURLFilters.sort);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialURLFilters.order);
+  const urlPinnedScope = useRef(initialURLFilters.company !== "all" || initialURLFilters.scope !== "all");
+
+  useEffect(() => {
+    if (workspaceCompanyId === null) return;
+    // A link that already says which company or scope to show wins once; after
+    // that, switching the workspace in the header re-scopes the page.
+    if (urlPinnedScope.current) {
+      urlPinnedScope.current = false;
+      appliedWorkspaceRef.current = workspaceCompanyId;
+      return;
+    }
+    if (appliedWorkspaceRef.current === workspaceCompanyId) return;
+    appliedWorkspaceRef.current = workspaceCompanyId;
+    if (workspaceCompanyId) {
+      setCompanyFilter(workspaceCompanyId);
+      setScopeFilter("all");
+    } else {
+      // The personal workspace is the person's own calls, not everything they
+      // can reach.
+      setCompanyFilter("all");
+      setScopeFilter("personal");
+    }
+    setDepartmentFilter("all");
+  }, [workspaceCompanyId]);
+
   // Bumped after a restore so the list picks the call back up.
   const [restoredCallsToken, setRestoredCallsToken] = useState(0);
   // Bumped after a delete so the bin panel shows the call straight away.

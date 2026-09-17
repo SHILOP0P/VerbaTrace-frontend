@@ -17,6 +17,7 @@ import type {
 } from "../../types";
 import { isAnalysisDone } from "../../shared/lib/analysis";
 import { formatBytes, formatDate, reportFormatLabel, reportStatusLabel } from "../../shared/lib/formatters";
+import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { SelectControl } from "../../shared/ui/primitives";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { reportFormats } from "./ReportExportPanel";
@@ -29,6 +30,7 @@ export function AiReportsPage({
   analyses: Record<string, AnalysisResponse>;
 }) {
   const reportsPageScrollRef = useRef<HTMLElement>(null);
+  const workspaceCompanyId = useWorkspaceCompanyId();
   const [reports, setReports] = useState<ReportWithCallResponse[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
   const [formatFilter, setFormatFilter] = useState<ReportFormat | "all">("all");
@@ -68,6 +70,9 @@ export function AiReportsPage({
         .listGlobalReports({
           format: formatFilter === "all" ? undefined : formatFilter,
           status: statusFilter === "all" ? undefined : statusFilter,
+          // Read in the workspace the header points at, like the calls and the
+          // actions are.
+          company_uuid: workspaceCompanyId || undefined,
           sort: "created_at",
           order: "desc",
           limit: 50,
@@ -86,7 +91,7 @@ export function AiReportsPage({
     return () => {
       cancelled = true;
     };
-  }, [formatFilter, statusFilter]);
+  }, [formatFilter, statusFilter, workspaceCompanyId]);
 
   async function createCallReport() {
     if (!selectedCall) {

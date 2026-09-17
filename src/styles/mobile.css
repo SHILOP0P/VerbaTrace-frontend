@@ -1,5 +1,78 @@
 /* Mobile layout layer. Imported last to consolidate desktop-first rules. */
 @media (max-width: 760px) {
+  /* The floor for a phone. Desktop type goes down to 10–12 px for labels and
+     secondary lines, which is legible next to desktop spacing and is not next to
+     the roomier padding a phone has: the panels read as one block of grey. These
+     three values are the minimum — a new rule for a phone does not go below
+     them, and there is no reason for it to set its own smaller size. */
+  .app-shell,
+  .landing {
+    --mobile-text: 16px;
+    --mobile-text-small: 14px;
+    --mobile-min-gap: 12px;
+  }
+
+  /* Secondary text: facts in a card, hints under a control, list labels, empty
+     states. All of these were 11–13 px. */
+  .app-shell :is(
+    .admin-detail dl, .admin-detail > p, .admin-detail dt, .admin-detail dd,
+    .admin-subscription p, .admin-subscription small, .admin-subscription strong,
+    .admin-action-block p, .admin-call-note p, .admin-session-summary,
+    .admin-entity-cell, .admin-entity-cell > small, .admin-entity-identity small,
+    .admin-section-summary, .admin-empty, .admin-notice, .admin-action-status,
+    .admin-restore-intro, .audit-trail-details, .audit-trail-entry-title small,
+    .audit-trail-actor, .audit-trail-date, .audit-trail-reason,
+    .admin-company-selection > p, .checkbox-row > span, .panel-note, .field-hint
+  ) { font-size: var(--mobile-text-small); }
+
+  /* The label above a control, and the control's own text with it: a 12 px
+     caption over a 44 px field is the pairing that looked most out of scale. */
+  .app-shell :is(.admin-detail, .admin-action-block, .admin-subscription, .admin-call-note) label {
+    font-size: var(--mobile-text-small);
+  }
+
+  /* Body text and the labels above controls: the size a phone is read at. */
+  .app-shell :is(
+    .admin-detail h2, .admin-action-block h3, .admin-company-selection h3,
+    .admin-restore-card h2, .admin-entity-identity strong, .audit-trail-entry-head strong,
+    .admin-nav button, .admin-toolbar label, .admin-toolbar input
+  ) { font-size: var(--mobile-text); }
+
+  .app-shell .eyebrow { font-size: 12px; }
+  .app-shell .mobile-bottom-nav button { font-size: 11px; }
+
+  /* A long single word — "Администрирование" — broke mid-word on the narrowest
+     phones. The heading gives up size, and the emblem beside it gives up room,
+     before the word gives up being one word. */
+  .app-shell :is(.app-page-heading, .admin-page-head) h1 { font-size: clamp(20px, 5.6vw, 34px); }
+  .app-shell :is(.app-page-heading, .admin-heading) { --settings-heading-icon-size: 64px; }
+
+  /* Below this the emblem and the title stop sharing a row: side by side the
+     title had 231 px for a word that needs 233 and broke after the last letter
+     but one. Stacked, it has the whole width. */
+  @media (max-width: 430px) {
+    .app-shell :is(.app-page-heading, .settings-heading) {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: start;
+    }
+
+    .app-shell :is(.app-page-heading, .admin-heading) { --settings-heading-icon-size: 56px; }
+
+    /* Stacked, the emblem is a square on its own row: as a stretched grid item
+       it became a band the width of the card. */
+    .app-shell :is(.app-page-heading, .settings-heading) > .settings-heading-icon {
+      justify-self: start;
+      width: var(--settings-heading-icon-size);
+    }
+  }
+
+  /* Stacked blocks keep at least the floor between them: 8 px next to 20 px of
+     card padding reads as a single paragraph. */
+  .app-shell :is(
+    .admin-action-block, .admin-subscription, .admin-call-note, .admin-button-row,
+    .admin-detail dl, .admin-company-selection, .admin-restore-list
+  ) { gap: var(--mobile-min-gap); }
+
   .transcription-edit-header { grid-template-columns: 1fr auto; padding: 16px; }
   .transcription-edit-header > button { grid-column: 1 / -1; justify-self: start; }
   .transcription-edit-guide { align-items: flex-start; }
@@ -414,6 +487,21 @@
     .panel-heading > *, .app-page-heading > *, .welcome-panel > *, .report-actions > *,
     .panel-actions > *, .deep-create-actions > *, .entity-toolbar > *, .admin-toolbar > *
   ) { max-width: 100%; }
+
+  /* The rule above stacks every toolbar control on a row of its own, which left
+     the search button stretched across the whole panel and the refresh icon
+     alone underneath, reading as two unfinished fields. The field keeps its own
+     row; the two buttons share the next one. */
+  .app-shell .admin-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .app-shell .admin-toolbar > * { grid-column: 1 / -1; }
+  .app-shell .admin-toolbar > button[type="submit"] { grid-column: 1; width: 100%; }
+  .app-shell .admin-toolbar > .icon-button { grid-column: 2; width: 44px; height: 44px; }
 
   /* A mini card that carries buttons has to stack: side by side the actions get
      squeezed into a column of single letters. Written without :has() so it also

@@ -78,25 +78,49 @@ export function CompanyLifecyclePanel({
       </div>
       {error && <div className="form-error">{error}</div>}
       {isOwner && (
+        /* Every action the state knows about stays on screen and the ones that do
+           not apply are pale and inert, with a title that says why. Hiding them
+           left the panel looking different on every visit and gave no hint that
+           the company could be switched on again at all. */
         <div className="panel-actions">
-          {lifecycle.state === "active" && (
-            <button className="ghost-button small" type="button" disabled={busy} onClick={() => setFreezeOpen(true)}>
-              <PauseCircle size={16} />
-              Заморозить
-            </button>
-          )}
-          {beingDeleted && (
-            <button className="primary-button small" type="button" disabled={busy} onClick={() => void change("cancel-deletion")}>
-              <Undo2 size={16} />
-              {busy ? "Отменяю…" : "Отменить удаление"}
-            </button>
-          )}
-          {lifecycle.state === "frozen" && !beingDeleted && (
-            <button className="primary-button small" type="button" disabled={busy} onClick={() => void change("activate")}>
-              <PlayCircle size={16} />
-              Включить компанию
-            </button>
-          )}
+          <button
+            className="ghost-button small"
+            type="button"
+            disabled={busy || lifecycle.state !== "active"}
+            title={lifecycle.state === "active" ? undefined : "Заморозить можно только работающую компанию"}
+            onClick={() => setFreezeOpen(true)}
+          >
+            <PauseCircle size={16} />
+            Заморозить
+          </button>
+          <button
+            className="primary-button small"
+            type="button"
+            disabled={busy || !beingDeleted}
+            title={beingDeleted ? undefined : "Отменять нечего: удаление не начато"}
+            onClick={() => void change("cancel-deletion")}
+          >
+            <Undo2 size={16} />
+            {busy && beingDeleted ? "Отменяю…" : "Отменить удаление"}
+          </button>
+          <button
+            className="primary-button small"
+            type="button"
+            disabled={busy || lifecycle.state !== "frozen" || beingDeleted}
+            title={
+              lifecycle.state === "active"
+                ? "Компания и так работает"
+                : beingDeleted
+                  ? "Сначала отмените удаление"
+                  : lifecycle.state === "soft_deleted"
+                    ? "Компания удалена: вернуть её может только суперадмин"
+                    : undefined
+            }
+            onClick={() => void change("activate")}
+          >
+            <PlayCircle size={16} />
+            Включить компанию
+          </button>
         </div>
       )}
       <ConfirmDialog

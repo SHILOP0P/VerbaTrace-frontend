@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../api";
 import type { AdminAuditTrail, AdminAuditTrailEntry } from "../../types";
 import { SelectControl } from "../../shared/ui/primitives";
+import { DateTimePicker } from "../../shared/ui/DateTimePicker";
 import { formatUsername } from "../calls/call-page-utils";
 
 const trailLabels: Record<AdminAuditTrail, string> = {
@@ -238,14 +239,16 @@ export function AuditTrailsPanel() {
             </option>
           ))}
         </SelectControl>
-        <label className="audit-trail-date">
+        {/* The project has its own calendar, so the period does not fall back to
+            the browser's native picker, which looks like another product. */}
+        <div className="audit-trail-date">
           <span>С</span>
-          <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-        </label>
-        <label className="audit-trail-date">
+          <DateTimePicker mode="date" placement="below" ariaLabel="Начало периода" value={from} onChange={setFrom} />
+        </div>
+        <div className="audit-trail-date">
           <span>По</span>
-          <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-        </label>
+          <DateTimePicker mode="date" placement="below" ariaLabel="Конец периода" value={to} onChange={setTo} />
+        </div>
         <button className="ghost-button small" type="submit">
           Показать
         </button>

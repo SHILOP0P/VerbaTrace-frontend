@@ -6,9 +6,11 @@ import { isVideoCall } from "../../shared/lib/media";
 import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
 import { SelectControl } from "../../shared/ui/primitives";
 import { DateTimePicker } from "../../shared/ui/DateTimePicker";
+import { formatUsername } from "../calls/call-page-utils";
 import type {
   AppPage,
   AdminCapabilitiesResponse,
+  AdminCompanyResponse,
   AdminRestorableCompanyResponse,
   CallResponse,
   CallAction,
@@ -80,13 +82,13 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
   const [actionCompanyTag, setActionCompanyTag] = useState("");
   const [actionDepartment, setActionDepartment] = useState("");
   const [users, setUsers] = useState<UserResponse[]>([]);
-  const [companies, setCompanies] = useState<CompanyResponse[]>([]);
+  const [companies, setCompanies] = useState<AdminCompanyResponse[]>([]);
   const [actions, setActions] = useState<CallAction[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
   const [companiesTotal, setCompaniesTotal] = useState(0);
   const [actionsTotal, setActionsTotal] = useState(0);
   const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<CompanyResponse | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<AdminCompanyResponse | null>(null);
   const [selectedAction, setSelectedAction] = useState<CallAction | null>(null);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState<Record<AdminSection, boolean>>({ users: false, companies: false, actions: false, audit: false, restore: false });
@@ -180,7 +182,7 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
     }
   }
 
-  async function openCompany(company: CompanyResponse) {
+  async function openCompany(company: AdminCompanyResponse) {
     setNotice("");
     try {
       setSelectedCompany(await api.getAdminCompany(company.id));
@@ -218,7 +220,7 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
     setUsers((items) => items.map((item) => item.id === updated.id ? updated : item));
   }
 
-  function replaceCompany(updated: CompanyResponse) {
+  function replaceCompany(updated: AdminCompanyResponse) {
     setSelectedCompany(updated);
     setCompanies((items) => items.map((item) => item.id === updated.id ? updated : item));
   }
@@ -387,7 +389,7 @@ function SessionsPanel({ userId, canManage, onNotice }: { userId: string; canMan
   return <div className="admin-action-block"><h3>Сессии</h3>{loading ? <p className="admin-session-summary">Загрузка сессий…</p> : sessions.length ? <ul className="admin-sessions">{sessions.map((item) => <li key={item.id}><span><strong>{item.current ? "Текущая сессия" : "Сессия"}</strong><small>{item.user_agent || "Устройство не определено"} · {item.ip || "IP скрыт"}<br />{date(item.last_seen_at || item.created_at)}</small></span>{canManage && <button className="ghost-button small" type="button" onClick={() => setPending({ id: item.id, label: "Завершить сессию" })}>Завершить</button>}</li>)}</ul> : <p className="admin-session-summary">Активных сессий нет</p>}{canManage && sessions.length > 0 && <button className="admin-session-danger" type="button" onClick={() => setPending({ label: "Завершить все сессии" })}>Завершить все сессии</button>}{pending && <ReasonDialog title={pending.label} busy={busy} reason={reason} onReason={setReason} onCancel={() => setPending(null)} onConfirm={() => void revoke()} />}</div>;
 }
 
-function CompanyDetail({ company, capabilities, onBack, onUpdated }: { company: CompanyResponse; capabilities: AdminCapabilitiesResponse; onBack: () => void; onUpdated: (company: CompanyResponse) => void }) {
+function CompanyDetail({ company, capabilities, onBack, onUpdated }: { company: AdminCompanyResponse; capabilities: AdminCapabilitiesResponse; onBack: () => void; onUpdated: (company: AdminCompanyResponse) => void }) {
   const [notice, setNotice] = useState("");
   const canEditTag = has(capabilities, "admin.companies.manage") || capabilities.role === "admin" || capabilities.role === "superadmin";
   const [tag, setTag] = useState(company.tag ?? "");
@@ -401,9 +403,19 @@ function CompanyDetail({ company, capabilities, onBack, onUpdated }: { company: 
     if (!tag.trim()) return setNotice("Введите тег компании");
     if (!tagReason.trim()) { setTagReasonInvalid(true); setNotice("Укажите причину: она обязательна для аудита."); tagReasonRef.current?.focus(); return; }
     setBusy(true);
-    try { onUpdated(await api.updateAdminCompanyTag(company.id, tag, tagReason.trim()) as unknown as CompanyResponse); setTagReason(""); setNotice("Тег компании обновлён"); showAdminAlert("Тег компании обновлён"); } catch (error) { setNotice(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
+    try { onUpdated(await api.updateAdminCompanyTag(company.id, tag, tagReason.trim())); setTagReason(""); setNotice("Тег компании обновлён"); showAdminAlert("Тег компании обновлён"); } catch (error) { setNotice(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
   }
-  return <section className="admin-page admin-user-page"><button className="text-button" type="button" onClick={onBack}>← К компаниям</button><header className="admin-page-head"><div><p className="eyebrow">КАРТОЧКА КОМПАНИИ</p><h1>{company.name}</h1><p>{company.tag || "Тег не задан"}</p></div></header>{notice && <p className="admin-notice" role="status">{notice}</p>}<div className="admin-profile-grid"><section className="admin-detail"><h2>Компания</h2><dl><dt>Тег</dt><dd>{company.tag || "Тег не задан"}</dd><dt>Создана</dt><dd>{date(company.created_at)}</dd></dl>{canEditTag && <div className="admin-action-block"><h3>Изменить тег</h3><p>Нужен временный доступ, одобренный компанией. Суперадмин действует без одобрения, но причина обязательна всегда.</p><label>Тег<input value={tag} onChange={(event) => setTag(event.target.value)} placeholder="@verbatrace_team" /></label><label className={tagReasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={tagReasonRef} aria-invalid={tagReasonInvalid} value={tagReason} onChange={(event) => { setTagReason(event.target.value); setTagReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><button className="primary-button small admin-action-button" type="button" disabled={busy} onClick={() => void saveTag()}>{busy ? "Сохраняю…" : "Сохранить тег"}</button></div>}{capabilities.role === "superadmin" && <CompanyRestorePanel companyId={company.id} />}{capabilities.role === "superadmin" && has(capabilities, "admin.subscriptions.manage") && <UsageResetPanel kind="companies" id={company.id} />}</section><section className="admin-detail">{has(capabilities, "admin.subscriptions.read") && <SubscriptionPanel kind="companies" id={company.id} canManage={has(capabilities, "admin.subscriptions.manage")} />}</section></div></section>;
+  // A restore applies to a company being deleted, once. The card only ever opens
+  // a company that is not deleted, so the action is offered but inert, with the
+  // reason on it — and the queue that does list such companies is named.
+  const restorable = company.lifecycle_state === "soft_deleted" && !company.restore_used;
+  return <section className="admin-page admin-user-page"><button className="text-button" type="button" onClick={onBack}>← К компаниям</button><header className="admin-page-head"><div><p className="eyebrow">КАРТОЧКА КОМПАНИИ</p><h1>{company.name}</h1><p>{normalizeTag(company.tag)}</p></div>{company.lifecycle_state && <span className={`status-chip ${company.lifecycle_state === "active" ? "ok" : "warn"}`}>{companyStateLabel(company)}</span>}</header>{notice && <p className="admin-notice" role="status">{notice}</p>}<div className="admin-profile-grid"><section className="admin-detail"><h2>Компания</h2><dl><dt>Тег</dt><dd>{normalizeTag(company.tag)}</dd><dt>Создана</dt><dd>{date(company.created_at)}</dd><dt>Состояние</dt><dd>{companyStateLabel(company)}</dd></dl>{canEditTag && <div className="admin-action-block"><h3>Изменить тег</h3><p>Нужен временный доступ, одобренный компанией. Суперадмин действует без одобрения, но причина обязательна всегда.</p><label>Тег<input value={tag} onChange={(event) => setTag(event.target.value)} placeholder="@verbatrace_team" /></label><label className={tagReasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={tagReasonRef} aria-invalid={tagReasonInvalid} value={tagReason} onChange={(event) => { setTagReason(event.target.value); setTagReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><button className="primary-button small admin-action-button" type="button" disabled={busy || !tag.trim() || !tagReason.trim()} title={!tag.trim() ? "Введите тег" : !tagReason.trim() ? "Причина обязательна для аудита" : undefined} onClick={() => void saveTag()}>{busy ? "Сохраняю…" : "Сохранить тег"}</button></div>}{capabilities.role === "superadmin" && <CompanyRestorePanel companyId={company.id} disabledReason={restorable ? undefined : company.restore_used ? "Восстановление уже использовано" : "Компания не удаляется — восстанавливать нечего. Удаляемые компании собраны в разделе «Восстановление»."} />}{capabilities.role === "superadmin" && has(capabilities, "admin.subscriptions.manage") && <UsageResetPanel kind="companies" id={company.id} />}</section><section className="admin-detail">{has(capabilities, "admin.subscriptions.read") && <SubscriptionPanel kind="companies" id={company.id} canManage={has(capabilities, "admin.subscriptions.manage")} />}</section></div></section>;
+}
+
+function companyStateLabel(company: AdminCompanyResponse) {
+  if (company.lifecycle_state === "frozen") return company.freeze_reason === "deletion" ? "Удаляется" : "Заморожена";
+  if (company.lifecycle_state === "soft_deleted") return "Удалена";
+  return "Активна";
 }
 
 /**
@@ -411,18 +423,19 @@ function CompanyDetail({ company, capabilities, onBack, onUpdated }: { company: 
  * is being deleted. It brings the company back to a freeze and gives nobody
  * access to its content, and it works once per company.
  */
-function CompanyRestorePanel({ companyId, onRestored }: { companyId: string; onRestored?: () => void }) {
+function CompanyRestorePanel({ companyId, onRestored, disabledReason }: { companyId: string; onRestored?: () => void; disabledReason?: string }) {
   const [reason, setReason] = useState("");
   const [reasonInvalid, setReasonInvalid] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const reasonRef = useRef<HTMLInputElement>(null);
   async function restore() {
+    if (disabledReason) return;
     if (!reason.trim()) { setReasonInvalid(true); setStatus("Укажите причину восстановления."); reasonRef.current?.focus(); return; }
     setBusy(true); setStatus("");
     try { const lifecycle = await api.restoreAdminCompany(companyId, reason.trim()); setReason(""); setStatus(`Компания возвращена в заморозку на 30 дней. Повторное восстановление недоступно: ${lifecycle.restore_used ? "уже использовано" : "доступно"}.`); showAdminAlert("Компания восстановлена"); onRestored?.(); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
   }
-  return <div className="admin-action-block"><h3>Восстановить удаляемую компанию</h3><p>Возвращает компанию из мягкого удаления в заморозку ещё на 30 дней, без доступа к её содержимому. Доступно один раз на компанию.</p><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void restore()}>{busy ? "Восстанавливаю…" : "Восстановить компанию"}</button></div>;
+  return <div className="admin-action-block"><h3>Восстановить удаляемую компанию</h3><p>Возвращает компанию из мягкого удаления в заморозку ещё на 30 дней, без доступа к её содержимому. Доступно один раз на компанию.</p>{disabledReason ? <p className="admin-action-status" role="status">{disabledReason}</p> : <label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>}{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button" type="button" disabled={busy || Boolean(disabledReason) || !reason.trim()} title={disabledReason ?? (!reason.trim() ? "Причина обязательна для аудита" : undefined)} onClick={() => void restore()}>{busy ? "Восстанавливаю…" : "Восстановить компанию"}</button></div>;
 }
 
 /**
@@ -532,7 +545,7 @@ function SubscriptionPanel({ kind, id, canManage }: { kind: SubscriptionOwner; i
     });
   }
   if (!available) return null;
-  return <div className="admin-subscription"><strong>Подписка</strong><p>{subscription ? `${subscriptionPlanName} · ${subscription.status}` : status}</p>{subscription?.ends_at && <small>Действует до {date(subscription.ends_at)}</small>}{canManage && <><label>Тариф<SelectControl value={planCode} onChange={(event) => setPlanCode(event.target.value)}>{plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</SelectControl></label><label>Дата окончания<input type="date" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy} onClick={() => void grant()}>{subscription ? "Продлить / выдать" : "Выдать подписку"}</button>{subscription && <button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void cancel()}>Отменить</button>}</div>{selection && <div className="admin-company-selection"><h3>Какие компании останутся активными</h3><p>Новый тариф покрывает {selection.limit} из {selection.companyIds.length}. Остальные будут заморожены: данные сохранятся, изменения прекратятся.</p><div className="admin-company-selection-list">{selection.companyIds.map((companyId) => <label className="checkbox-row" key={companyId}><input type="checkbox" checked={selection.chosen.includes(companyId)} onChange={() => toggleChosen(companyId)} /><span>{selectionNames[companyId] ?? "Компания без названия"}</span></label>)}</div><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy || selection.chosen.length === 0 || selection.chosen.length > selection.limit} onClick={() => void grant(selection.chosen)}>Применить тариф</button><button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => setSelection(null)}>Отмена</button></div></div>}</>}</div>;
+  return <div className="admin-subscription"><strong>Подписка</strong><p>{subscription ? `${subscriptionPlanName} · ${subscription.status}` : status}</p>{subscription?.ends_at && <small>Действует до {date(subscription.ends_at)}</small>}{canManage && <><label>Тариф<SelectControl value={planCode} onChange={(event) => setPlanCode(event.target.value)}>{plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</SelectControl></label><label>Дата окончания<DateTimePicker mode="date" placement="below" ariaLabel="Дата окончания подписки" value={endsAt} onChange={setEndsAt} /></label><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy} onClick={() => void grant()}>{subscription ? "Продлить / выдать" : "Выдать подписку"}</button>{subscription && <button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void cancel()}>Отменить</button>}</div>{selection && <div className="admin-company-selection"><h3>Какие компании останутся активными</h3><p>Новый тариф покрывает {selection.limit} из {selection.companyIds.length}. Остальные будут заморожены: данные сохранятся, изменения прекратятся.</p><div className="admin-company-selection-list">{selection.companyIds.map((companyId) => <label className="checkbox-row" key={companyId}><input type="checkbox" checked={selection.chosen.includes(companyId)} onChange={() => toggleChosen(companyId)} /><span>{selectionNames[companyId] ?? "Компания без названия"}</span></label>)}</div><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy || selection.chosen.length === 0 || selection.chosen.length > selection.limit} onClick={() => void grant(selection.chosen)}>Применить тариф</button><button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => setSelection(null)}>Отмена</button></div></div>}</>}</div>;
 }
 
 function UsageResetPanel({ kind, id }: { kind: SubscriptionOwner; id: string }) {
@@ -572,8 +585,42 @@ function ReasonDialog({ title, reason, busy, onReason, onCancel, onConfirm }: { 
   return <div className="confirm-dialog-layer" role="presentation" onPointerDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel(); }}><form className="confirm-dialog danger" role="dialog" aria-modal="true" aria-label={title} onSubmit={(event) => { event.preventDefault(); if (!busy && reason.trim()) onConfirm(); }}><div className="confirm-dialog-content"><div className="confirm-dialog-head"><h2>{title}</h2></div><p>Причина обязательна для аудита действия.</p><label className="admin-dialog-field">Причина<input autoFocus value={reason} onChange={(event) => onReason(event.target.value)} /></label><div className="confirm-dialog-actions"><button className="primary-button small danger-confirm" type="submit" disabled={busy || !reason.trim()}>{busy ? "Выполняю…" : "Подтвердить"}</button><button className="ghost-button small" type="button" disabled={busy} onClick={onCancel}>Отмена</button></div></div></form></div>;
 }
 
-function UsersTable({ users, onOpen }: { users: UserResponse[]; onOpen: (user: UserResponse) => void }) { return <div className="admin-table-wrap"><table><thead><tr><th>Пользователь</th><th>Роль</th><th>Создан</th><th /></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><strong>{fullName(user)}</strong><small>{user.username} · {user.email}</small></td><td><span className="chip">{roleLabel(user.role)}</span></td><td>{date(user.created_at)}</td><td><button className="ghost-button small" type="button" onClick={() => onOpen(user)}>Открыть</button></td></tr>)}</tbody></table>{users.length === 0 && <p className="admin-empty">Пользователи не найдены</p>}</div>; }
-function CompaniesTable({ companies, onOpen }: { companies: CompanyResponse[]; onOpen: (company: CompanyResponse) => void }) { return <div className="admin-table-wrap"><table><thead><tr><th>Компания</th><th>Тег</th><th>Создана</th><th /></tr></thead><tbody>{companies.map((company) => <tr key={company.id}><td><strong>{company.name}</strong></td><td>{company.tag || "Тег не задан"}</td><td>{date(company.created_at)}</td><td><button className="ghost-button small" type="button" onClick={() => onOpen(company)}>Открыть</button></td></tr>)}</tbody></table>{companies.length === 0 && <p className="admin-empty">Компании не найдены</p>}</div>; }
+/*
+ * The lists follow the same shape the actions list already uses: a header row
+ * on a wide screen, and rows that carry their own labels once the layout is too
+ * narrow for columns. A table there scrolled sideways instead, so the role and
+ * the date were simply off screen with nothing to say they existed.
+ */
+function UsersTable({ users, onOpen }: { users: UserResponse[]; onOpen: (user: UserResponse) => void }) {
+  return <div className="admin-entity-list">
+    <div className="admin-entity-list-head" aria-hidden="true"><span>Пользователь</span><span>Роль</span><span>Создан</span><span /></div>
+    {users.map((user) => <article className="admin-entity-list-row" key={user.id}>
+      <div className="admin-entity-identity">
+        <UserAvatar user={user} />
+        <div><strong>{fullName(user)}</strong><small>{formatUsername(user.username)} · {user.email}</small></div>
+      </div>
+      <div className="admin-entity-cell"><small>Роль</small><span className={`chip is-role-${user.role}`}>{roleLabel(user.role)}</span></div>
+      <div className="admin-entity-cell"><small>Создан</small><span>{date(user.created_at)}</span></div>
+      <button className="ghost-button small" type="button" onClick={() => onOpen(user)}>Открыть</button>
+    </article>)}
+    {users.length === 0 && <p className="admin-empty">Пользователи не найдены</p>}
+  </div>;
+}
+function CompaniesTable({ companies, onOpen }: { companies: AdminCompanyResponse[]; onOpen: (company: AdminCompanyResponse) => void }) {
+  return <div className="admin-entity-list">
+    <div className="admin-entity-list-head" aria-hidden="true"><span>Компания</span><span>Тег</span><span>Создана</span><span /></div>
+    {companies.map((company) => <article className="admin-entity-list-row" key={company.id}>
+      <div className="admin-entity-identity">
+        <span className="admin-avatar" aria-hidden="true"><Building2 size={19} /></span>
+        <div><strong>{company.name}</strong></div>
+      </div>
+      <div className="admin-entity-cell"><small>Тег</small><span>{normalizeTag(company.tag)}</span></div>
+      <div className="admin-entity-cell"><small>Создана</small><span>{date(company.created_at)}</span></div>
+      <button className="ghost-button small" type="button" onClick={() => onOpen(company)}>Открыть</button>
+    </article>)}
+    {companies.length === 0 && <p className="admin-empty">Компании не найдены</p>}
+  </div>;
+}
 
 function ActionsTable({ actions, onOpen, onOpenScope }: { actions: CallAction[]; onOpen: (action: CallAction) => void; onOpenScope: (action: CallAction) => void }) {
   return <div className="admin-actions-list"><div className="admin-action-list-head" aria-hidden="true"><span>Действие, компания и отдел</span><span>Ответственный</span><span>Статус</span><span>Срок</span><span/></div>{actions.map((action) => <article className="admin-action-list-row" key={action.id}><div className="admin-action-title"><strong>{action.title}</strong><small className="admin-action-scope"><span>{action.company_uuid ? (action.company_name || "Компания") : "Персональное действие"}</span> · <button type="button" onClick={() => void onOpenScope(action)}>{actionScopeTag(action)}</button>{action.target_department_name ? <> · <span>{action.target_department_name}</span></> : null}</small></div><div className="admin-action-assignee"><small>Ответственный</small>{usernameLabel(action.assignee_username)}</div><div className="admin-action-state"><small>Статус</small><span className={`admin-action-status-chip is-${action.status}`}>{actionStatusLabel(action.status)}</span></div><div className="admin-action-due"><small>Срок</small>{date(action.due_at)}</div><button className="ghost-button small" type="button" onClick={() => onOpen(action)}>Открыть</button></article>)}{actions.length === 0 && <p className="admin-empty">Действия не найдены</p>}</div>;

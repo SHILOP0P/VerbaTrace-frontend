@@ -1337,7 +1337,30 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
   transition:
     transform 160ms ease,
     border-color 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
+/* An action that does not apply right now is pale and inert, not identical to
+   one that works. Nothing styled a disabled button before this, so a control the
+   state forbids looked exactly like a control waiting to be pressed. */
+.primary-button:disabled,
+.ghost-button:disabled,
+.text-button:disabled,
+.icon-button:disabled,
+.primary-button[aria-disabled="true"],
+.ghost-button[aria-disabled="true"] {
+  opacity: .42;
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: saturate(.72);
+}
+
+.primary-button:disabled:hover,
+.ghost-button:disabled:hover,
+.text-button:disabled:hover,
+.icon-button:disabled:hover {
+  transform: none;
 }
 
 .primary-button {
@@ -7871,6 +7894,11 @@ html[data-theme="dark"] .app-shell .chip { color: #8ee5aa; background: rgba(69, 
    its lines by default: the first line — the journal selector — grew to 200 px
    and left a hole above the date fields. The controls keep their own height. */
 .admin-toolbar { align-items: center; align-content: start; }
+/* Every control in the row is the same height, so the search field and the
+   buttons beside it read as one toolbar rather than as three loose boxes. */
+.admin-toolbar label,
+.admin-toolbar > button[type="submit"] { min-height: 44px; }
+.admin-toolbar > button[type="submit"] { flex: 0 0 auto; padding: 0 18px; white-space: nowrap; }
 .admin-toolbar label { min-width: 0; }
 .admin-toolbar input { min-width: 0; box-shadow: none; }
 .admin-table-wrap { overflow-x: auto; }
@@ -9027,9 +9055,12 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
    narrow screen, and there a basis of 200px is a height, which stretched the
    picker to 200 px and left a hole above the period fields. */
 .admin-audit-toolbar .select-control { flex: 1 1 auto; min-width: 180px; max-width: 320px; }
-.audit-trail-date { flex: 0 1 auto; gap: 8px; font-size: 12px; font-weight: 700; }
+/* The period is two of the project's own date pickers rather than native date
+   inputs, so it is a plain row here: the label, then the picker's own control. */
+.audit-trail-date { display: flex; flex: 0 1 auto; gap: 8px; align-items: center; min-width: 0; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; }
 .audit-trail-date > span { white-space: nowrap; }
-.audit-trail-date input { width: auto; min-width: 0; }
+.audit-trail-date .date-time-picker { min-width: 0; }
+.audit-trail-date .date-time-trigger { min-height: 44px; }
 .audit-trail-reason { display: grid; gap: 6px; margin: 0 18px 4px; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; }
 .audit-trail-reason input { width: 100%; min-height: 40px; padding: 9px 11px; box-sizing: border-box; color: var(--app-text, var(--text)); font: inherit; background: var(--app-panel-soft, var(--surface-2)); border: 1px solid var(--app-border, var(--border)); border-radius: 10px; }
 .audit-trail-resolve { margin-left: auto; white-space: nowrap; }
@@ -9154,6 +9185,114 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
   overflow-y: auto;
   min-width: 0;
 }
+
+/* Users and companies as a list rather than a table: the same shape the actions
+   list uses, so the columns turn into labelled rows instead of scrolling out of
+   sight. */
+.admin-entity-list { min-width: 0; overflow: hidden; }
+
+.admin-entity-list-head,
+.admin-entity-list-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, .4fr) 130px 106px;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  padding: 14px 18px;
+}
+
+.admin-entity-list-head {
+  color: var(--app-muted, var(--muted));
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  border-bottom: 1px solid var(--app-border, var(--border));
+  text-transform: uppercase;
+}
+
+.admin-entity-list-row { border-bottom: 1px solid var(--app-border, var(--border)); }
+.admin-entity-list-row:last-of-type { border-bottom: 0; }
+.admin-entity-list-row > * { min-width: 0; }
+
+.admin-entity-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-entity-identity strong { display: block; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.admin-entity-identity small { display: block; margin-top: 3px; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+
+.admin-entity-list-row .admin-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+/* The label in front of a value only appears where the header row is gone. */
+.admin-entity-cell { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.admin-entity-cell > small { display: none; color: var(--app-muted, var(--muted)); font-size: 11px; font-weight: 700; }
+.admin-entity-list-row > button { justify-content: center; width: 100%; }
+
+@media (max-width: 1180px) {
+  .admin-entity-list-head { display: none; }
+
+  .admin-entity-list-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 18px;
+    padding: 16px 18px;
+  }
+
+  .admin-entity-list-row .admin-entity-identity { grid-column: 1 / -1; }
+
+  .admin-entity-cell {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    grid-column: 1;
+  }
+
+  .admin-entity-cell > small { display: block; }
+  .admin-entity-list-row > button { grid-column: 2; grid-row: 2 / span 2; align-self: center; width: 108px; }
+}
+
+@media (max-width: 620px) {
+  .admin-entity-list-row { grid-template-columns: minmax(0, 1fr); }
+  .admin-entity-list-row > button { grid-column: 1; grid-row: auto; width: 100%; }
+}
+
+/* A role is not a status: all four used to be the same green chip, so the one
+   that matters — an administrator among ordinary users — did not stand out. The
+   theme rules for `.chip` carry `.app-shell` in front of them, so these do too,
+   otherwise the green would win on specificity. */
+.app-shell .chip.is-role-user,
+html[data-theme="dark"] .app-shell .chip.is-role-user,
+html[data-theme="light"] .app-shell .chip.is-role-user {
+  color: var(--app-muted, var(--muted));
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.app-shell .chip.is-role-helper,
+html[data-theme="dark"] .app-shell .chip.is-role-helper,
+html[data-theme="light"] .app-shell .chip.is-role-helper {
+  color: #69b9f1;
+  background: rgba(65, 151, 218, .14);
+}
+
+.app-shell .chip.is-role-admin,
+html[data-theme="dark"] .app-shell .chip.is-role-admin,
+html[data-theme="light"] .app-shell .chip.is-role-admin {
+  color: #efb45f;
+  background: rgba(224, 148, 50, .14);
+}
+
+/* A chip is as wide as its label: in a labelled row it is a grid item, and a
+   grid item stretches unless it is told not to. */
+.admin-entity-cell > .chip { justify-self: start; }
 
 /* The superadmin's rescue queue: companies on their way to being erased. The
    cards are the ordinary admin detail card, minus its stickiness — a sticky

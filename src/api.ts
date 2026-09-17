@@ -1031,7 +1031,7 @@ export const api = {
   },
 
   getAdminCompany(companyId: string) {
-    return request<CompanyResponse>(
+    return request<AdminCompanyResponse>(
       `/admin/companies/${encodeURIComponent(companyId)}`,
     );
   },

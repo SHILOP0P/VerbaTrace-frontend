@@ -267,7 +267,7 @@ export interface AdminUsersResponse {
 }
 
 export interface AdminCompaniesResponse {
-  items: CompanyResponse[];
+  items: AdminCompanyResponse[];
   total: number;
   limit: number;
   offset: number;
@@ -293,6 +293,13 @@ export interface AdminCompanyResponse {
   tag: string;
   manager_user_uuid: string;
   created_at: string;
+  /**
+   * Which actions on the card still mean anything. A restore applies to a
+   * company being deleted and to no other, and it applies once.
+   */
+  lifecycle_state?: "active" | "frozen" | "soft_deleted";
+  freeze_reason?: string;
+  restore_used?: boolean;
 }
 
 /**

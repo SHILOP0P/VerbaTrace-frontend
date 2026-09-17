@@ -295,6 +295,20 @@ export interface AdminCompanyResponse {
   created_at: string;
 }
 
+/**
+ * A company waiting to be erased that the superadmin may still pull back. It
+ * cannot appear in the ordinary company list, which filters deleted rows.
+ */
+export interface AdminRestorableCompanyResponse {
+  company_uuid: string;
+  name: string;
+  tag: string;
+  manager_user_uuid: string;
+  soft_deleted_at: string;
+  /** The deadline the decision is made by; null while it is not set. */
+  purge_after: string | null;
+}
+
 /** Where a company stands after the superadmin's rescue: frozen, and rescued. */
 export interface AdminCompanyLifecycleResponse {
   company_uuid: string;

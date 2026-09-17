@@ -2,6 +2,7 @@ import type {
   AdminCapabilitiesResponse,
   AdminCompanyLifecycleResponse,
   AdminCompanyResponse,
+  AdminRestorableCompanyResponse,
   AssistantCapabilities,
   AssistantDraft,
   AssistantChat,
@@ -138,10 +139,13 @@ const apiErrorMessages: Record<string, string> = {
   invalid_billing_input: "Некорректные данные подписки",
   failed_to_cancel_subscription: "Не удалось отменить подписку",
   // Running out of budget is not a failure: the call is accepted and waits.
+  // The limit is checked against the whole possible cost of the call, so it can
+  // refuse one while the remaining limit is not zero — saying only "исчерпан"
+  // made that look like a bug.
   company_credit_limit_exceeded:
-    "Лимит кредитов компании исчерпан. Звонок подождёт в очереди и начнёт обрабатываться, когда лимит обновится",
+    "Лимит кредитов компании не покрывает этот звонок целиком: проверяется его максимальная стоимость, поэтому остатка может не хватить даже при непустом лимите. Звонок подождёт в очереди и начнёт обрабатываться, когда лимит обновится",
   department_credit_limit_exceeded:
-    "Лимит кредитов отдела исчерпан. Звонок подождёт в очереди и начнёт обрабатываться, когда лимит обновится",
+    "Лимит кредитов отдела не покрывает этот звонок целиком: проверяется его максимальная стоимость, поэтому остатка может не хватить даже при непустом лимите. Звонок подождёт в очереди и начнёт обрабатываться, когда лимит обновится",
   pending_credit_queue_full:
     "Слишком много звонков уже ждут кредитов. Дождитесь их обработки или увеличьте лимит",
   company_frozen:
@@ -1051,6 +1055,14 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify({ tag, reason }),
       },
+    );
+  },
+
+  // The queue the rescue works from. A soft-deleted company is filtered out of
+  // every other list, so without this one there is no way to find one.
+  listRestorableAdminCompanies() {
+    return request<{ items: AdminRestorableCompanyResponse[] }>(
+      "/admin/companies/restorable",
     );
   },
 

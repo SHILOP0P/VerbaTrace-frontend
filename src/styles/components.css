@@ -7863,8 +7863,14 @@ html[data-theme="dark"] .app-shell .chip { color: #8ee5aa; background: rgba(69, 
 
 /* Responsive admin corrections */
 .admin-layout { grid-template-columns: 210px minmax(0, 1fr); }
-.admin-nav { position: sticky; top: 100px; align-self: start; }
+/* Sticky, and in front: the cards beside it carry their own background, so
+   without a stacking order they painted over the nav as the page scrolled. */
+.admin-nav { position: sticky; top: 100px; z-index: 3; align-self: start; }
 .admin-content { min-width: 0; }
+/* The toolbar wraps on narrow screens, and a wrapped flex container stretches
+   its lines by default: the first line — the journal selector — grew to 200 px
+   and left a hole above the date fields. The controls keep their own height. */
+.admin-toolbar { align-items: center; align-content: start; }
 .admin-toolbar label { min-width: 0; }
 .admin-toolbar input { min-width: 0; box-shadow: none; }
 .admin-table-wrap { overflow-x: auto; }
@@ -7882,6 +7888,26 @@ html[data-theme="dark"] .app-shell .admin-toolbar label input { padding-left: 6p
 .admin-session-danger:hover { background: linear-gradient(135deg, #ff6138, #dc3f24); transform: translateY(-1px); }
 @media (max-width: 900px) { .admin-layout { display: block; } .admin-nav { margin-bottom: 12px; } .admin-profile-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .admin-table-wrap table { min-width: 520px; } }
+
+/* Where the layout stacks, the sections wrap onto as many rows as they need.
+   They used to sit in a strip that scrolled sideways, so whatever did not fit —
+   the last section, which is the superadmin's own — was simply invisible, with
+   nothing on screen to say it was there. */
+@media (max-width: 900px) {
+  .admin-nav {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  .admin-nav button {
+    width: auto;
+    justify-content: flex-start;
+    white-space: nowrap;
+  }
+}
 
 .admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .admin-heading { --settings-heading-icon-size: 110px; max-width: none; margin-bottom: 30px; }
@@ -8997,7 +9023,10 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
    toolbar keeps the picker and the period on one row and the entries read as
    a plain list, because the details differ from trail to trail. */
 .admin-audit-toolbar { flex-wrap: wrap; align-items: center; }
-.admin-audit-toolbar .select-control { flex: 1 1 200px; min-width: 180px; max-width: 320px; }
+/* `flex-basis: auto` rather than a length: the toolbar turns into a column on a
+   narrow screen, and there a basis of 200px is a height, which stretched the
+   picker to 200 px and left a hole above the period fields. */
+.admin-audit-toolbar .select-control { flex: 1 1 auto; min-width: 180px; max-width: 320px; }
 .audit-trail-date { flex: 0 1 auto; gap: 8px; font-size: 12px; font-weight: 700; }
 .audit-trail-date > span { white-space: nowrap; }
 .audit-trail-date input { width: auto; min-width: 0; }
@@ -9006,13 +9035,20 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
 .audit-trail-resolve { margin-left: auto; white-space: nowrap; }
 .audit-trail-list { display: grid; gap: 10px; margin: 0; padding: 14px; list-style: none; }
 .audit-trail-entry { display: grid; gap: 8px; min-width: 0; padding: 12px 14px; background: var(--app-panel-soft, var(--surface-2)); border: 1px solid var(--app-border, var(--border)); border-radius: 12px; }
-.audit-trail-entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; min-width: 0; }
+.audit-trail-entry-head { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.audit-trail-entry-title { display: grid; gap: 2px; min-width: 0; }
+.audit-trail-entry-title small { display: flex; flex-wrap: wrap; gap: 0 4px; align-items: baseline; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; }
 .audit-trail-entry-head time { color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .audit-trail-entry-head strong { font-size: 14px; overflow-wrap: anywhere; }
 /* A handle, not an identifier, so it is set in the normal face at the same size
    as the other secondary labels instead of in the monospace used for raw data. */
 .audit-trail-actor { color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 600; white-space: nowrap; }
-.audit-trail-details { margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; color: var(--app-muted, var(--muted)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--app-surface, var(--surface)); border-radius: 10px; }
+/* Labelled rows rather than a JSON dump: the same shape the rest of the panel
+   uses for facts, so a record reads as a record and not as debug output. */
+.audit-trail-details { display: grid; gap: 6px; margin: 0; padding: 10px 12px; background: var(--app-surface, var(--surface)); border-radius: 10px; font-size: 13px; }
+.audit-trail-details > div { display: grid; grid-template-columns: minmax(0, 120px) minmax(0, 1fr); gap: 4px 12px; }
+.audit-trail-details dt { color: var(--app-muted, var(--muted)); }
+.audit-trail-details dd { margin: 0; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 
 /* A confirmation that is not a plain yes: handing a company over also asks
    whether the previous owner stays as a member. The extra controls sit between
@@ -9117,5 +9153,45 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
   max-height: 210px;
   overflow-y: auto;
   min-width: 0;
+}
+
+/* The superadmin's rescue queue: companies on their way to being erased. The
+   cards are the ordinary admin detail card, minus its stickiness — a sticky
+   card inside a list of cards sticks over its own neighbours. */
+.admin-restore-intro {
+  flex: 1;
+  align-self: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-restore-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+}
+
+/* `grid-column: auto` undoes the responsive rule that pins an admin detail card
+   to the second column of the page layout (`max-width: 1100px`). Inside this
+   list that rule pushed every card into a column of its own grid, which then
+   collapsed to 40 px and set the text one letter per line. */
+.admin-restore-card {
+  position: static;
+  grid-column: auto;
+  min-width: 0;
+}
+
+.admin-restore-card h2 {
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-restore-card dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 

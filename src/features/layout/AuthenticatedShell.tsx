@@ -104,6 +104,8 @@ export function AuthenticatedShell({
 	const [companyCredits, setCompanyCredits] = useState<Record<string, CreditDashboardResponse | null>>({});
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [mobileTransitionDirection, setMobileTransitionDirection] = useState<"forward" | "backward" | null>(null);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const mobileMoreRef = useRef<HTMLDivElement>(null);
   const teamPopoverRef = useRef<HTMLDivElement>(null);
   const searchPopoverRef = useRef<HTMLLabelElement>(null);
   const notificationPopoverRef = useRef<HTMLDivElement>(null);
@@ -125,6 +127,16 @@ export function AuthenticatedShell({
   const recentUnreadNotifications = recentNotifications.filter((notification) => !notification.read_at).length;
 
   useEffect(() => { setAssistantOpen(false); }, [activePage]);
+  useEffect(() => { setMobileMoreOpen(false); }, [activePage]);
+
+  // The bar holds four pages; everything else lives behind "Ещё". The sidebar is
+  // hidden on a phone, so before this the remaining sections — the admin panel
+  // among them — had no route on a phone at all.
+  const mobileMoreItems = useMemo(() => [
+    ...sidebarItems.slice(4),
+    ...(adminCapabilities ? [adminSidebarItem] : []),
+    { page: "settings" as AppPage, label: "Настройки", icon: <Settings size={19} /> }
+  ], [adminCapabilities]);
 
   function navigateFromMobileBar(nextPage: AppPage) {
     const currentMobilePage = isSettingsPage(activePage) ? "settings" : activePage;
@@ -346,6 +358,7 @@ export function AuthenticatedShell({
     return () => window.removeEventListener("verbatrace:notification-read", handleNotificationRead);
   }, []);
   useDismissibleLayer(profileOpen, profilePopoverRef, () => setProfileOpen(false));
+  useDismissibleLayer(mobileMoreOpen, mobileMoreRef, () => setMobileMoreOpen(false));
 
   function persistPreferences(next: {
     active_company_uuid?: string | null;
@@ -742,19 +755,51 @@ export function AuthenticatedShell({
         </aside>
         <main className="workspace" data-mobile-transition={mobileTransitionDirection ?? undefined}>{children}</main>
       </div>
-      <nav className="mobile-bottom-nav" aria-label="Основная навигация">
-        {[...sidebarItems.slice(0, 4), { page: "settings" as AppPage, label: "Ещё", icon: <Menu size={19} /> }].map((item) => (
+      {/* The sheet and the bar are one layer: the button that opens the sheet sits
+          in the bar, and a tap on it while the sheet is open has to close it
+          rather than count as a click outside and immediately reopen it. */}
+      <div className="mobile-nav-layer" ref={mobileMoreRef}>
+        <nav className="mobile-bottom-nav" aria-label="Основная навигация">
+          {sidebarItems.slice(0, 4).map((item) => (
+            <button
+              key={item.page}
+              className={activeSidebarPage === item.page ? "active" : ""}
+              type="button"
+              onClick={() => { setMobileMoreOpen(false); navigateFromMobileBar(item.page); }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
           <button
-            key={item.page}
-            className={activeSidebarPage === item.page || (item.page === "settings" && isSettingsPage(activePage)) ? "active" : ""}
+            className={mobileMoreOpen || isSettingsPage(activePage) || activePage === "admin" ? "active" : ""}
             type="button"
-            onClick={() => navigateFromMobileBar(item.page)}
+            aria-expanded={mobileMoreOpen}
+            aria-label={mobileMoreOpen ? "Закрыть остальные разделы" : "Остальные разделы"}
+            onClick={() => setMobileMoreOpen((open) => !open)}
           >
-            {item.icon}
-            <span>{item.label}</span>
+            <Menu size={19} />
+            <span>Ещё</span>
           </button>
-        ))}
-      </nav>
+        </nav>
+        {mobileMoreOpen && (
+          <div className="mobile-more-sheet" role="menu" aria-label="Остальные разделы">
+            {mobileMoreItems.map((item) => (
+              <button
+                key={item.page}
+                className={activeSidebarPage === item.page || (item.page === "settings" && activePage === "settings") ? "active" : ""}
+                type="button"
+                role="menuitem"
+                onClick={() => { setMobileMoreOpen(false); navigateFromMobileBar(item.page); }}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+                <ChevronRight size={16} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <AssistantWorkspace open={assistantOpen} setOpen={setAssistantOpen} companies={companies} companyId={selectedCompanyId} onOpenCall={onOpenCall} />
     </div>
   );

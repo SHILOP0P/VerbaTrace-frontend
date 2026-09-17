@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones, ListTodo, RefreshCw, ScrollText, Search, ShieldCheck, Users, X, XCircle } from "lucide-react";
+import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones, ListTodo, RefreshCw, ScrollText, Search, ShieldCheck, Undo2, Users, X, XCircle } from "lucide-react";
 import { api, ApiError, getAdminCallAudioBlob } from "../../api";
 import { AuditTrailsPanel } from "./AuditTrailsPanel";
 import { isVideoCall } from "../../shared/lib/media";
@@ -9,6 +9,7 @@ import { DateTimePicker } from "../../shared/ui/DateTimePicker";
 import type {
   AppPage,
   AdminCapabilitiesResponse,
+  AdminRestorableCompanyResponse,
   CallResponse,
   CallAction,
   CallActionAssignee,
@@ -20,7 +21,7 @@ import type {
   UserSessionResponse
 } from "../../types";
 
-type AdminSection = "users" | "companies" | "actions" | "audit";
+type AdminSection = "users" | "companies" | "actions" | "audit" | "restore";
 type SubscriptionOwner = "users" | "companies";
 type AdminDetailRoute = { section: AdminSection; id: string } | null;
 type AdminAlert = { id: number; message: string; tone: "success" | "error" };
@@ -56,7 +57,7 @@ function adminDetailFromPath(pathname: string): AdminDetailRoute {
 }
 
 function adminSectionFromPath(pathname: string): AdminSection | null {
-  const match = pathname.match(/^\/app\/admin\/(users|companies|actions|audit)$/);
+  const match = pathname.match(/^\/app\/admin\/(users|companies|actions|audit|restore)$/);
   return match ? match[1] as AdminSection : null;
 }
 
@@ -68,6 +69,10 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
     // The audit trails name no customer content, so panel access is the only
     // thing they need — everyone who can open this page can read them.
     , "audit" as const
+    // The superadmin's own section. A company on its way to being erased is
+    // filtered out of the company list, so the one-time rescue needs a place
+    // of its own to be reachable from at all.
+    , ...(capabilities.role === "superadmin" ? ["restore" as const] : [])
   ], [capabilities]);
   const [section, setSection] = useState<AdminSection>(() => adminSectionFromPath(window.location.pathname) ?? availableSections[0] ?? "users");
   const [query, setQuery] = useState("");
@@ -84,15 +89,15 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
   const [selectedCompany, setSelectedCompany] = useState<CompanyResponse | null>(null);
   const [selectedAction, setSelectedAction] = useState<CallAction | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState<Record<AdminSection, boolean>>({ users: false, companies: false, actions: false, audit: false });
+  const [loaded, setLoaded] = useState<Record<AdminSection, boolean>>({ users: false, companies: false, actions: false, audit: false, restore: false });
   const [notice, setNotice] = useState("");
   const [routeLoading, setRouteLoading] = useState(() => Boolean(adminDetailFromPath(window.location.pathname)));
   const requestSequence = useRef(0);
 
   const load = useCallback(async (nextSection: AdminSection, search: string, actionFilters: AdminActionFilters = {}) => {
-    // The audit panel keeps its own filters and loads itself; this list is for
-    // the three searchable sections.
-    if (nextSection === "audit") return;
+    // The audit and restore panels keep their own state and load themselves;
+    // this list is for the three searchable sections.
+    if (nextSection === "audit" || nextSection === "restore") return;
     const requestId = ++requestSequence.current;
     setLoading(true);
     setNotice("");
@@ -259,9 +264,10 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
         {has(capabilities, "admin.actions.read") && <button className={section === "actions" ? "active" : ""} type="button" onClick={() => selectSection("actions")}><span><ListTodo size={17} />Действия</span></button>}
         {has(capabilities, "admin.monitoring.read") && <button type="button" onClick={openMonitoring}><span><Activity size={17} />Мониторинг</span></button>}
         <button className={section === "audit" ? "active" : ""} type="button" onClick={() => selectSection("audit")}><span><ScrollText size={17} />Журналы</span></button>
+        {capabilities.role === "superadmin" && <button className={section === "restore" ? "active" : ""} type="button" onClick={() => selectSection("restore")}><span><Undo2 size={17} />Восстановление</span></button>}
       </nav>
       <div className="admin-content">
-        {section === "audit" ? <AuditTrailsPanel /> : <>
+        {section === "audit" ? <AuditTrailsPanel /> : section === "restore" ? <CompanyRestoreQueue /> : <>
           <form className={`admin-toolbar${section === "actions" ? " admin-actions-toolbar" : ""}`} onSubmit={(event) => { event.preventDefault(); void load(section, query, { status: actionStatus || undefined, company_tag: actionCompanyTag.trim() || undefined, department: actionDepartment.trim() || undefined }); }}>
             <label><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={section === "users" ? "Имя, @username или email" : section === "companies" ? "Название или тег компании" : "Действие, ответственный, компания или отдел"} /></label>
             {section === "actions" && <div className="admin-action-filter-fields"><SelectControl aria-label="Статус действия" value={actionStatus} onChange={(event) => setActionStatus(event.target.value)}><option value="">Все статусы</option><option value="open">Открыто</option><option value="in_progress">В работе</option><option value="completed">Выполнено</option><option value="cancelled">Отменено</option><option value="overdue">Просрочено</option></SelectControl><input aria-label="Тег компании" value={actionCompanyTag} onChange={(event) => setActionCompanyTag(event.target.value)} placeholder="Тег компании"/><input aria-label="Отдел" value={actionDepartment} onChange={(event) => setActionDepartment(event.target.value)} placeholder="Отдел"/></div>}
@@ -405,7 +411,7 @@ function CompanyDetail({ company, capabilities, onBack, onUpdated }: { company: 
  * is being deleted. It brings the company back to a freeze and gives nobody
  * access to its content, and it works once per company.
  */
-function CompanyRestorePanel({ companyId }: { companyId: string }) {
+function CompanyRestorePanel({ companyId, onRestored }: { companyId: string; onRestored?: () => void }) {
   const [reason, setReason] = useState("");
   const [reasonInvalid, setReasonInvalid] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -414,9 +420,63 @@ function CompanyRestorePanel({ companyId }: { companyId: string }) {
   async function restore() {
     if (!reason.trim()) { setReasonInvalid(true); setStatus("Укажите причину восстановления."); reasonRef.current?.focus(); return; }
     setBusy(true); setStatus("");
-    try { const lifecycle = await api.restoreAdminCompany(companyId, reason.trim()); setReason(""); setStatus(`Компания возвращена в заморозку на 30 дней. Повторное восстановление недоступно: ${lifecycle.restore_used ? "уже использовано" : "доступно"}.`); showAdminAlert("Компания восстановлена"); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
+    try { const lifecycle = await api.restoreAdminCompany(companyId, reason.trim()); setReason(""); setStatus(`Компания возвращена в заморозку на 30 дней. Повторное восстановление недоступно: ${lifecycle.restore_used ? "уже использовано" : "доступно"}.`); showAdminAlert("Компания восстановлена"); onRestored?.(); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
   }
   return <div className="admin-action-block"><h3>Восстановить удаляемую компанию</h3><p>Возвращает компанию из мягкого удаления в заморозку ещё на 30 дней, без доступа к её содержимому. Доступно один раз на компанию.</p><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void restore()}>{busy ? "Восстанавливаю…" : "Восстановить компанию"}</button></div>;
+}
+
+/**
+ * CompanyRestoreQueue is the superadmin's own section: the companies on their
+ * way to being erased. They are filtered out of the company list — that is what
+ * deleted means there — so before this the rescue on the company card could not
+ * be reached for any company that actually needed it.
+ */
+function CompanyRestoreQueue() {
+  const [companies, setCompanies] = useState<AdminRestorableCompanyResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setNotice("");
+    try {
+      const response = await api.listRestorableAdminCompanies();
+      setCompanies(response.items);
+    } catch (error) {
+      setNotice(message(error));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return <>
+    <div className="admin-toolbar">
+      <p className="admin-restore-intro">Компании в мягком удалении, которые ещё можно вернуть. После срока очистки компания удаляется полностью и из этого списка исчезает.</p>
+      <button className="icon-button" type="button" aria-label="Обновить" aria-busy={loading} disabled={loading} onClick={() => void load()}><RefreshCw className={loading ? "refresh-icon spinning" : "refresh-icon"} size={17} /></button>
+    </div>
+    <p className="admin-section-summary">Компаний к восстановлению: {companies.length}</p>
+    {notice && <p className="admin-notice" role="status">{notice}</p>}
+    <div className="admin-results" aria-busy={loading}>
+      {loading ? <p className="admin-empty">Загрузка списка…</p>
+        : companies.length === 0 ? <p className="admin-empty">Удаляемых компаний нет.</p>
+          : <div className="admin-restore-list">
+            {companies.map((company) => <article className="admin-detail admin-restore-card" key={company.company_uuid}>
+              <h2>{company.name}</h2>
+              <dl>
+                <dt>Тег</dt>
+                <dd>{normalizeTag(company.tag)}</dd>
+                <dt>Удаление начато</dt>
+                <dd>{date(company.soft_deleted_at)}</dd>
+                <dt>Очистка после</dt>
+                <dd>{company.purge_after ? date(company.purge_after) : "срок не задан"}</dd>
+              </dl>
+              <CompanyRestorePanel companyId={company.company_uuid} onRestored={() => void load()} />
+            </article>)}
+          </div>}
+    </div>
+  </>;
 }
 
 function SubscriptionPanel({ kind, id, canManage }: { kind: SubscriptionOwner; id: string; canManage: boolean }) {

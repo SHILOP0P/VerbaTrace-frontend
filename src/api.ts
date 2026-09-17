@@ -1,5 +1,7 @@
 import type {
   AdminCapabilitiesResponse,
+  AdminCompanyLifecycleResponse,
+  AdminCompanyResponse,
   AssistantCapabilities,
   AssistantDraft,
   AssistantChat,
@@ -22,6 +24,7 @@ import type {
   CallFilterOptionsResponse,
   CallFoldersListResponse,
   CallFolderResponse,
+  CompanyDataTransfer,
   CompanyOwnershipTransfer,
   DepartmentTransferRequest,
   CallResponse,
@@ -50,6 +53,7 @@ import type {
   DepartmentResponse,
   GlobalReportsResponse,
   Invitation,
+  InvitationCompanyRole,
   InvitationDepartmentRole,
   InvitationStatus,
   InstructionScope,
@@ -153,9 +157,25 @@ const apiErrorMessages: Record<string, string> = {
   plan_limit_exceeded: "Лимит тарифа исчерпан",
   monthly_minutes_limit_exceeded: "Месячный лимит минут исчерпан",
   instruction_limit_exceeded: "Лимит активных инструкций исчерпан",
-  company_limit_exceeded: "Лимит компаний исчерпан",
+  company_limit_exceeded:
+    "Тариф не покрывает ещё одну компанию. Повысьте тариф или освободите слот",
   department_limit_exceeded: "Лимит отделов исчерпан",
   member_limit_exceeded: "Лимит сотрудников исчерпан",
+  // A business plan belongs to the owner and covers several companies, so
+  // neither end of a handover can be halfway.
+  ownership_recipient_busy:
+    "У этого человека уже есть своя компания или бизнес-подписка. Принять передачу он не может",
+  ownership_scope_mismatch:
+    "Одну компанию из нескольких отделить от подписки нельзя: передавайте все сразу",
+  company_selection_required:
+    "Новый тариф покрывает меньше компаний. Сначала выберите, какие останутся активными",
+  company_ownership_transfer_pending:
+    "Предложение о передаче уже отправлено и ждёт ответа",
+  company_ownership_transfer_not_found: "Предложение о передаче не найдено",
+  company_deputy_already_assigned: "В компании уже есть заместитель",
+  admin_reason_required: "Укажите причину: она обязательна для аудита",
+  department_transfer_required:
+    "Сотрудник уже в другом отделе этой компании. Нужен перевод, а не приглашение",
   forbidden: "Недостаточно прав",
   unauthorized: "Необходимо войти в аккаунт",
   invalid_request_body: "Некорректное тело запроса",
@@ -1021,12 +1041,27 @@ export const api = {
       },
     );
   },
-  updateAdminCompanyTag(companyId: string, tag: string) {
-    return request<CompanyResponse>(
+  // Changing a customer's tag is a change to their data: it needs their
+  // approval through support access, a reason and an audit record. Only a
+  // superadmin is exempt from the approval.
+  updateAdminCompanyTag(companyId: string, tag: string, reason: string) {
+    return request<AdminCompanyResponse>(
       `/admin/companies/${encodeURIComponent(companyId)}/tag`,
       {
         method: "PATCH",
-        body: JSON.stringify({ tag }),
+        body: JSON.stringify({ tag, reason }),
+      },
+    );
+  },
+
+  // The superadmin's one-time rescue of a company that is being deleted: it
+  // comes back frozen, with nobody gaining access to its content.
+  restoreAdminCompany(companyId: string, reason: string) {
+    return request<AdminCompanyLifecycleResponse>(
+      `/admin/companies/${encodeURIComponent(companyId)}/restore`,
+      {
+        method: "POST",
+        body: JSON.stringify({ reason }),
       },
     );
   },
@@ -1037,6 +1072,9 @@ export const api = {
     );
   },
 
+  // A business plan that covers fewer companies than the owner has is refused
+  // with company_selection_required and the list to choose from; the chosen ones
+  // come back in `active_company_uuids` and the rest are frozen.
   grantAdminSubscription(
     kind: "users" | "companies",
     id: string,
@@ -1045,6 +1083,7 @@ export const api = {
       starts_at?: string;
       ends_at: string;
       reason: string;
+      active_company_uuids?: string[];
     },
   ) {
     return request<AdminSubscriptionResponse>(
@@ -2159,19 +2198,80 @@ export const api = {
     );
   },
 
-  offerCompanyOwnership(companyId: string, userId: string, reason?: string) {
+  // A business plan belongs to the owner and covers several companies, so a
+  // single company may be handed over only when it is the only one under that
+  // plan. `stayCompanyIds` are the companies the previous owner wants to remain
+  // in as an ordinary member; anything not listed there they leave.
+  offerCompanyOwnership(
+    companyId: string,
+    userId: string,
+    reason?: string,
+    stayCompanyIds: string[] = [],
+  ) {
     return request<CompanyOwnershipTransfer>(
       `/companies/${encodeURIComponent(companyId)}/ownership-transfers`,
       {
         method: "POST",
-        body: JSON.stringify({ user_uuid: userId, reason: reason ?? "" }),
+        body: JSON.stringify({
+          user_uuid: userId,
+          reason: reason ?? "",
+          scope: "company",
+          stay_company_uuids: stayCompanyIds,
+        }),
       },
     );
+  },
+
+  // Handing over every company at once, which is the only way when the plan
+  // covers more than one of them.
+  offerAllCompanyOwnership(
+    userId: string,
+    reason?: string,
+    stayCompanyIds: string[] = [],
+  ) {
+    return request<CompanyOwnershipTransfer>("/ownership-transfers", {
+      method: "POST",
+      body: JSON.stringify({
+        user_uuid: userId,
+        reason: reason ?? "",
+        scope: "all",
+        stay_company_uuids: stayCompanyIds,
+      }),
+    });
   },
 
   listIncomingOwnershipTransfers() {
     return request<{ items: CompanyOwnershipTransfer[] }>(
       "/ownership-transfers/incoming",
+    );
+  },
+
+  // Moving calls and instruction folders between two of the owner's companies,
+  // which is what emptying a company before it is deleted needs.
+  transferCompanyData(input: {
+    sourceCompanyId: string;
+    targetCompanyId: string;
+    callIds?: string[];
+    includeCalls?: boolean;
+    includeFolders?: boolean;
+    reason?: string;
+  }) {
+    return request<CompanyDataTransfer>("/company-data-transfers", {
+      method: "POST",
+      body: JSON.stringify({
+        source_company_uuid: input.sourceCompanyId,
+        target_company_uuid: input.targetCompanyId,
+        call_uuids: input.callIds ?? [],
+        include_calls: input.includeCalls ?? true,
+        include_folders: input.includeFolders ?? true,
+        reason: input.reason ?? "",
+      }),
+    });
+  },
+
+  listCompanyDataTransfers(limit = 20) {
+    return request<{ items: CompanyDataTransfer[] }>(
+      `/company-data-transfers?${new URLSearchParams({ limit: String(limit) }).toString()}`,
     );
   },
 
@@ -2299,20 +2399,19 @@ export const api = {
     );
   },
 
+  // Working somewhere else is no longer a conflict, so an invitation carries no
+  // acknowledgement. The role is the seat offered: an ordinary member, or the
+  // deputy seat directly, which only the owner may offer.
   createCompanyInvitation(
     companyId: string,
     username: string,
-    acknowledgeCurrentMembership = false,
+    role: InvitationCompanyRole = "employee",
   ) {
     return request<Invitation>(
       `/companies/${encodeURIComponent(companyId)}/invitations`,
       {
         method: "POST",
-        body: JSON.stringify({
-          username,
-          role: "employee",
-          acknowledge_current_membership: acknowledgeCurrentMembership,
-        }),
+        body: JSON.stringify({ username, role }),
       },
     );
   },
@@ -2322,17 +2421,12 @@ export const api = {
     departmentId: string,
     username: string,
     role: InvitationDepartmentRole,
-    acknowledgeCurrentMembership = false,
   ) {
     return request<Invitation>(
       `/companies/${encodeURIComponent(companyId)}/departments/${encodeURIComponent(departmentId)}/invitations`,
       {
         method: "POST",
-        body: JSON.stringify({
-          username,
-          role,
-          acknowledge_current_membership: acknowledgeCurrentMembership,
-        }),
+        body: JSON.stringify({ username, role }),
       },
     );
   },
@@ -2344,13 +2438,12 @@ export const api = {
     return request<Invitation[]>(`/invitations${query}`);
   },
 
-  acceptInvitation(invitationId: string, confirmTransfer = false) {
+  // Accepting adds a membership and leaves every other one alone, so there is
+  // nothing left to confirm.
+  acceptInvitation(invitationId: string) {
     return request<Invitation>(
       `/invitations/${encodeURIComponent(invitationId)}/accept`,
-      {
-        method: "POST",
-        body: JSON.stringify({ confirm_transfer: confirmTransfer }),
-      },
+      { method: "POST" },
     );
   },
 

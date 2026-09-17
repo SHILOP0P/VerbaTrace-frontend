@@ -28,6 +28,7 @@ import { CallListSkeleton } from "../../shared/ui/loading";
 import { ProfileField, SelectControl } from "../../shared/ui/primitives";
 import { InvitationCreatePanel } from "../invitations/InvitationsPage";
 import { CompanyMembersPanel } from "./CompanyMembersPanel";
+import { CompanyDataTransferPanel } from "./CompanyDataTransferPanel";
 import { CompanyLifecyclePanel } from "./CompanyLifecyclePanel";
 import { CreditLimitsPanel } from "./CreditLimitsPanel";
 import { SupportJournalPanel } from "./SupportJournalPanel";
@@ -133,6 +134,7 @@ export function CompaniesPage({
     return (
       <CompanyWorkspace
         company={selectedCompany}
+        companies={companies}
         departments={departments.filter((department) => department.company_uuid === selectedCompanyId)}
         departmentMembers={departmentMembers}
         session={session}
@@ -387,6 +389,7 @@ function formatMinutes(minutes: number) {
 
 export function CompanyWorkspace({
   company,
+  companies = [],
   departments,
   departmentMembers,
   session,
@@ -397,6 +400,8 @@ export function CompanyWorkspace({
   onInvitationCreated
 }: {
   company?: CompanyResponse;
+  /** Every company the user can see; the owned ones decide how ownership moves. */
+  companies?: CompanyResponse[];
   departments: DepartmentResponse[];
   departmentMembers: DepartmentMemberResponse[];
   session: SessionState;
@@ -428,6 +433,10 @@ export function CompanyWorkspace({
   }
 
   const isManager = company.manager_user_uuid === session.user.id;
+  // The companies this person owns. A business plan belongs to the owner and
+  // covers several of them, which is what decides whether ownership can move
+  // one company at a time and whether data can be moved between them at all.
+  const ownedCompanies = companies.filter((item) => item.manager_user_uuid === session.user.id);
   const ledDepartmentIds = departments
     .filter((department) => departmentMembers.some((member) => member.department_uuid === department.id && member.user_uuid === session.user.id && member.role === "department_leader" && member.status === "active"))
     .map((department) => department.id);
@@ -525,7 +534,11 @@ export function CompanyWorkspace({
           departments={departments}
           session={session}
           isOwner={isManager}
+          ownedCompanyCount={ownedCompanies.length}
         />
+        {isManager && ownedCompanies.length > 1 && (
+          <CompanyDataTransferPanel companies={ownedCompanies} sourceCompanyId={company.id} />
+        )}
         {/* Hidden from members who do not run the company or a department. */}
         <CompanyLifecyclePanel companyId={company.id} isOwner={isManager} />
         <CreditLimitsPanel companyId={company.id} isOwner={isManager} />

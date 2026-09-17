@@ -13,6 +13,7 @@ import type {
   CompanyResponse,
   DepartmentResponse,
   Invitation,
+  InvitationCompanyRole,
   InvitationDepartmentRole,
   SessionState
 } from "../../types";
@@ -113,27 +114,20 @@ export function InvitationCard({
 }) {
   const [busyAction, setBusyAction] = useState<"accept" | "decline" | null>(null);
   const [error, setError] = useState("");
-  const [transferPrompt, setTransferPrompt] = useState("");
 
   const companyName = companies.find((company) => company.id === invitation.company_uuid)?.name;
   const departmentName = departments.find((department) => department.id === invitation.department_uuid)?.name;
   const isDepartmentInvitation = Boolean(invitation.department_uuid);
 
-  async function acceptInvitation(confirmTransfer = false) {
+  // Accepting simply adds a membership now. It used to move the person out of
+  // wherever they already worked, which is why there was a confirmation here.
+  async function acceptInvitation() {
     setError("");
     setBusyAction("accept");
     try {
-      const accepted = await api.acceptInvitation(invitation.id, confirmTransfer);
-      setTransferPrompt("");
+      const accepted = await api.acceptInvitation(invitation.id);
       await onAccepted(accepted);
     } catch (acceptError) {
-      // Joining a new company means leaving the current one, so the move is
-      // confirmed explicitly instead of happening behind the user's back.
-      if (acceptError instanceof ApiError && acceptError.code === "company_membership_conflict") {
-        const current = (acceptError.details?.current_company_name as string) || "текущей компании";
-        setTransferPrompt(current);
-        return;
-      }
       setError(acceptError instanceof Error ? acceptError.message : "Не удалось принять приглашение");
     } finally {
       setBusyAction(null);
@@ -181,17 +175,6 @@ export function InvitationCard({
           {busyAction === "decline" ? "Отклоняю..." : "Отклонить"}
         </button>
       </div>
-      <ConfirmDialog
-        open={Boolean(transferPrompt)}
-        title="Перейти в другую компанию?"
-        message={`Вы сейчас работаете в компании «${transferPrompt}». Если продолжить, вы покинете её и потеряете доступ к её звонкам, отделам и инструкциям.`}
-        confirmLabel="Перейти"
-        cancelLabel="Остаться"
-        variant="danger"
-        busy={busyAction === "accept"}
-        onCancel={() => setTransferPrompt("")}
-        onConfirm={() => void acceptInvitation(true)}
-      />
     </article>
   );
 }
@@ -216,14 +199,17 @@ export function InvitationCreatePanel({
   const [departmentId, setDepartmentId] = useState("");
   const [username, setUsername] = useState("");
   const [departmentRole, setDepartmentRole] = useState<InvitationDepartmentRole>("employee");
+  const [companyRole, setCompanyRole] = useState<InvitationCompanyRole>("employee");
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [engagedPrompt, setEngagedPrompt] = useState(false);
   const [transferTarget, setTransferTarget] = useState("");
   const availableDepartments = departments.filter((department) => department.company_uuid === companyId && (!allowedDepartmentIds || allowedDepartmentIds.includes(department.id)));
   const selectedCompany = companies.find((company) => company.id === companyId);
-  const canInviteDepartmentLeader = selectedCompany?.manager_user_uuid === session.user.id;
+  // Only the owner seats a deputy, and only the owner may promote to it, so the
+  // same person decides both ways into that seat.
+  const isOwner = selectedCompany?.manager_user_uuid === session.user.id;
+  const canInviteDepartmentLeader = isOwner;
 
   useEffect(() => {
     if (!allowCompanyInvitations && mode !== "department") setMode("department");
@@ -244,6 +230,10 @@ export function InvitationCreatePanel({
       setDepartmentRole("employee");
     }
   }, [canInviteDepartmentLeader, departmentRole]);
+
+  useEffect(() => {
+    if (!isOwner && companyRole !== "employee") setCompanyRole("employee");
+  }, [companyRole, isOwner]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -267,7 +257,7 @@ export function InvitationCreatePanel({
     }
   }
 
-  async function sendInvitation(acknowledge = false) {
+  async function sendInvitation() {
     setError("");
     setSuccess("");
 
@@ -290,10 +280,9 @@ export function InvitationCreatePanel({
     try {
       const created =
         mode === "company"
-          ? await api.createCompanyInvitation(companyId, username.trim(), acknowledge)
-          : await api.createDepartmentInvitation(companyId, departmentId, username.trim(), departmentRole, acknowledge);
+          ? await api.createCompanyInvitation(companyId, username.trim(), companyRole)
+          : await api.createDepartmentInvitation(companyId, departmentId, username.trim(), departmentRole);
       onInvitationCreated(created);
-      setEngagedPrompt(false);
       setSuccess(
         created.approval_status === "pending"
           ? "Приглашение отправлено на одобрение заместителю."
@@ -301,14 +290,9 @@ export function InvitationCreatePanel({
       );
       setUsername("");
     } catch (createError) {
-      // The person already works somewhere, so inviting them is a move and the
-      // sender confirms it first.
-      if (createError instanceof ApiError && createError.code === "target_already_engaged") {
-        setEngagedPrompt(true);
-        return;
-      }
-      // A leader cannot take a colleague from another department: that move is
-      // a request addressed to the deputy.
+      // Working in another company is fine now. Sitting in another department of
+      // *this* company is not: that is a move, and it belongs to the owner or
+      // the deputy.
       if (createError instanceof ApiError && createError.code === "department_transfer_required") {
         const userId = createError.details?.user_uuid;
         setTransferTarget(typeof userId === "string" ? userId : "");
@@ -349,6 +333,18 @@ export function InvitationCreatePanel({
           ))}
         </SelectControl>
       </label>
+      {mode === "company" && isOwner && (
+        <label>
+          Роль в компании
+          <SelectControl
+            value={companyRole}
+            onChange={(event) => setCompanyRole(event.target.value as InvitationCompanyRole)}
+          >
+            <option value="employee">Сотрудник</option>
+            <option value="company_deputy">Заместитель</option>
+          </SelectControl>
+        </label>
+      )}
       {mode === "department" && (
         <>
           <label>
@@ -388,16 +384,6 @@ export function InvitationCreatePanel({
         <Plus size={18} />
         {busy ? "Отправляю..." : "Отправить приглашение"}
       </button>
-      <ConfirmDialog
-        open={engagedPrompt}
-        title="Пользователь уже состоит в компании"
-        message="Этот человек уже работает в компании или отделе. Если он примет приглашение, он покинет прежнее место. Точно отправить приглашение?"
-        confirmLabel="Отправить"
-        cancelLabel="Отмена"
-        busy={busy}
-        onCancel={() => setEngagedPrompt(false)}
-        onConfirm={() => void sendInvitation(true)}
-      />
       <ConfirmDialog
         open={Boolean(transferTarget)}
         title="Сотрудник уже в другом отделе"

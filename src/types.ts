@@ -286,6 +286,23 @@ export interface AdminSubscriptionResponse {
   updated_at: string;
 }
 
+/** A company as the admin panel sees it. */
+export interface AdminCompanyResponse {
+  id: string;
+  name: string;
+  tag: string;
+  manager_user_uuid: string;
+  created_at: string;
+}
+
+/** Where a company stands after the superadmin's rescue: frozen, and rescued. */
+export interface AdminCompanyLifecycleResponse {
+  company_uuid: string;
+  state: string;
+  freeze_reason: string;
+  restore_used: boolean;
+}
+
 export interface UpdateProfileRequest {
   full_name?: string;
   full_surname?: string;
@@ -782,13 +799,31 @@ export interface DepartmentTransferRequest {
 
 export interface CompanyOwnershipTransfer {
   id: string;
-  company_uuid: string;
+  /** "company" hands over one company, "all" every company under the plan. */
+  scope: "company" | "all";
+  /** Set only for a single-company transfer. */
+  company_uuid: string | null;
+  /** What the offer actually covers. */
+  company_uuids: string[];
+  /** The companies the previous owner stays in as an ordinary member. */
+  stay_company_uuids: string[];
   from_user_uuid: string;
   to_user_uuid: string;
   status: "pending" | "accepted" | "declined" | "canceled" | "expired";
   reason?: string | null;
   created_at: string;
   expires_at: string;
+}
+
+/** A record of calls and folders moved between two companies of one owner. */
+export interface CompanyDataTransfer {
+  id: string;
+  source_company_uuid: string;
+  target_company_uuid: string;
+  calls: number;
+  folders: number;
+  reason?: string;
+  created_at: string;
 }
 
 export interface AnalysisInstruction {

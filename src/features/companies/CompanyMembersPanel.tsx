@@ -29,11 +29,18 @@ export function CompanyMembersPanel({
   departments,
   session,
   isOwner,
+  ownedCompanyCount = 1,
 }: {
   companyId: string;
   departments: DepartmentResponse[];
   session: SessionState;
   isOwner: boolean;
+  /**
+   * How many companies this owner has. A business plan belongs to the owner and
+   * covers several companies, so a single one can be handed over only when it
+   * is the only one under that plan — otherwise all of them move together.
+   */
+  ownedCompanyCount?: number;
 }) {
   const [members, setMembers] = useState<CompanyMemberListItemResponse[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -43,6 +50,9 @@ export function CompanyMembersPanel({
   const [busyUser, setBusyUser] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState<PendingAction>(null);
+  // Handing a company over asks one more thing: does the previous owner stay in
+  // it as an ordinary member, or leave it altogether?
+  const [stayAsMember, setStayAsMember] = useState(false);
   // Regular members simply do not get this panel, and the server is the one
   // who decides that.
   const [visible, setVisible] = useState(true);
@@ -91,7 +101,14 @@ export function CompanyMembersPanel({
         await api.updateCompanyMemberRole(companyId, action.member.user_uuid, "employee");
       }
       if (action.kind === "ownership") {
-        await api.offerCompanyOwnership(companyId, action.member.user_uuid);
+        const stay = stayAsMember ? [companyId] : [];
+        // One company may leave on its own only when the plan covers just it.
+        // With several, the plan cannot be split, so they all go together.
+        if (ownedCompanyCount > 1) {
+          await api.offerAllCompanyOwnership(action.member.user_uuid, "", stay);
+        } else {
+          await api.offerCompanyOwnership(companyId, action.member.user_uuid, "", stay);
+        }
       }
       setPending(null);
       await reload();
@@ -340,27 +357,46 @@ export function CompanyMembersPanel({
 
       <ConfirmDialog
         open={pending !== null}
-        title={confirmTitle(pending)}
-        message={confirmMessage(pending)}
+        title={confirmTitle(pending, ownedCompanyCount)}
+        message={confirmMessage(pending, ownedCompanyCount)}
         confirmLabel={pending?.kind === "remove" ? "Исключить" : "Подтвердить"}
         variant={pending?.kind === "remove" ? "danger" : "default"}
         busy={Boolean(busyUser)}
-        onCancel={() => setPending(null)}
+        onCancel={() => {
+          setPending(null);
+          setStayAsMember(false);
+        }}
         onConfirm={() => pending && void runAction(pending)}
-      />
+      >
+        {pending?.kind === "ownership" && (
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={stayAsMember}
+              onChange={(event) => setStayAsMember(event.target.checked)}
+            />
+            <span>
+              {ownedCompanyCount > 1
+                ? "Остаться участником этих компаний"
+                : "Остаться участником компании"}
+            </span>
+          </label>
+        )}
+      </ConfirmDialog>
     </section>
   );
 }
 
-function confirmTitle(action: PendingAction) {
+function confirmTitle(action: PendingAction, ownedCompanyCount: number) {
   if (!action) return "";
   if (action.kind === "remove") return "Исключить сотрудника?";
   if (action.kind === "deputy") return "Назначить заместителя?";
   if (action.kind === "revoke") return "Снять заместителя?";
-  return "Передать компанию?";
+
+  return ownedCompanyCount > 1 ? "Передать все компании?" : "Передать компанию?";
 }
 
-function confirmMessage(action: PendingAction) {
+function confirmMessage(action: PendingAction, ownedCompanyCount: number) {
   if (!action) return "";
   const name = `${action.member.full_surname} ${action.member.full_name}`.trim() || action.member.username;
   if (action.kind === "remove") {
@@ -372,5 +408,11 @@ function confirmMessage(action: PendingAction) {
   if (action.kind === "revoke") {
     return `${name} останется в компании обычным сотрудником и потеряет права управления.`;
   }
-  return `${name} получит уведомление и станет владельцем компании после подтверждения. Вы останетесь в компании как заместитель.`;
+  // The plan lives on the owner and covers several companies, so one of several
+  // cannot be cut out of it — an owner with more than one hands over all of them.
+  if (ownedCompanyCount > 1) {
+    return `${name} станет владельцем всех ваших ${ownedCompanyCount} компаний после подтверждения. Бизнес-подписка и личный тариф перейдут к нему на остаток периода: одну компанию из нескольких отделить от подписки нельзя. Принять предложение можно только тому, у кого нет своих компаний и своей бизнес-подписки.`;
+  }
+
+  return `${name} станет владельцем компании после подтверждения. Бизнес-подписка и личный тариф перейдут к нему на остаток периода, лимиты и потраченные объёмы сохранятся. Принять предложение можно только тому, у кого нет своих компаний и своей бизнес-подписки.`;
 }

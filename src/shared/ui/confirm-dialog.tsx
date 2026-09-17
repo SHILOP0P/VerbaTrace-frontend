@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   X
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useEscapeDismiss } from "./dismissible-layer";
 
@@ -13,6 +14,12 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   busy?: boolean;
   variant?: "danger" | "default";
+  /**
+   * Extra controls the decision needs, shown between the message and the
+   * buttons. Some confirmations are not a plain yes: handing over a company
+   * also asks whether the previous owner stays as a member.
+   */
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -25,6 +32,7 @@ export function ConfirmDialog({
   cancelLabel = "Отмена",
   busy = false,
   variant = "default",
+  children,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
@@ -61,6 +69,7 @@ export function ConfirmDialog({
             </button>
           </div>
           <p>{message}</p>
+          {children && <div className="confirm-dialog-extra">{children}</div>}
           <div className="confirm-dialog-actions">
             <button
               className={`primary-button small ${variant === "danger" ? "danger-confirm" : ""}`}

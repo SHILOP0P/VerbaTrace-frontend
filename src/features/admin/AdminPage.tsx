@@ -385,13 +385,38 @@ function CompanyDetail({ company, capabilities, onBack, onUpdated }: { company: 
   const [notice, setNotice] = useState("");
   const canEditTag = has(capabilities, "admin.companies.manage") || capabilities.role === "admin" || capabilities.role === "superadmin";
   const [tag, setTag] = useState(company.tag ?? "");
+  // Changing a customer's own data needs a reason: it lands in the audit trail
+  // the customer can read, which is what protects them from arbitrary edits.
+  const [tagReason, setTagReason] = useState("");
+  const [tagReasonInvalid, setTagReasonInvalid] = useState(false);
   const [busy, setBusy] = useState(false);
+  const tagReasonRef = useRef<HTMLInputElement>(null);
   async function saveTag() {
     if (!tag.trim()) return setNotice("Введите тег компании");
+    if (!tagReason.trim()) { setTagReasonInvalid(true); setNotice("Укажите причину: она обязательна для аудита."); tagReasonRef.current?.focus(); return; }
     setBusy(true);
-    try { onUpdated(await api.updateAdminCompanyTag(company.id, tag)); setNotice("Тег компании обновлён"); showAdminAlert("Тег компании обновлён"); } catch (error) { setNotice(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
+    try { onUpdated(await api.updateAdminCompanyTag(company.id, tag, tagReason.trim()) as unknown as CompanyResponse); setTagReason(""); setNotice("Тег компании обновлён"); showAdminAlert("Тег компании обновлён"); } catch (error) { setNotice(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
   }
-  return <section className="admin-page admin-user-page"><button className="text-button" type="button" onClick={onBack}>← К компаниям</button><header className="admin-page-head"><div><p className="eyebrow">КАРТОЧКА КОМПАНИИ</p><h1>{company.name}</h1><p>{company.tag || "Тег не задан"}</p></div></header>{notice && <p className="admin-notice" role="status">{notice}</p>}<div className="admin-profile-grid"><section className="admin-detail"><h2>Компания</h2><dl><dt>Тег</dt><dd>{company.tag || "Тег не задан"}</dd><dt>Создана</dt><dd>{date(company.created_at)}</dd></dl>{canEditTag && <div className="admin-action-block"><h3>Изменить тег</h3><label>Тег<input value={tag} onChange={(event) => setTag(event.target.value)} placeholder="@verbatrace_team" /></label><button className="primary-button small" type="button" disabled={busy} onClick={() => void saveTag()}>{busy ? "Сохраняю…" : "Сохранить тег"}</button></div>}{capabilities.role === "superadmin" && has(capabilities, "admin.subscriptions.manage") && <UsageResetPanel kind="companies" id={company.id} />}</section><section className="admin-detail">{has(capabilities, "admin.subscriptions.read") && <SubscriptionPanel kind="companies" id={company.id} canManage={has(capabilities, "admin.subscriptions.manage")} />}</section></div></section>;
+  return <section className="admin-page admin-user-page"><button className="text-button" type="button" onClick={onBack}>← К компаниям</button><header className="admin-page-head"><div><p className="eyebrow">КАРТОЧКА КОМПАНИИ</p><h1>{company.name}</h1><p>{company.tag || "Тег не задан"}</p></div></header>{notice && <p className="admin-notice" role="status">{notice}</p>}<div className="admin-profile-grid"><section className="admin-detail"><h2>Компания</h2><dl><dt>Тег</dt><dd>{company.tag || "Тег не задан"}</dd><dt>Создана</dt><dd>{date(company.created_at)}</dd></dl>{canEditTag && <div className="admin-action-block"><h3>Изменить тег</h3><p>Нужен временный доступ, одобренный компанией. Суперадмин действует без одобрения, но причина обязательна всегда.</p><label>Тег<input value={tag} onChange={(event) => setTag(event.target.value)} placeholder="@verbatrace_team" /></label><label className={tagReasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={tagReasonRef} aria-invalid={tagReasonInvalid} value={tagReason} onChange={(event) => { setTagReason(event.target.value); setTagReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><button className="primary-button small admin-action-button" type="button" disabled={busy} onClick={() => void saveTag()}>{busy ? "Сохраняю…" : "Сохранить тег"}</button></div>}{capabilities.role === "superadmin" && <CompanyRestorePanel companyId={company.id} />}{capabilities.role === "superadmin" && has(capabilities, "admin.subscriptions.manage") && <UsageResetPanel kind="companies" id={company.id} />}</section><section className="admin-detail">{has(capabilities, "admin.subscriptions.read") && <SubscriptionPanel kind="companies" id={company.id} canManage={has(capabilities, "admin.subscriptions.manage")} />}</section></div></section>;
+}
+
+/**
+ * CompanyRestorePanel is the superadmin's last-chance rescue of a company that
+ * is being deleted. It brings the company back to a freeze and gives nobody
+ * access to its content, and it works once per company.
+ */
+function CompanyRestorePanel({ companyId }: { companyId: string }) {
+  const [reason, setReason] = useState("");
+  const [reasonInvalid, setReasonInvalid] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const reasonRef = useRef<HTMLInputElement>(null);
+  async function restore() {
+    if (!reason.trim()) { setReasonInvalid(true); setStatus("Укажите причину восстановления."); reasonRef.current?.focus(); return; }
+    setBusy(true); setStatus("");
+    try { const lifecycle = await api.restoreAdminCompany(companyId, reason.trim()); setReason(""); setStatus(`Компания возвращена в заморозку на 30 дней. Повторное восстановление недоступно: ${lifecycle.restore_used ? "уже использовано" : "доступно"}.`); showAdminAlert("Компания восстановлена"); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
+  }
+  return <div className="admin-action-block"><h3>Восстановить удаляемую компанию</h3><p>Возвращает компанию из мягкого удаления в заморозку ещё на 30 дней, без доступа к её содержимому. Доступно один раз на компанию.</p><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void restore()}>{busy ? "Восстанавливаю…" : "Восстановить компанию"}</button></div>;
 }
 
 function SubscriptionPanel({ kind, id, canManage }: { kind: SubscriptionOwner; id: string; canManage: boolean }) {
@@ -404,14 +429,46 @@ function SubscriptionPanel({ kind, id, canManage }: { kind: SubscriptionOwner; i
   const [reason, setReason] = useState("");
   const [reasonInvalid, setReasonInvalid] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Set when the new plan covers fewer companies than the owner has: the
+  // administrator picks which ones stay active before anything changes.
+  const [selection, setSelection] = useState<{ companyIds: string[]; limit: number; chosen: string[] } | null>(null);
   const reasonRef = useRef<HTMLInputElement>(null);
   useEffect(() => { let alive = true; Promise.all([api.getAdminSubscription(kind, id), api.listPlans()]).then(([current, allPlans]) => { if (!alive) return; setSubscription(current); setStatus(""); const allowed = allPlans.plans.filter((plan) => plan.type === (kind === "users" ? "personal" : "business")); setPlans(allowed); setPlanCode(allowed[0]?.code ?? ""); }).catch((error) => { if (!alive) return; if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { setAvailable(false); return; } setStatus(error instanceof ApiError && error.code === "subscription_not_found" ? "Активной подписки нет" : message(error)); api.listPlans().then((response) => { if (alive) { const allowed = response.plans.filter((plan) => plan.type === (kind === "users" ? "personal" : "business")); setPlans(allowed); setPlanCode(allowed[0]?.code ?? ""); } }).catch(() => undefined); }); return () => { alive = false; }; }, [id, kind]);
   function requireReason(action: string) { if (reason.trim()) return true; setReasonInvalid(true); setStatus(`Укажите причину: ${action}.`); reasonRef.current?.focus(); return false; }
-  async function grant() { if (!requireReason("она обязательна для аудита")) return; if (!planCode || !endsAt) return setStatus("Выберите тариф и дату окончания"); setBusy(true); try { const updated = await api.grantAdminSubscription(kind, id, { plan_code: planCode as Plan["code"], ends_at: new Date(`${endsAt}T23:59:59`).toISOString(), reason: reason.trim() }); setSubscription(updated); setStatus(""); setReason(""); showAdminAlert("Подписка выдана или продлена"); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); } }
+  // Lowering a business plan below the number of companies the owner runs is
+  // refused until somebody says which ones keep working. The answer carries the
+  // list, so the choice is made here rather than discovered afterwards.
+  async function grant(activeCompanyIds?: string[]) {
+    if (!requireReason("она обязательна для аудита")) return;
+    if (!planCode || !endsAt) return setStatus("Выберите тариф и дату окончания");
+    setBusy(true);
+    try {
+      const updated = await api.grantAdminSubscription(kind, id, { plan_code: planCode as Plan["code"], ends_at: new Date(`${endsAt}T23:59:59`).toISOString(), reason: reason.trim(), ...(activeCompanyIds ? { active_company_uuids: activeCompanyIds } : {}) });
+      setSubscription(updated); setStatus(""); setReason(""); setSelection(null); showAdminAlert("Подписка выдана или продлена");
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "company_selection_required") {
+        const ids = Array.isArray(error.details?.company_uuids) ? (error.details?.company_uuids as string[]) : [];
+        const limit = typeof error.details?.company_limit === "number" ? (error.details?.company_limit as number) : 1;
+        setSelection({ companyIds: ids, limit, chosen: ids.slice(0, limit) });
+        setStatus("Новый тариф покрывает меньше компаний. Выберите, какие останутся активными.");
+        return;
+      }
+      setStatus(message(error)); showAdminAlert(message(error), "error");
+    } finally { setBusy(false); }
+  }
   async function cancel() { if (!requireReason("она обязательна для отмены")) return; setBusy(true); try { const updated = await api.cancelAdminSubscription(kind, id, reason.trim()); setSubscription(updated); setReason(""); showAdminAlert("Подписка отменена"); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); } }
   const subscriptionPlanName = subscription ? plans.find((plan) => plan.code === subscription.plan_code)?.name ?? subscription.plan_code : "";
+  function toggleChosen(companyId: string) {
+    setSelection((current) => {
+      if (!current) return current;
+      const chosen = current.chosen.includes(companyId)
+        ? current.chosen.filter((item) => item !== companyId)
+        : [...current.chosen, companyId];
+      return { ...current, chosen };
+    });
+  }
   if (!available) return null;
-  return <div className="admin-subscription"><strong>Подписка</strong><p>{subscription ? `${subscriptionPlanName} · ${subscription.status}` : status}</p>{subscription?.ends_at && <small>Действует до {date(subscription.ends_at)}</small>}{canManage && <><label>Тариф<SelectControl value={planCode} onChange={(event) => setPlanCode(event.target.value)}>{plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</SelectControl></label><label>Дата окончания<input type="date" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy} onClick={() => void grant()}>{subscription ? "Продлить / выдать" : "Выдать подписку"}</button>{subscription && <button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void cancel()}>Отменить</button>}</div></>}</div>;
+  return <div className="admin-subscription"><strong>Подписка</strong><p>{subscription ? `${subscriptionPlanName} · ${subscription.status}` : status}</p>{subscription?.ends_at && <small>Действует до {date(subscription.ends_at)}</small>}{canManage && <><label>Тариф<SelectControl value={planCode} onChange={(event) => setPlanCode(event.target.value)}>{plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</SelectControl></label><label>Дата окончания<input type="date" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy} onClick={() => void grant()}>{subscription ? "Продлить / выдать" : "Выдать подписку"}</button>{subscription && <button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => void cancel()}>Отменить</button>}</div>{selection && <div className="admin-company-selection"><h3>Какие компании останутся активными</h3><p>Новый тариф покрывает {selection.limit} из {selection.companyIds.length}. Остальные будут заморожены: данные сохранятся, изменения прекратятся.</p><div className="admin-company-selection-list">{selection.companyIds.map((companyId) => <label className="checkbox-row" key={companyId}><input type="checkbox" checked={selection.chosen.includes(companyId)} onChange={() => toggleChosen(companyId)} /><span>{companyId}</span></label>)}</div><div className="admin-button-row"><button className="primary-button small admin-action-button" type="button" disabled={busy || selection.chosen.length === 0 || selection.chosen.length > selection.limit} onClick={() => void grant(selection.chosen)}>Применить тариф</button><button className="ghost-button small admin-action-button" type="button" disabled={busy} onClick={() => setSelection(null)}>Отмена</button></div></div>}</>}</div>;
 }
 
 function UsageResetPanel({ kind, id }: { kind: SubscriptionOwner; id: string }) {

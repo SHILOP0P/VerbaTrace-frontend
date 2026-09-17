@@ -54,6 +54,20 @@ export function OwnershipOffersPanel({
 
   const companyName = (id: string) => companies.find((company) => company.id === id)?.name ?? "Компания";
 
+  // An offer can cover every company under the owner's plan, so it is described
+  // by what it actually carries rather than by one company's name.
+  const offerTitle = (offer: CompanyOwnershipTransfer) => {
+    if (offer.scope === "company" && offer.company_uuid) return companyName(offer.company_uuid);
+    if (offer.company_uuids.length === 0) return "Компании владельца";
+
+    return offer.company_uuids.map(companyName).join(", ");
+  };
+
+  const offerSummary = (offer: CompanyOwnershipTransfer) =>
+    offer.scope === "all"
+      ? `Передаются все компании владельца (${offer.company_uuids.length}) вместе с подпиской`
+      : "Передаётся компания вместе с подпиской";
+
   return (
     <section className="company-list-panel glass-panel">
       <div className="panel-heading large">
@@ -67,8 +81,10 @@ export function OwnershipOffersPanel({
         {offers.map((offer) => (
           <article className="company-mini-card" key={offer.id}>
             <div>
-              <strong>{companyName(offer.company_uuid)}</strong>
-              <small>Предложение действует до {formatDate(offer.expires_at)}</small>
+              <strong>{offerTitle(offer)}</strong>
+              <small>
+                {offerSummary(offer)} · действует до {formatDate(offer.expires_at)}
+              </small>
             </div>
             <div className="panel-actions">
               <button
@@ -94,9 +110,13 @@ export function OwnershipOffersPanel({
       </div>
       <ConfirmDialog
         open={pending !== null}
-        title="Стать владельцем компании?"
-        message={`Вы станете владельцем компании «${pending ? companyName(pending.company_uuid) : ""}». Подписка и лимиты перейдут вместе с компанией, а прежний владелец останется заместителем.`}
-        confirmLabel="Принять компанию"
+        title={pending?.scope === "all" ? "Принять все компании?" : "Стать владельцем компании?"}
+        message={
+          pending
+            ? `Вы станете владельцем: ${offerTitle(pending)}. Бизнес-подписка и личный тариф перейдут к вам на остаток периода, лимиты и уже потраченные объёмы сохранятся. Принять это можно только если у вас нет своих компаний и своей бизнес-подписки.`
+            : ""
+        }
+        confirmLabel={pending?.scope === "all" ? "Принять компании" : "Принять компанию"}
         busy={Boolean(busyId)}
         onCancel={() => setPending(null)}
         onConfirm={() => pending && void decide(pending, true)}

@@ -75,6 +75,7 @@ export const demoBusinessPlans: Plan[] = [
 		marketing_hours_hint: 100,
     monthly_minutes_limit: 6000,
     monthly_credit_allowance: 7_000_000,
+    pending_credit_calls_limit: 20,
     active_instruction_limit: 0,
     company_limit: 1,
     departments_per_company_limit: 5,

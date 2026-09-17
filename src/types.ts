@@ -30,7 +30,15 @@ export type AppPage =
   | "admin"
   | "upload";
 export type CallStatus =
-  "new" | "processing" | "transcribed" | "analyzed" | "failed";
+  | "new"
+  | "processing"
+  // The budget ran out: the call is accepted and waits its turn in the queue.
+  | "awaiting_credits"
+  // Processing was stopped on purpose; the recording is still there.
+  | "cancelled"
+  | "transcribed"
+  | "analyzed"
+  | "failed";
 export type VisibilityScope = "personal" | "company" | "department";
 export type InstructionScope = "personal" | "company" | "department";
 export type AnalysisPersonalizationScope =
@@ -861,6 +869,10 @@ export interface CreditDashboardResponse {
   wallet_entries: CreditWalletEntry[];
   visible_to_members?: boolean;
   can_manage_visibility?: boolean;
+  // How many calls are parked because the limit ran out, and how many more the
+  // plan lets wait. A null limit means the queue has no cap.
+  calls_awaiting_credits?: number;
+  pending_credit_calls_limit?: number | null;
 }
 
 export interface DeveloperApplication {
@@ -1322,6 +1334,9 @@ export type CompanyLifecycleState = "active" | "frozen" | "soft_deleted";
 export interface CompanyLifecycle {
   company_uuid: string;
   state: CompanyLifecycleState;
+  // Why the company stopped: a downgrade is switched back on, a deletion has to
+  // be called off first.
+  freeze_reason?: "downgrade" | "deletion" | null;
   frozen_at?: string;
   soft_deleted_at?: string;
   purge_after?: string;
@@ -1454,6 +1469,8 @@ export interface CallAction {
   cancel_reason?: string;
   evidence: CallActionEvidence[];
   capabilities: CallActionCapabilities;
+  // The call is in the bin: the action is readable but frozen until it returns.
+  call_in_bin: boolean;
 }
 export interface CallActionsResponse {
   items: CallAction[];
@@ -1506,6 +1523,9 @@ export interface Plan {
 	marketing_hours_hint: number;
 	monthly_minutes_limit: number;
 	monthly_credit_allowance: number;
+  // How many calls may wait for credits at once: null is no cap, 0 refuses the
+  // upload the moment the budget runs out.
+  pending_credit_calls_limit: number | null;
   active_instruction_limit: number;
   company_limit: number | null;
   departments_per_company_limit: number | null;
@@ -1636,6 +1656,8 @@ export interface AnalysisReviewContext {
   next_review_requires_different_author: boolean;
   active_score_source: "ai" | "human_review_1" | "human_review_2" | string;
   source_outdated: boolean;
+  // The call is in the bin: the review is readable but frozen until it returns.
+  call_in_bin: boolean;
   challenge?: QualityReviewResponse["challenge"];
   effective_analysis?: EffectiveAnalysis;
   comments: AnalysisComment[];
@@ -1660,6 +1682,8 @@ export interface QualityReviewResponse {
   updated_at: string;
   published_at?: string;
   source_outdated: boolean;
+  // The call is in the bin: the review is readable but frozen until it returns.
+  call_in_bin: boolean;
   capabilities: QualityReviewCapabilities;
   analysis: Record<string, unknown>;
   draft?: QualityReviewRevision;
@@ -1768,4 +1792,32 @@ export interface SupportAccessJournalEntry {
   reason: string;
   access_expires_at?: string;
   created_at: string;
+}
+
+// The append-only records the system keeps. Every one of them was written and
+// none could be read from the product until now.
+export type AdminAuditTrail =
+  | "admin_actions"
+  | "billing_alerts"
+  | "credit_reconciliation"
+  | "retention"
+  | "transcript_edits"
+  | "comment_revisions";
+
+export interface AdminAuditTrailEntry {
+  occurred_at: string;
+  // Present only where the record can be acted on, which today means a billing
+  // alert waiting to be closed.
+  entry_uuid?: string;
+  actor_user_uuid?: string;
+  action: string;
+  details?: unknown;
+}
+
+export interface AdminAuditTrailResponse {
+  trail: AdminAuditTrail;
+  items: AdminAuditTrailEntry[];
+  total: number;
+  limit: number;
+  offset: number;
 }

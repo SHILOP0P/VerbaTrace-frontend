@@ -47,6 +47,14 @@ export function formatHistoryDays(value: number) {
   return `${value} ${pluralizeRu(value, "день", "дня", "дней")}`;
 }
 
+// An empty limit is unlimited and a zero is a ban — the two look alike in the
+// data and mean opposite things, so they are spelled out rather than printed.
+export function formatPendingQueueLimit(value: number | null) {
+  if (value === null) return "без ограничений";
+  if (value === 0) return "не ставятся в очередь";
+  return `${value} ${pluralizeRu(value, "звонок", "звонка", "звонков")}`;
+}
+
 export function formatNullableLimit(value: number | null) {
   return value === null ? "Не применяется" : String(value);
 }

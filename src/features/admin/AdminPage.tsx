@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones, ListTodo, RefreshCw, Search, ShieldCheck, Users, X, XCircle } from "lucide-react";
+import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones, ListTodo, RefreshCw, ScrollText, Search, ShieldCheck, Users, X, XCircle } from "lucide-react";
 import { api, ApiError, getAdminCallAudioBlob } from "../../api";
+import { AuditTrailsPanel } from "./AuditTrailsPanel";
 import { isVideoCall } from "../../shared/lib/media";
 import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
 import { SelectControl } from "../../shared/ui/primitives";
@@ -19,7 +20,7 @@ import type {
   UserSessionResponse
 } from "../../types";
 
-type AdminSection = "users" | "companies" | "actions";
+type AdminSection = "users" | "companies" | "actions" | "audit";
 type SubscriptionOwner = "users" | "companies";
 type AdminDetailRoute = { section: AdminSection; id: string } | null;
 type AdminAlert = { id: number; message: string; tone: "success" | "error" };
@@ -55,7 +56,7 @@ function adminDetailFromPath(pathname: string): AdminDetailRoute {
 }
 
 function adminSectionFromPath(pathname: string): AdminSection | null {
-  const match = pathname.match(/^\/app\/admin\/(users|companies|actions)$/);
+  const match = pathname.match(/^\/app\/admin\/(users|companies|actions|audit)$/);
   return match ? match[1] as AdminSection : null;
 }
 
@@ -64,6 +65,9 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
     ...(has(capabilities, "admin.users.read") ? ["users" as const] : []),
     ...(has(capabilities, "admin.companies.read") ? ["companies" as const] : [])
     , ...(has(capabilities, "admin.actions.read") ? ["actions" as const] : [])
+    // The audit trails name no customer content, so panel access is the only
+    // thing they need — everyone who can open this page can read them.
+    , "audit" as const
   ], [capabilities]);
   const [section, setSection] = useState<AdminSection>(() => adminSectionFromPath(window.location.pathname) ?? availableSections[0] ?? "users");
   const [query, setQuery] = useState("");
@@ -80,12 +84,15 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
   const [selectedCompany, setSelectedCompany] = useState<CompanyResponse | null>(null);
   const [selectedAction, setSelectedAction] = useState<CallAction | null>(null);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState<Record<AdminSection, boolean>>({ users: false, companies: false, actions: false });
+  const [loaded, setLoaded] = useState<Record<AdminSection, boolean>>({ users: false, companies: false, actions: false, audit: false });
   const [notice, setNotice] = useState("");
   const [routeLoading, setRouteLoading] = useState(() => Boolean(adminDetailFromPath(window.location.pathname)));
   const requestSequence = useRef(0);
 
   const load = useCallback(async (nextSection: AdminSection, search: string, actionFilters: AdminActionFilters = {}) => {
+    // The audit panel keeps its own filters and loads itself; this list is for
+    // the three searchable sections.
+    if (nextSection === "audit") return;
     const requestId = ++requestSequence.current;
     setLoading(true);
     setNotice("");
@@ -251,9 +258,10 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
         {has(capabilities, "admin.companies.read") && <button className={section === "companies" ? "active" : ""} type="button" onClick={() => selectSection("companies")}><span><Building2 size={17} />Компании</span></button>}
         {has(capabilities, "admin.actions.read") && <button className={section === "actions" ? "active" : ""} type="button" onClick={() => selectSection("actions")}><span><ListTodo size={17} />Действия</span></button>}
         {has(capabilities, "admin.monitoring.read") && <button type="button" onClick={openMonitoring}><span><Activity size={17} />Мониторинг</span></button>}
+        <button className={section === "audit" ? "active" : ""} type="button" onClick={() => selectSection("audit")}><span><ScrollText size={17} />Журналы</span></button>
       </nav>
       <div className="admin-content">
-        <>
+        {section === "audit" ? <AuditTrailsPanel /> : <>
           <form className={`admin-toolbar${section === "actions" ? " admin-actions-toolbar" : ""}`} onSubmit={(event) => { event.preventDefault(); void load(section, query, { status: actionStatus || undefined, company_tag: actionCompanyTag.trim() || undefined, department: actionDepartment.trim() || undefined }); }}>
             <label><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={section === "users" ? "Имя, @username или email" : section === "companies" ? "Название или тег компании" : "Действие, ответственный, компания или отдел"} /></label>
             {section === "actions" && <div className="admin-action-filter-fields"><SelectControl aria-label="Статус действия" value={actionStatus} onChange={(event) => setActionStatus(event.target.value)}><option value="">Все статусы</option><option value="open">Открыто</option><option value="in_progress">В работе</option><option value="completed">Выполнено</option><option value="cancelled">Отменено</option><option value="overdue">Просрочено</option></SelectControl><input aria-label="Тег компании" value={actionCompanyTag} onChange={(event) => setActionCompanyTag(event.target.value)} placeholder="Тег компании"/><input aria-label="Отдел" value={actionDepartment} onChange={(event) => setActionDepartment(event.target.value)} placeholder="Отдел"/></div>}
@@ -265,7 +273,7 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
           <div className="admin-results" aria-busy={loading}>
             {loading && !loaded[section] ? <p className="admin-empty">Загрузка данных…</p> : section === "users" ? <UsersTable users={users} onOpen={openUser} /> : section === "companies" ? <CompaniesTable companies={companies} onOpen={openCompany} /> : <ActionsTable actions={actions} onOpen={openAction} onOpenScope={openActionScope} />}
           </div>
-        </>
+        </>}
       </div>
     </div>
   </section></>;
@@ -415,9 +423,9 @@ function UsageResetPanel({ kind, id }: { kind: SubscriptionOwner; id: string }) 
   async function resetUsage() {
     if (!reason.trim()) { setReasonInvalid(true); setStatus("Укажите причину сброса лимитов."); reasonRef.current?.focus(); return; }
     setBusy(true); setStatus("");
-    try { await api.resetAdminUsage(kind, id, reason.trim()); setReason(""); setStatus("Месячный лимит кредитов сброшен. Купленный кошелёк не изменён."); showAdminAlert("Лимит кредитов сброшен"); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
+    try { await api.resetAdminUsage(kind, id, reason.trim()); setReason(""); setStatus("Лимит кредитов за текущий период сброшен. Купленный кошелёк не изменён."); showAdminAlert("Лимит кредитов сброшен"); } catch (error) { setStatus(message(error)); showAdminAlert(message(error), "error"); } finally { setBusy(false); }
   }
-  return <div className="admin-action-block admin-usage-reset"><h3>Сброс месячного лимита</h3><p>Создаёт новый allowance подписки до ближайшего месячного сброса. Купленные кредиты кошелька не меняются.</p><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button admin-reset-button" type="button" disabled={busy} onClick={() => void resetUsage()}>{busy ? "Сбрасываю…" : "Сбросить лимит"}</button></div>;
+  return <div className="admin-action-block admin-usage-reset"><h3>Сброс лимита кредитов</h3><p>Создаёт новый allowance подписки до ближайшего сброса — период идёт 30 дней от покупки. Купленные кредиты кошелька не меняются.</p><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button admin-reset-button" type="button" disabled={busy} onClick={() => void resetUsage()}>{busy ? "Сбрасываю…" : "Сбросить лимит"}</button></div>;
 }
 
 function UserCallsPanel({ user }: { user: UserResponse }) {

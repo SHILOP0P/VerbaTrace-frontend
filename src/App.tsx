@@ -579,6 +579,12 @@ function App() {
     setCompanySubscriptions(loaded.companySubscriptions);
   }
 
+  // Cancelling processing leaves the call in place with a new status, so the
+  // list is patched rather than emptied.
+  function applyCallUpdate(updated: CallResponse) {
+    setCalls((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+  }
+
   async function deleteCall(callId: string) {
     await api.deleteCall(callId);
 
@@ -695,6 +701,7 @@ function App() {
           }
           onUpdateCallTitle={updateCallTitle}
           onDeleteCall={deleteCall}
+                onCallUpdated={applyCallUpdate}
           onOpenTranscriptionEditor={openTranscriptionEditor}
           onOpenRevisionComparison={openTranscriptionComparison}
           loading={loadingWorkspace}
@@ -768,6 +775,7 @@ function App() {
             }))
           }
           onDeleteCall={deleteCall}
+                onCallUpdated={applyCallUpdate}
           onNavigate={navigate}
         />
       )}

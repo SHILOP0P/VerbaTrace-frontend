@@ -3,6 +3,7 @@ import { FormEvent, MouseEvent as ReactMouseEvent, useDeferredValue, useEffect, 
 import { ApiError, api } from "../../api";
 import type { ActionExternalSync, ActionExternalSyncPreview, AnalysisResponse, CallAction, CallActionAssignee, CallResponse, CompanyResponse, DepartmentResponse, TranscriptionResponse, TranscriptionSpeakerAssignment } from "../../types";
 import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
+import { FrozenRegion } from "../../shared/ui/frozen-region";
 import { TranscriptPreview } from "../../shared/ui/call";
 import { DateTimePicker } from "../../shared/ui/DateTimePicker";
 import { SelectControl } from "../../shared/ui/primitives";
@@ -36,8 +37,12 @@ export function ActionDetailPage({ actionId, onBack, onOpenEvidence }: { actionI
   const canStart=item.capabilities.can_start&&item.status==="open";
   const canCancel=item.capabilities.can_cancel&&!terminal;
   const selectedAssignee=assignees.find((candidate)=>candidate.user_uuid===assigneeId);
-  return <section className="action-detail-page atmospheric-page">
-    <button className="text-button action-back" type="button" onClick={onBack}><ArrowLeft size={16}/>К действиям</button>
+  return <FrozenRegion
+    frozen={item.call_in_bin}
+    message="Звонок помещён в корзину. Действие доступно для чтения, изменения вернутся вместе со звонком."
+  >
+  <section className="action-detail-page atmospheric-page">
+    <button className="text-button action-back" type="button" onClick={onBack} data-frozen-allow><ArrowLeft size={16}/>К действиям</button>
     <header className="action-detail-head glass">
       <div className="action-detail-title"><span className={`action-status action-status-${item.status}`}>{statusLabels[item.status]}</span>{editingFields?<><input aria-label="Название действия" value={draftTitle} maxLength={200} onChange={(event)=>setDraftTitle(event.target.value)}/><textarea aria-label="Описание действия" value={draftDescription} maxLength={10000} onChange={(event)=>setDraftDescription(event.target.value)}/><div className="panel-actions"><button className="primary-button small" type="button" disabled={busy||!draftTitle.trim()} onClick={()=>void saveFields()}>Сохранить</button><button className="ghost-button small" type="button" disabled={busy} onClick={()=>{setEditingFields(false);setDraftTitle(item.title);setDraftDescription(item.description)}}>Отмена</button></div></>:<><h1>{item.title}</h1>{item.description.trim() && <p>{item.description.trim()}</p>}{item.capabilities.can_edit_fields?<button className="text-button" type="button" onClick={()=>{setEditingFields(true);setDraftTitle(item.title);setDraftDescription(item.description)}}>Изменить формулировку</button>:null}</>}</div>
       <aside className="action-detail-meta" aria-label="Сведения о задаче"><div><UserRound size={19}/><span><small>Ответственный</small><strong>{usernameLabel(item.assignee_username)}</strong></span></div><div><CalendarClock size={19}/><span><small>Срок выполнения</small><strong>{formatDateTime(item.due_at)}</strong></span></div></aside>
@@ -49,7 +54,8 @@ export function ActionDetailPage({ actionId, onBack, onOpenEvidence }: { actionI
       <section className="action-panel action-management-panel glass"><div className="action-management-heading"><div><span className="eyebrow">УПРАВЛЕНИЕ</span><h2>Статус задачи</h2></div><span className={`action-status action-status-${item.status}`}>{statusLabels[item.status]}</span></div><div className="action-progress"><span className={item.status!=="open"?"done":"active"}>1</span><i/><span className={item.status==="completed"?"done":item.status==="in_progress"||item.status==="overdue"?"active":""}>2</span><i/><span className={item.status==="completed"?"done":""}>3</span></div><div className="action-progress-labels"><small>Открыто</small><small>В работе</small><small>Выполнено</small></div><div className="action-close-help">{item.status==="completed"?<><CheckCircle2 size={20}/><span><strong>Задача выполнена</strong><small>Дополнительных действий не требуется.</small></span></>:item.status==="cancelled"?<><XCircle size={20}/><span><strong>Задача отменена</strong><small>{item.cancel_reason||"Причина не указана"}</small></span></>:canFinish?<><CheckCircle2 size={20}/><span><strong>Как закрыть задачу?</strong><small>После фактического выполнения нажмите «Отметить выполненной».</small></span></>:<><Clock3 size={20}/><span><strong>Ожидается выполнение</strong><small>Закрыть задачу может ответственный, лидер исходного или целевого отдела либо менеджер компании.</small></span></>}</div><div className="action-controls">{canStart?<button className="ghost-button action-start-button" type="button" disabled={busy} onClick={()=>void mutate("start")}><Clock3 size={18}/>{busy?"Обновляю…":"Начать выполнение"}</button>:null}{canFinish?<button className="primary-button action-complete-button" type="button" disabled={busy} onClick={()=>void mutate("complete")}><CheckCircle2 size={18}/>{busy?"Закрываю…":"Отметить выполненной"}</button>:null}{canCancel?<div className="action-cancel-control"><label htmlFor="action-cancel-reason">Отмена задачи <small>Только если задача ошибочная или потеряла актуальность.</small></label><textarea id="action-cancel-reason" value={reason} maxLength={2000} onChange={(event)=>setReason(event.target.value)} placeholder="Укажите причину отмены — минимум 10 символов"/><button className="ghost-button danger" type="button" disabled={busy||reason.trim().length<10} onClick={()=>void mutate("cancel")}><XCircle size={17}/>Отменить задачу</button></div>:null}</div></section>
       {(item.capabilities.can_reschedule||item.capabilities.can_reassign||item.capabilities.can_revert_status)?<ActionCorrectionControls item={item} busy={busy} reason={reason} dueAt={dueAt} assignees={assignees} assigneeId={assigneeId} departmentId={departmentId} onReason={(value)=>{setReason(value);setError("")}} onDueAt={setDueAt} onAssignee={(value)=>{setAssigneeId(value);const person=assignees.find((candidate)=>candidate.user_uuid===value);setDepartmentId(person?.departments[0]?.id??"")}} onDepartment={setDepartmentId} onMutate={mutate}/>:null}
     </div>
-  </section>;
+  </section>
+  </FrozenRegion>;
 }
 
 type ExternalSyncResolution = "retry_create"|"cancel"|"confirm_task"|"accept_external"|"unlink"|"restore_verbatrace";

@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle2, ChevronUp, Pencil, Plus, RotateCcw, Save, Send
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { AnalysisComment, QualityReviewCriterion, QualityReviewResponse } from "../../types";
+import { FrozenRegion } from "../../shared/ui/frozen-region";
 import { AnalysisComments } from "../calls/AnalysisComments";
 
 type CriterionDraft = { key: string; title: string; custom: boolean; persistedEdited: boolean; aiScore?: number; scoreMin: number; scoreMax: number; storageMax: number; humanScore?: number; notApplicable: boolean; comment: string };
@@ -133,9 +134,13 @@ export function QualityReviewPage({ reviewId, onBack }: { reviewId: string; onBa
   const openAppeal = review.appeals.find((item) => item.status === "open" || item.status === "in_review");
   const sourceSummary = analysisSummary(review.analysis);
 
-  return <div className="quality-page quality-editor">
+  return <FrozenRegion
+    frozen={review.call_in_bin}
+    message="Звонок помещён в корзину. Проверка доступна для чтения, изменения вернутся вместе со звонком."
+  >
+  <div className="quality-page quality-editor">
     <header className="quality-page-header quality-editor-header">
-      <button className="ghost-button quality-back-button" type="button" onClick={onBack}><ArrowLeft size={17} />К очереди</button>
+      <button className="ghost-button quality-back-button" type="button" onClick={onBack} data-frozen-allow><ArrowLeft size={17} />К очереди</button>
       <div className="quality-editor-heading"><span className="eyebrow">Проверка человеком</span><h1>Проверка анализа</h1><p>Читайте исходный анализ и раскрывайте только те разделы, которые хотите изменить.</p></div>
       <span className={`quality-status is-${review.status}`}>{reviewStatusLabel(review.status)}</span>
     </header>
@@ -171,7 +176,8 @@ export function QualityReviewPage({ reviewId, onBack }: { reviewId: string; onBa
       {!readOnly && <footer className="quality-actions"><div>{saving ? "Сохраняю…" : dirty ? "Есть несохранённые изменения" : review.draft ? "Черновик сохранён — работу можно продолжить позже" : "Изменений пока нет"}{blockers.length > 0 && <span>{blockers[0]}</span>}</div><button className="ghost-button" type="button" disabled={saving || (!dirty && !review.draft)} onClick={() => void discardChanges()}><RotateCcw size={17} />Отменить изменения</button><button className="ghost-button" type="button" disabled={saving || !dirty} onClick={() => void saveDraft()}><Save size={17} />Сохранить</button><button className="primary-button" type="button" disabled={saving || blockers.length > 0 || review.source_outdated} title={blockers[0]} onClick={() => void publish()}><Send size={17} />Опубликовать</button></footer>}
     {review.published_revision && <div className="quality-published"><CheckCircle2 size={20} />Опубликована человеческая версия №{review.published_revision.revision_number}</div>}
     {openAppeal && <section className="quality-workflow"><h2>Апелляция</h2><p>{openAppeal.reason}</p>{review.capabilities.can_resolve_appeal && <><p>{review.capabilities.can_edit ? "Чтобы принять замечания, опубликуйте независимую переоценку выше. Она станет действующей и автоматически завершит пересмотр." : "Вы можете отклонить обращение, оставив действующую оценку без изменений."}</p><textarea value={resolutionComment} maxLength={5000} placeholder="Комментарий к решению" onChange={(event) => setResolutionComment(event.target.value)} /><div><button className="ghost-button" disabled={saving || resolutionComment.trim().length < 3} onClick={() => void resolveAppeal(openAppeal.appeal_uuid, "rejected")}>Отклонить обращение</button></div></>}</section>}
-  </div>;
+  </div>
+  </FrozenRegion>;
 }
 
 function fromStored(criteria: QualityReviewCriterion[], analysis: Record<string, unknown>): CriterionDraft[] { const sourceKeys = new Set(sourceCriteria(analysis).map(sourceCriterionKey)); return criteria.map((item) => { const custom = !sourceKeys.has(item.criterion_key); const storageMax = item.score_max && item.score_max > 0 ? item.score_max : custom ? 10 : 100; return { key: item.criterion_key, title: custom ? item.title : criterionTitle(item.criterion_key, item.title), custom, persistedEdited: custom || item.decision === "overridden" || item.decision === "not_applicable" || Boolean(item.comment?.trim()), aiScore: toTenPointScale(item.ai_score, storageMax), scoreMin: 0, scoreMax: 10, storageMax, humanScore: toTenPointScale(item.human_score, storageMax), notApplicable: item.decision === "not_applicable", comment: item.comment ?? "" }; }); }

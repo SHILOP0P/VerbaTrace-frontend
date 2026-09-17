@@ -88,20 +88,23 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
   }
 
   const forecast = useMemo(() => data ? creditForecast(data) : null, [data]);
+  // The waiting queue only matters once something is actually waiting or the
+  // limit has run out; the rest of the time it is noise on the card.
+  const queueNote = useMemo(() => data ? pendingQueueNote(data) : "", [data]);
 
   if (hiddenByManager) return null;
 
   return <section className={`credit-usage-panel${embeddedHeader ? " is-profile-overview" : " glass"}`} aria-labelledby="credit-usage-title">
     {embeddedHeader}
     <div className="credit-usage-head">
-      <div><span className="credit-usage-icon"><Activity size={20} /></span><h2 id="credit-usage-title">Использование кредитов</h2><p>Остаток месячного лимита и фактическая активность.</p></div>
+      <div><span className="credit-usage-icon"><Activity size={20} /></span><h2 id="credit-usage-title">Использование кредитов</h2><p>Остаток лимита за период подписки (30 дней) и фактическая активность.</p></div>
       {!companyId && managed.length > 0 && <label>Аккаунт<SelectControl value={scope} onChange={(event) => setScope(event.target.value)}><option value="personal">Личный</option>{managed.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</SelectControl></label>}
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {!error && !data && <CreditDashboardSkeleton />}
     {data && <>
       <div className={`credit-limit-row${integrationAccess ? " has-sandbox" : ""}`}>
-        <div className="credit-balance-summary"><CreditLimitRing percent={data.allowance_remaining_percent} /><div className="credit-limit-copy"><strong>{data.days_until_reset} дн. до сброса лимита</strong><small>Сброс {new Date(data.resets_at).toLocaleDateString("ru-RU")}</small><p className="credit-limit-values"><strong>{data.allowance_remaining.toLocaleString("ru-RU")}</strong><span>из {data.allowance_credits.toLocaleString("ru-RU")} кредитов</span></p></div></div>
+        <div className="credit-balance-summary"><CreditLimitRing percent={data.allowance_remaining_percent} /><div className="credit-limit-copy"><strong>{data.days_until_reset} дн. до сброса лимита</strong><small>Сброс {new Date(data.resets_at).toLocaleDateString("ru-RU")}</small><p className="credit-limit-values"><strong>{data.allowance_remaining.toLocaleString("ru-RU")}</strong><span>из {data.allowance_credits.toLocaleString("ru-RU")} кредитов</span></p>{queueNote && <small className="credit-queue-note">{queueNote}</small>}</div></div>
         <section className="credit-main-wallet credit-summary-card" aria-label="Основной кошелёк"><header><span><WalletCards size={17}/></span><div><strong>Основной кошелёк</strong><small>Купленные кредиты</small></div></header><p><strong>{data.wallet_credits === null ? "—" : data.wallet_credits.toLocaleString("ru-RU")}</strong>{data.wallet_credits !== null && <span>кредитов</span>}</p>{!companyId && <small className="credit-wallet-note">Пополнение появится вместе с оплатой.</small>}</section>
         {forecast && <section className="credit-forecast credit-summary-card" aria-label="Прогноз расхода"><header><span><TrendingDown size={17}/></span><div><strong>Прогноз расхода</strong><small>По текущему темпу</small></div></header><dl><div><dt>Потрачено</dt><dd>{forecast.used.toLocaleString("ru-RU")}</dd></div><div><dt>В среднем за день</dt><dd>{forecast.daily.toLocaleString("ru-RU")}</dd></div><div><dt>Останется к сбросу</dt><dd>{forecast.atReset.toLocaleString("ru-RU")}</dd></div><div><dt>Лимита хватит</dt><dd>{forecast.depletion}</dd></div></dl></section>}
         {integrationAccess && <section className="credit-sandbox-wallet credit-summary-card" aria-label="Тестовый кошелёк"><header><span><FlaskConical size={17}/></span><div><strong>Тестовый кошелёк</strong><small>{sandboxWalletError ? "Не удалось загрузить баланс" : sandboxWallet?.application_name ?? "Тестовое приложение не создано"}</small></div></header><p><strong>{sandboxWalletError ? "—" : (sandboxWallet?.balance_credits ?? 0).toLocaleString("ru-RU")}</strong>{!sandboxWalletError && <span>кредитов</span>}</p><small>{sandboxWalletError ? "Обновите страницу или проверьте интеграцию" : "Не влияет на основной лимит"}</small></section>}
@@ -207,11 +210,23 @@ function walletReason(reason: string, sandbox: boolean) {
   return "Операция с тестовыми кредитами";
 }
 
+function pendingQueueNote(data: CreditDashboardResponse) {
+  const waiting = data.calls_awaiting_credits ?? 0;
+  if (waiting === 0 && !data.allowance_exhausted) return "";
+  const limit = data.pending_credit_calls_limit;
+  if (limit === null || limit === undefined) return `Ждут кредитов: ${waiting} звонк${waiting === 1 ? "" : "ов"}`;
+  if (limit === 0) return "Звонки без кредитов не принимаются";
+  return `Ждут кредитов: ${waiting} из ${limit}`;
+}
+
+// The limit runs for 30 days from the day the subscription started, not for a
+// calendar month, so the elapsed part of the period is counted the same way.
+const creditPeriodDays = 30;
+
 function creditForecast(data: CreditDashboardResponse) {
   const used = Math.max(0, data.allowance_credits - data.allowance_remaining);
   const reset = new Date(data.resets_at);
-  const start = new Date(reset);
-  start.setUTCMonth(start.getUTCMonth() - 1);
+  const start = new Date(reset.getTime() - creditPeriodDays * 86_400_000);
   const elapsed = Math.max(1, Math.ceil((Date.now() - start.getTime()) / 86_400_000));
   const daily = Math.round(used / elapsed);
   const atReset = Math.max(0, data.allowance_remaining - daily * Math.max(0, data.days_until_reset));

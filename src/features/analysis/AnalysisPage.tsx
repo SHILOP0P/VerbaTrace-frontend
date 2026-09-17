@@ -23,6 +23,8 @@ import type {
 } from "../../types";
 
 import { analysisProgress, isAnalysisDone } from "../../shared/lib/analysis";
+import { enterOverlayMode } from "../../shared/lib/page-scroll";
+import { useDrawerLayout } from "../../shared/lib/drawer-layout";
 import { AnalysisStructuredView } from "../../shared/ui/analysis";
 import { StatusChip, StatusTimeline } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
@@ -49,6 +51,7 @@ export function AnalysisPage({
   onSelectCall,
   onAnalysisReady,
   onDeleteCall,
+  onCallUpdated,
   onNavigate
 }: {
   session: SessionState;
@@ -65,6 +68,7 @@ export function AnalysisPage({
   onSelectCall: (callId: string) => void;
   onAnalysisReady: (callId: string, analysis: AnalysisResponse) => void;
   onDeleteCall: (callId: string) => Promise<void>;
+  onCallUpdated?: (call: CallResponse) => void;
   onNavigate: (page: AppPage) => void;
 }) {
   const analysisSidebarScrollRef = useRef<HTMLElement | null>(null);
@@ -76,6 +80,7 @@ export function AnalysisPage({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isDrawerLayout = useDrawerLayout();
   const [statusFilter, setStatusFilter] = useState<CallStatus | "all">("all");
   const [scopeFilter, setScopeFilter] = useState<VisibilityScope | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -106,15 +111,14 @@ export function AnalysisPage({
   useEffect(() => {
     if (!mobileSidebarOpen) return;
 
-    const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMobileSidebarOpen(false);
     };
 
-    document.body.style.overflow = "hidden";
+    const leaveOverlay = enterOverlayMode();
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      leaveOverlay();
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [mobileSidebarOpen]);
@@ -314,7 +318,11 @@ export function AnalysisPage({
         tabIndex={mobileSidebarOpen ? 0 : -1}
         onClick={() => setMobileSidebarOpen(false)}
       />
-      <CustomScrollbar targetRef={analysisSidebarScrollRef} className="analysis-drawer-scroll-thumb mobile-call-drawer-scroll-thumb" />
+      {/* Only while the drawer is on screen: otherwise its scrollbar stayed
+          drawn over the page behind it. */}
+      {(!isDrawerLayout || mobileSidebarOpen) && (
+        <CustomScrollbar targetRef={analysisSidebarScrollRef} className="analysis-drawer-scroll-thumb mobile-call-drawer-scroll-thumb" />
+      )}
       <section className="analysis-detail glass custom-scroll-target" ref={analysisDetailScrollRef}>
         <div className="panel-heading large">
           <div>

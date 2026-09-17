@@ -34,6 +34,8 @@ import type {
   CallsListResponse,
   DeletedCallsListResponse,
   CompanyCreditForecast,
+  AdminAuditTrail,
+  AdminAuditTrailResponse,
   CompanyLifecycle,
   CompanyResponse,
   CreditDashboardResponse,
@@ -130,8 +132,21 @@ const apiErrorMessages: Record<string, string> = {
   subscription_required: "Требуется активная подписка",
   subscription_not_found: "Подписка не найдена",
   invalid_billing_input: "Некорректные данные подписки",
-  failed_to_activate_subscription: "Не удалось активировать подписку",
   failed_to_cancel_subscription: "Не удалось отменить подписку",
+  // Running out of budget is not a failure: the call is accepted and waits.
+  company_credit_limit_exceeded:
+    "Лимит кредитов компании исчерпан. Звонок подождёт в очереди и начнёт обрабатываться, когда лимит обновится",
+  department_credit_limit_exceeded:
+    "Лимит кредитов отдела исчерпан. Звонок подождёт в очереди и начнёт обрабатываться, когда лимит обновится",
+  pending_credit_queue_full:
+    "Слишком много звонков уже ждут кредитов. Дождитесь их обработки или увеличьте лимит",
+  company_frozen:
+    "Компания заморожена: данные можно читать, но не изменять",
+  company_deletion_in_progress: "Компания удаляется. Сначала отмените удаление",
+  call_processing_in_progress:
+    "Звонок ещё обрабатывается. Сначала отмените обработку",
+  call_in_bin:
+    "Звонок помещён в корзину. Восстановите его, чтобы вносить изменения",
   failed_to_convert_subscription: "Не удалось обработать данные подписки",
   failed_to_list_plans: "Не удалось загрузить тарифы",
   failed_to_convert_plan: "Не удалось обработать тарифы",
@@ -336,6 +351,7 @@ function normalizePlan(plan: RawPlan): Plan {
 			plan.monthly_credit_allowance,
 			numberOrFallback(plan.monthly_minutes_limit) * 875,
 		),
+    pending_credit_calls_limit: nullableNumber(plan.pending_credit_calls_limit),
     active_instruction_limit: numberOrFallback(
       plan.active_instruction_limit ?? plan.active_instructions_limit,
     ),
@@ -896,6 +912,26 @@ export const api = {
       { method: "POST", body: JSON.stringify(input) },
     );
   },
+  // The append-only trails: admin actions, billing alerts, credit
+  // reconciliation, retention, transcript edits and comment revisions.
+  getAdminAuditTrail(
+    trail: AdminAuditTrail,
+    range: { from?: string; to?: string } = {},
+  ) {
+    return request<AdminAuditTrailResponse>(
+      `/admin/audit-trails/${encodeURIComponent(trail)}${queryString({ from: range.from, to: range.to, limit: 100 })}`,
+    );
+  },
+
+  // Alerts are the only trail with a state: closing one is itself an admin
+  // action, so it carries a reason into the audit log.
+  resolveBillingAlert(alertId: string, reason: string) {
+    return request<{ status: string }>(
+      `/admin/billing-alerts/${encodeURIComponent(alertId)}/resolve`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+    );
+  },
+
   getAdminCapabilities() {
     return request<AdminCapabilitiesResponse>("/admin/capabilities");
   },
@@ -1312,6 +1348,24 @@ export const api = {
     return request<CallResponse>(
       `/calls/${encodeURIComponent(callId)}/restore`,
       { method: "POST" },
+    );
+  },
+
+  // Stops the queue working on a call and keeps the call. Deleting one
+  // mid-flight is refused, so this is the way out of a wrong upload.
+  cancelCallProcessing(callId: string) {
+    return request<CallResponse>(
+      `/calls/${encodeURIComponent(callId)}/cancel-processing`,
+      { method: "POST" },
+    );
+  },
+
+  // Starts a cancelled call again, with or without the analysis. Switching a
+  // call that is already transcribed costs nothing and finishes it on the spot.
+  restartCallProcessing(callId: string, mode: "analyze" | "transcribe") {
+    return request<CallResponse>(
+      `/calls/${encodeURIComponent(callId)}/restart-processing`,
+      { method: "POST", body: JSON.stringify({ processing_mode: mode }) },
     );
   },
 
@@ -2499,6 +2553,15 @@ export const api = {
     });
   },
 
+  // Calling off a deletion is separate from switching a company back on: a
+  // deleted company must not come back with the same click.
+  cancelCompanyDeletion(companyId: string) {
+    return request<void>(
+      `/companies/${encodeURIComponent(companyId)}/cancel-deletion`,
+      { method: "POST" },
+    );
+  },
+
   activateCompany(companyId: string) {
     return request<void>(
       `/companies/${encodeURIComponent(companyId)}/activate`,
@@ -2668,25 +2731,8 @@ export const api = {
     } satisfies PlansResponse;
   },
 
-  activateCompanySubscription(companyId: string, planCode?: PlanCode) {
-    const body = planCode ? { plan_code: planCode } : {};
-    return request<Subscription>(
-      `/companies/${encodeURIComponent(companyId)}/subscription/activate`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
-    );
-  },
-
-  activateSubscription(planCode?: PlanCode) {
-    const body = planCode ? { plan_code: planCode } : {};
-    return request<Subscription>("/subscription/activate", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-  },
-
+  // There is no self-service activation: a plan is issued by an administrator.
+  // The two methods that used to be here called routes that did not exist.
   cancelCompanySubscription(companyId: string) {
     return request<Subscription>(
       `/companies/${encodeURIComponent(companyId)}/subscription/cancel`,

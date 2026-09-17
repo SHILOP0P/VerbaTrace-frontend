@@ -1,4 +1,5 @@
 import {
+  Ban,
   CheckCircle2,
   ClipboardCheck,
   ChevronRight,
@@ -9,6 +10,7 @@ import {
   Headphones,
   MessageSquareWarning,
   PhoneCall,
+  RotateCcw,
   Trash2,
   WandSparkles
 } from "lucide-react";
@@ -38,6 +40,7 @@ import { analysisProgress, analysisNextStep, analysisScore100, formatScore, isAn
 import { contextLabel, formatDate, formatDuration } from "../../shared/lib/formatters";
 import { AnalysisPreview } from "../../shared/ui/analysis";
 import { CallMediaPlayer } from "../../shared/ui/audio";
+import { isCallBeingProcessed } from "../../shared/lib/call-status";
 import { InfoCard, StatusChip, StatusTimeline, TranscriptPreview } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { CallDetailSkeleton } from "../../shared/ui/loading";
@@ -65,6 +68,7 @@ export function CallDetailPanel({
   onNavigate,
   onAnalysisReady,
   onDeleteCall,
+  onCallUpdated,
   onOpenTranscriptionEditor,
   onOpenRevisionComparison,
   folders = [],
@@ -87,6 +91,9 @@ export function CallDetailPanel({
   onNavigate: (page: AppPage) => void;
   onAnalysisReady?: (callId: string, analysis: AnalysisResponse) => void;
   onDeleteCall?: (callId: string) => Promise<void>;
+  // Cancelling processing changes the call in place rather than removing it, so
+  // the list has to hear about the new status.
+  onCallUpdated?: (call: CallResponse) => void;
   onOpenTranscriptionEditor?: (callId: string) => void;
   onOpenRevisionComparison?: (callId: string, revision?: number) => void;
   folders?: CallFolderResponse[];
@@ -102,6 +109,9 @@ export function CallDetailPanel({
   const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  const [restarting, setRestarting] = useState<"analyze" | "transcribe" | null>(null);
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisRunError, setAnalysisRunError] = useState("");
   const [rerunRequestOpen, setRerunRequestOpen] = useState(false);
@@ -373,6 +383,45 @@ export function CallDetailPanel({
     }
   }
 
+  // A call the queue is still working on cannot be thrown away: the provider has
+  // it and its credits are reserved. Stopping it is a decision of its own, and
+  // the recording survives it.
+  const processingInFlight = call ? isCallBeingProcessed(call.status) : false;
+
+  async function cancelProcessing() {
+    if (!call || cancelling) return;
+
+    setCancelError("");
+    setCancelling(true);
+    try {
+      const updated = await api.cancelCallProcessing(call.id);
+      onCallUpdated?.(updated);
+    } catch (cancelProcessingError) {
+      setCancelError(
+        cancelProcessingError instanceof Error ? cancelProcessingError.message : "Не удалось отменить обработку"
+      );
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  // A cancelled call keeps its recording, so starting it again is an ordinary
+  // choice between the two modes — not a new upload.
+  async function restartProcessing(mode: "analyze" | "transcribe") {
+    if (!call || restarting) return;
+
+    setCancelError("");
+    setRestarting(mode);
+    try {
+      const updated = await api.restartCallProcessing(call.id, mode);
+      onCallUpdated?.(updated);
+    } catch (restartError) {
+      setCancelError(restartError instanceof Error ? restartError.message : "Не удалось запустить обработку заново");
+    } finally {
+      setRestarting(null);
+    }
+  }
+
   async function deleteSelectedCall() {
     if (!call || !onDeleteCall || deleting) return;
 
@@ -492,7 +541,15 @@ export function CallDetailPanel({
               {analysisBusy ? "Анализирую…" : "Сделать анализ"}
             </button>
           )}
-          {onDeleteCall && (
+          {/* While the queue still owns the call, stopping it is the way out;
+              deleting is refused until then and would only produce an error. */}
+          {onDeleteCall && processingInFlight && (
+            <button className="ghost-button small danger-button" type="button" onClick={() => void cancelProcessing()} disabled={cancelling}>
+              <Ban size={16} />
+              {cancelling ? "Отменяю…" : "Отменить обработку"}
+            </button>
+          )}
+          {onDeleteCall && !processingInFlight && (
             <button className="ghost-button small danger-button" onClick={() => setDeleteConfirmOpen(true)} disabled={deleting}>
               <Trash2 size={16} />
               {deleting ? "Удаляю..." : "Удалить"}
@@ -500,6 +557,31 @@ export function CallDetailPanel({
           )}
         </div>
       </div>
+      {call.status === "awaiting_credits" && (
+        <div className="call-waiting-notice" role="note">
+          <strong>Звонок ждёт кредитов</strong>
+          <span>Лимит исчерпан. Обработка начнётся сама, как только лимит обновится или кошелёк пополнят. Можно отменить обработку и вернуться к звонку позже.</span>
+        </div>
+      )}
+      {call.status === "cancelled" && (
+        <div className="call-waiting-notice" role="note">
+          <strong>Обработка отменена</strong>
+          <span>Запись на месте: её можно прослушать и скачать в плеере ниже, обработать заново или удалить в корзину.</span>
+          {onDeleteCall && !call.is_test && (
+            <div className="call-waiting-actions">
+              <button className="primary-button small" type="button" disabled={restarting !== null} onClick={() => void restartProcessing("analyze")}>
+                <RotateCcw size={16} />
+                {restarting === "analyze" ? "Запускаю…" : "Обработать заново"}
+              </button>
+              <button className="ghost-button small" type="button" disabled={restarting !== null} onClick={() => void restartProcessing("transcribe")}>
+                <FileText size={16} />
+                {restarting === "transcribe" ? "Переключаю…" : "Только транскрибация"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {cancelError && <div className="form-error">{cancelError}</div>}
       {analysisRunError && <div className="form-error is-dismissible" role="alert">{analysisRunError}</div>}
       {deleteError && <div className="form-error">{deleteError}</div>}
       {call.is_test && <div className="call-test-notice" role="note"><strong>Тестовый звонок</strong><span>Он хранится отдельно и доступен только для проверки загрузки и удаления. Анализ, редактирование и перенос в другие папки отключены.</span></div>}

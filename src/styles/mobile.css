@@ -498,152 +498,6 @@
     border-radius: 16px;
   }
 
-  .app-shell .mobile-call-drawer-trigger-anchor {
-    display: block;
-    width: auto;
-    justify-self: end;
-  }
-
-  .app-shell .mobile-call-drawer-trigger {
-    display: grid;
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
-    min-height: 40px;
-    padding: 0;
-    color: var(--app-accent-strong);
-    background: color-mix(in srgb, var(--app-accent) 10%, transparent);
-    border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
-    border-radius: 12px;
-    place-items: center;
-  }
-
-  .app-shell .mobile-call-drawer-trigger span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-
-  .app-shell :is(.analysis-layout, .calls-layout) > .mobile-call-drawer {
-    position: fixed;
-    z-index: 92;
-    top: calc(max(10px, env(safe-area-inset-top)) + 74px);
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 74px);
-    left: 12px;
-    display: flex;
-    width: min(360px, calc(100vw - 36px));
-    height: auto;
-    max-height: calc(100dvh - 168px);
-    min-height: 0;
-    padding: 18px 14px;
-    flex-direction: column;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    visibility: hidden;
-    opacity: 0;
-    transform: translate3d(calc(-100% - 24px), 0, 0);
-    transition:
-      transform 260ms cubic-bezier(.22, .8, .28, 1),
-      opacity 180ms ease,
-      visibility 0s linear 260ms;
-    pointer-events: none;
-  }
-
-  .app-shell :is(.analysis-layout, .calls-layout) > .mobile-call-drawer.open {
-    visibility: visible;
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-    transition-delay: 0s;
-    pointer-events: auto;
-  }
-
-  .app-shell :is(.analysis-sidebar-actions, .mobile-call-drawer-heading-actions) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .app-shell :is(.analysis-drawer-close, .mobile-call-drawer-close) {
-    display: grid;
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
-    padding: 0;
-    place-items: center;
-  }
-
-  .app-shell :is(.analysis-drawer-backdrop, .mobile-call-drawer-backdrop) {
-    position: fixed;
-    z-index: 91;
-    inset: 0;
-    display: block;
-    visibility: hidden;
-    padding: 0;
-    background: rgba(14, 9, 7, .42);
-    border: 0;
-    opacity: 0;
-    transition: opacity 180ms ease, visibility 0s linear 260ms;
-    pointer-events: none;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-  }
-
-  .app-shell :is(.analysis-drawer-backdrop, .mobile-call-drawer-backdrop).open {
-    visibility: visible;
-    opacity: 1;
-    transition-delay: 0s;
-    pointer-events: auto;
-  }
-
-  .analysis-drawer-scroll-thumb,
-  .mobile-call-drawer-scroll-thumb {
-    z-index: 95;
-  }
-
-  .mobile-call-drawer-header-trigger {
-    position: fixed;
-    z-index: 96;
-    top: 23px;
-    left: 50%;
-    display: grid;
-    width: 38px;
-    height: 38px;
-    padding: 0;
-    color: var(--app-accent-strong);
-    background: color-mix(in srgb, var(--app-glass-strong) 92%, transparent);
-    border: 1px solid color-mix(in srgb, var(--app-accent) 34%, var(--app-border));
-    border-radius: 12px;
-    box-shadow: 0 8px 22px rgba(20, 12, 8, .18);
-    place-items: center;
-    visibility: hidden;
-    opacity: 0;
-    transform: translate3d(-50%, 14px, 0) scale(.72);
-    pointer-events: none;
-  }
-
-  .mobile-call-drawer-header-trigger.visible {
-    visibility: visible;
-    opacity: 1;
-    transform: translate3d(-50%, 0, 0) scale(1);
-    animation: mobile-drawer-trigger-arrive 320ms cubic-bezier(.2, .9, .28, 1.16) both;
-    pointer-events: auto;
-  }
-
-  .mobile-call-drawer-header-trigger.drawer-open {
-    color: var(--app-text);
-    background: color-mix(in srgb, var(--app-glass-strong) 96%, transparent);
-    border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-border));
-  }
-
-  @keyframes mobile-drawer-trigger-arrive {
-    0% { opacity: 0; transform: translate3d(-50%, 16px, 0) scale(.68); }
-    68% { opacity: 1; transform: translate3d(-50%, -2px, 0) scale(1.06); }
-    100% { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); }
-  }
 
   @media (max-width: 380px) {
     .app-shell .app-header .logo { gap: 4px; font-size: 15px; }
@@ -729,10 +583,20 @@
     white-space: normal;
   }
 
+  /* Two per row. Stacked one per row they read as four heavy bars filling the
+     top of the card before any of the call itself is visible. */
   .app-shell .call-overview > .panel-heading .panel-actions {
     display: grid;
     width: 100%;
-    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Below this the two columns cut the labels, so they go back to one. */
+  @media (max-width: 420px) {
+    .app-shell .call-overview > .panel-heading .panel-actions {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .app-shell .call-overview > .panel-heading .panel-actions > :is(button, .call-folder-action-menu),
@@ -818,10 +682,30 @@
   .app-header-center { grid-area: search; display: flex; width: 100%; }
   .app-header .profile-block { grid-area: controls; width: auto; justify-content: flex-end; }
   .app-header .team-switcher,
-  .app-header .date-range-control,
   .header-profile-link strong,
   .profile-block .logout { display: none; }
-  .app-header .global-search { width: 100%; }
+
+  /* The brand row has a wide gap between the logo and the icons, and the date
+     is the one control that was dropped for width it does not need. It sits in
+     that gap, centred, so it depends on neither the logo's length nor the
+     number of icons. It lives inside the search row in the markup, so it is
+     lifted out of that flow rather than moved. */
+  .app-header-center > div.header-popover-wrap {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .app-header .date-range-control {
+    display: inline-flex;
+    max-width: 260px;
+  }
+  /* The search has a row to itself here, so it takes the whole of it. The
+     240px cap that keeps it away from the date picker on wide screens has to
+     be overridden by name: it is the more specific rule. */
+  .app-shell .app-header-center .global-search { width: 100%; }
+  .app-shell .app-header-center { min-width: 0; }
 
   .workspace-frame { display: block; width: 100%; padding: 26px 24px 118px; }
   .app-sidebar { display: none; }
@@ -920,3 +804,223 @@
   .compare-section-heading > small { text-align: left; }
   .compare-change-range { grid-template-columns: 1fr; gap: 8px; }
 }
+
+/* The call list and the call itself stop fitting side by side at 1320px, where
+   the layout drops to a single column. From there the list has to become a
+   drawer behind a button: left in place it pushed the call far down the page,
+   and collapsed it left an empty strip with nothing in it. The width is the
+   same one `auth-app.css` uses to stack the layout, so the two cannot drift
+   apart. */
+@media (max-width: 1320px) {
+  .app-shell .calls-layout > .calls-list-collapse,
+  .app-shell .calls-layout > .calls-list-emblem { display: none; }
+
+  .app-shell .mobile-call-drawer-trigger-anchor {
+    display: block;
+    width: auto;
+    justify-self: end;
+  }
+
+  /* The heading stacks its title and its buttons, so a button left in that flow
+     took a whole row to itself and pushed the call down. It belongs on the
+     title's line instead, at the far end of it. */
+  .app-shell :is(.call-overview, .analysis-detail) > .panel-heading {
+    position: relative;
+    padding-right: 52px;
+  }
+
+  .app-shell :is(.call-overview, .analysis-detail) > .panel-heading > .mobile-call-drawer-trigger-anchor {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .app-shell .mobile-call-drawer-trigger {
+    display: grid;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    color: var(--app-accent-strong);
+    background: color-mix(in srgb, var(--app-accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--app-accent) 28%, var(--app-border));
+    border-radius: 12px;
+    place-items: center;
+  }
+
+  .app-shell .mobile-call-drawer-trigger span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  /* A fixed overlay is measured against the nearest ancestor with a
+     backdrop-filter, and the workspace page has one for its atmosphere. With it
+     in place the drawer was measured against the page: off-centre, and its
+     bottom edge past the screen. Dropping the blur for these widths — the phone
+     layout already does it — gives the overlay the window to measure against.
+     The page keeps its background; only the blur behind it goes. */
+  .app-shell :is(.analysis-layout, .calls-layout).atmospheric-page {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  /* The drawer sits inside the workspace frame, which is a stacking context of
+     its own: the sidebar and the header painted over it whatever z-index it
+     claimed, and the list came out sliced down its left edge. Raising the frame
+     while an overlay is open carries the drawer and its backdrop above them. */
+  .app-shell.overlay-open .workspace-frame {
+    position: relative;
+    z-index: 130;
+  }
+
+  /* The workspace is a stacking context of its own at level 0, so the drawer
+     inside it was still compared against the sidebar as a whole and lost. It is
+     lifted past the sidebar for as long as the overlay is open. */
+  .app-shell.overlay-open .workspace {
+    z-index: 50;
+  }
+
+  /* The list opens in the middle of the screen and takes the work over: the
+     page behind it stops scrolling and the backdrop swallows the clicks. Its
+     width follows the screen instead of staying at one number, and it keeps an
+     even margin top and bottom so it never runs into the edge. */
+  .app-shell :is(.analysis-layout, .calls-layout) > .mobile-call-drawer {
+    position: fixed;
+    z-index: 92;
+    top: 50%;
+    left: 50%;
+    display: flex;
+    width: clamp(288px, 62vw + 120px, 760px);
+    max-width: calc(100vw - 32px);
+    height: min(76dvh, 860px);
+    max-height: calc(100dvh - max(32px, env(safe-area-inset-top)) - max(32px, env(safe-area-inset-bottom)) - 96px);
+    min-height: 0;
+    padding: 20px 16px;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 22px;
+    box-shadow: 0 32px 90px rgba(14, 9, 7, .46);
+    visibility: hidden;
+    opacity: 0;
+    transform: translate3d(-50%, calc(-50% + 14px), 0) scale(.985);
+    transition:
+      transform 260ms cubic-bezier(.22, .8, .28, 1),
+      opacity 180ms ease,
+      visibility 0s linear 260ms;
+    pointer-events: none;
+  }
+
+  .app-shell :is(.analysis-layout, .calls-layout) > .mobile-call-drawer.open {
+    visibility: visible;
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+    transition-delay: 0s;
+    pointer-events: auto;
+  }
+
+  .app-shell :is(.analysis-sidebar-actions, .mobile-call-drawer-heading-actions) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* A close button belongs in the corner of the thing it closes. Sitting in the
+     row of heading actions it read as one more action next to "Upload a call".
+     The collapse button that normally lives in that corner is a control of the
+     column layout, which this is not, so it steps aside. */
+  .app-shell .mobile-call-drawer > .calls-list-collapse {
+    display: none;
+  }
+
+  .app-shell :is(.mobile-call-drawer, .analysis-sidebar-drawer) > .panel-heading {
+    position: relative;
+    padding-right: 46px;
+  }
+
+  .app-shell :is(.analysis-drawer-close, .mobile-call-drawer-close) {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    display: grid;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    padding: 0;
+    place-items: center;
+  }
+
+  .app-shell :is(.analysis-sidebar-actions, .mobile-call-drawer-heading-actions) > .primary-button {
+    flex: 1 1 auto;
+  }
+
+  .app-shell :is(.analysis-drawer-backdrop, .mobile-call-drawer-backdrop) {
+    position: fixed;
+    z-index: 91;
+    inset: 0;
+    display: block;
+    visibility: hidden;
+    padding: 0;
+    background: rgba(14, 9, 7, .42);
+    border: 0;
+    opacity: 0;
+    transition: opacity 180ms ease, visibility 0s linear 260ms;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .app-shell :is(.analysis-drawer-backdrop, .mobile-call-drawer-backdrop).open {
+    visibility: visible;
+    opacity: 1;
+    transition-delay: 0s;
+    pointer-events: auto;
+  }
+
+  .analysis-drawer-scroll-thumb,
+  .mobile-call-drawer-scroll-thumb {
+    z-index: 95;
+  }
+
+  /* The button stands in the row of header icons, first in line, and keeps its
+     place whether or not it is showing. Holding the place is what lets the
+     arrival animate on opacity and transform alone — the two properties the
+     compositor handles without a layout pass — instead of widening the row and
+     shoving the icons sideways every time the page is scrolled. */
+  /* One of the header's icons, so it looks like one: the accent is kept for the
+     open state, the way the other controls mark theirs. */
+  .profile-block > .mobile-call-drawer-header-trigger {
+    order: -1;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    transform: translate3d(0, -5px, 0) scale(.84);
+    transition:
+      opacity 180ms ease,
+      transform 240ms cubic-bezier(.22, .86, .3, 1);
+    pointer-events: none;
+  }
+
+  .profile-block > .mobile-call-drawer-header-trigger.visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    pointer-events: auto;
+  }
+
+  .profile-block > .mobile-call-drawer-header-trigger.drawer-open {
+    color: var(--app-accent-strong);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .profile-block > .mobile-call-drawer-header-trigger { transition: opacity 120ms ease; transform: none; }
+    .profile-block > .mobile-call-drawer-header-trigger.visible { transform: none; }
+  }
+}
+

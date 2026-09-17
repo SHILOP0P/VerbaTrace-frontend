@@ -14,12 +14,31 @@ export const statusMeta: Record<
 > = {
   new: { label: "Новый", chip: "Новый", description: "Файл загружен и принят" },
   processing: { label: "В обработке", chip: "В обработке", description: "Идет обработка аудио" },
+  // Waiting for credits is not a failure and must never look like one: the call
+  // is fine, there is simply no budget to process it yet.
+  awaiting_credits: {
+    label: "Ждёт кредитов",
+    chip: "Ждёт кредитов",
+    description: "Лимит кредитов исчерпан. Обработка начнётся, когда он обновится"
+  },
+  // Cancelled is a decision, not a breakdown. The recording is intact.
+  cancelled: {
+    label: "Обработка отменена",
+    chip: "Отменён",
+    description: "Обработка остановлена. Запись на месте, её можно обработать заново"
+  },
   transcribed: { label: "Расшифрован", chip: "Расшифрован", description: "Текстовая расшифровка готова" },
   analyzed: { label: "Проанализирован", chip: "Анализ готов", description: "AI-анализ завершен" },
   failed: { label: "Ошибка", chip: "Ошибка", description: "Нужно проверить файл" }
 };
 
 export const normalTimelineSteps: CallStatus[] = ["new", "processing", "transcribed", "analyzed"];
+
+// Statuses where the queue still owns the call. Deleting is refused here; the
+// way out is to cancel the processing.
+export function isCallBeingProcessed(status: CallStatus) {
+  return status === "new" || status === "processing" || status === "awaiting_credits";
+}
 
 type AnalysisStatus = AnalysisResponse["status"] | undefined;
 
@@ -29,6 +48,9 @@ export function isCallStatus(value: unknown): value is CallStatus {
 
 export function timelineFromStatus(status: CallStatus) {
   if (status === "failed") return [status];
+  // Waiting and cancelling both happen before anything was produced, so the
+  // timeline shows the call as accepted and stops there.
+  if (status === "awaiting_credits" || status === "cancelled") return ["new"] as CallStatus[];
 
   const currentIndex = normalTimelineSteps.indexOf(status);
   if (currentIndex === -1) return ["new"] as CallStatus[];
@@ -47,6 +69,7 @@ export function nextTimelineStatuses(previous: CallStatus[], status: CallStatus)
 
 export function callStatusChip(status: CallStatus, analysisStatus?: AnalysisStatus) {
   if (status === "failed") return statusMeta.failed.chip;
+  if (status === "awaiting_credits" || status === "cancelled") return statusMeta[status].chip;
   if (analysisStatus === "failed") return "Ошибка анализа";
   if (status === "new") return "В очереди";
   if (status === "processing") return "Транскрибируется";
@@ -60,6 +83,8 @@ export function callStatusTone(status: CallStatus, analysisStatus?: AnalysisStat
   if (
     status === "new" ||
     status === "processing" ||
+    status === "awaiting_credits" ||
+    status === "cancelled" ||
     status === "transcribed" ||
     (status === "analyzed" && analysisStatus !== undefined && analysisStatus !== "done")
   ) return "warn";

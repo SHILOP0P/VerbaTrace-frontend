@@ -11,14 +11,12 @@ import { api, ApiError } from "../../api";
 import type {
   CompanyResponse,
   Plan,
-  PlanCode,
   SessionState,
   Subscription
 } from "../../types";
 
-import { analysisLevelLabel, comparePlans, formatHistoryDays, formatInstructionLimit, formatMinutesLimit, planGradients } from "../../shared/lib/plans";
+import { analysisLevelLabel, comparePlans, formatHistoryDays, formatInstructionLimit, formatMinutesLimit, formatPendingQueueLimit, planGradients } from "../../shared/lib/plans";
 import { SkeletonLine, TextBlockSkeleton } from "../../shared/ui/loading";
-import { SelectControl } from "../../shared/ui/primitives";
 
 if (typeof window !== "undefined" && window.location.pathname === "/app/settings/tariffs" && "scrollRestoration" in window.history) {
   window.history.scrollRestoration = "manual";
@@ -136,17 +134,10 @@ export function PersonalSubscriptionPanel({
   initialSubscription: Subscription | null;
   onSubscriptionChanged: (subscription: Subscription | null) => void;
 }) {
-  const defaultPlanCode = personalPlans[0]?.code ?? "personal_plus";
-  const [selectedPlan, setSelectedPlan] = useState<PlanCode>(defaultPlanCode);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    setSelectedPlan(defaultPlanCode);
-  }, [defaultPlanCode]);
 
   useEffect(() => {
     setSubscription(initialSubscription);
@@ -187,23 +178,6 @@ export function PersonalSubscriptionPanel({
     };
   }, []);
 
-  async function activate() {
-    setBusy(true);
-    setMessage("");
-    setError("");
-
-    try {
-      const response = await api.activateSubscription(selectedPlan);
-      setSubscription(response);
-      onSubscriptionChanged(response);
-      setMessage("Персональная подписка активирована.");
-    } catch (activateError) {
-      setError(activateError instanceof Error ? activateError.message : "Не удалось активировать подписку");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const active = subscription?.status === "active";
 
   return (
@@ -215,7 +189,7 @@ export function PersonalSubscriptionPanel({
         </div>
         <span className="status-chip warn">Без оплаты</span>
       </div>
-      <div className="subscription-company">
+      <div className="subscription-company readonly">
         <div>
           <strong>{subscription?.plan.name ?? "Личный тариф"}</strong>
           <small>
@@ -223,39 +197,17 @@ export function PersonalSubscriptionPanel({
               ? "Загружаю текущую подписку..."
               : active
                 ? "Подписка привязана к вашему аккаунту."
-                : "Можно активировать personal_start, personal_plus или personal_pro."}
+                : "Тариф подключает администратор. Напишите в поддержку, чтобы его выдали."}
           </small>
         </div>
-        <SelectControl
-          value={selectedPlan}
-          onChange={(event) => setSelectedPlan(event.target.value as PlanCode)}
-          disabled={busy || personalPlans.length === 0}
-        >
-          {personalPlans.length === 0 ? (
-            <option value="personal_plus">Personal Plus</option>
-          ) : (
-            personalPlans.map((plan) => (
-              <option key={plan.id} value={plan.code}>
-                {plan.name}
-              </option>
-            ))
-          )}
-        </SelectControl>
         <span className={`status-chip ${active ? "ok" : "warn"}`}>
-          {active ? "Активна" : subscription?.status === "canceled" ? "Отменена" : "Не активирована"}
+          {active ? "Активна" : subscription?.status === "canceled" ? "Отменена" : "Не подключена"}
         </span>
-        <div className="subscription-actions">
-          <button
-            type="button"
-            className="primary-button small"
-            onClick={activate}
-            disabled={busy || loading || personalPlans.length === 0}
-          >
-            <ShieldCheck size={16} />
-            {busy ? "Сохраняю..." : active ? "Сменить тариф" : "Активировать подписку"}
-          </button>
-        </div>
       </div>
+      <p className="tariff-note">
+        <ShieldCheck size={16} />
+        Самостоятельной покупки пока нет: тариф выдаёт администратор.
+      </p>
       {message && <div className="form-success tariff-message">{message}</div>}
       {error && <div className="form-error tariff-message">{error}</div>}
     </section>
@@ -276,33 +228,12 @@ export function CompanySubscriptionPanel({
   onSubscriptionChanged: (subscription: Subscription) => void;
 }) {
   const managedCompanies = companies.filter((company) => company.manager_user_uuid === session.user.id);
-  const defaultPlanCode = businessPlans[0]?.code ?? "business_start";
-  const [selectedPlans, setSelectedPlans] = useState<Record<string, PlanCode>>({});
   const [busyCompanyId, setBusyCompanyId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   if (managedCompanies.length === 0) {
     return null;
-  }
-
-  async function activate(companyId: string) {
-    setBusyCompanyId(companyId);
-    setMessage("");
-    setError("");
-
-    try {
-      const subscription = await api.activateCompanySubscription(
-        companyId,
-        selectedPlans[companyId] ?? defaultPlanCode
-      );
-      onSubscriptionChanged(subscription);
-      setMessage("Подписка активирована.");
-    } catch (activateError) {
-      setError(activateError instanceof Error ? activateError.message : "Не удалось активировать подписку");
-    } finally {
-      setBusyCompanyId("");
-    }
   }
 
   async function cancel(companyId: string) {
@@ -326,7 +257,7 @@ export function CompanySubscriptionPanel({
       <div className="panel-heading large">
         <div>
           <h2>Бизнес-подписка компании</h2>
-          <p>Подключение бизнес-тарифа без платежной формы.</p>
+          <p>Тариф покрывает компании владельца, кредиты у них общие.</p>
         </div>
         <span className="status-chip warn">Без оплаты</span>
       </div>
@@ -334,48 +265,18 @@ export function CompanySubscriptionPanel({
         {managedCompanies.map((company) => {
           const subscription = subscriptions[company.id];
           const active = subscription?.status === "active";
-          const selectedPlan = selectedPlans[company.id] ?? defaultPlanCode;
 
           return (
-            <div className="subscription-company" key={company.id}>
+            <div className="subscription-company readonly" key={company.id}>
               <div>
                 <strong>{company.name}</strong>
-                <small>{subscription?.plan.name ?? "Бизнес-тариф не выбран"}</small>
+                <small>{subscription?.plan.name ?? "Бизнес-тариф не подключён"}</small>
               </div>
-              <SelectControl
-                value={selectedPlan}
-                onChange={(event) =>
-                  setSelectedPlans((current) => ({
-                    ...current,
-                    [company.id]: event.target.value as PlanCode
-                  }))
-                }
-                disabled={busyCompanyId === company.id || businessPlans.length === 0}
-              >
-                {businessPlans.length === 0 ? (
-                  <option value="business_start">Business Start</option>
-                ) : (
-                  businessPlans.map((plan) => (
-                    <option key={plan.id} value={plan.code}>
-                      {plan.name}
-                    </option>
-                  ))
-                )}
-              </SelectControl>
               <span className={`status-chip ${active ? "ok" : "warn"}`}>
-                {active ? "Активна" : subscription?.status === "canceled" ? "Отменена" : "Не активирована"}
+                {active ? "Активна" : subscription?.status === "canceled" ? "Отменена" : "Не подключена"}
               </span>
               <div className="subscription-actions">
-                <button
-                  type="button"
-                  className="primary-button small"
-                  onClick={() => activate(company.id)}
-                  disabled={busyCompanyId === company.id}
-                >
-                  <ShieldCheck size={16} />
-                  {busyCompanyId === company.id ? "Сохраняю..." : "Активировать подписку"}
-                </button>
-                {active && (
+                {active ? (
                   <button
                     type="button"
                     className="ghost-button small"
@@ -383,14 +284,20 @@ export function CompanySubscriptionPanel({
                     disabled={busyCompanyId === company.id}
                   >
                     <X size={16} />
-                    Отменить подписку
+                    {busyCompanyId === company.id ? "Отменяю…" : "Отменить подписку"}
                   </button>
+                ) : (
+                  <small className="subscription-hint">Тариф подключает администратор</small>
                 )}
               </div>
             </div>
           );
         })}
       </div>
+      <p className="tariff-note">
+        <ShieldCheck size={16} />
+        Подписку выдаёт администратор. Отменить её может владелец компании.
+      </p>
       {message && <div className="form-success tariff-message">{message}</div>}
       {error && <div className="form-error tariff-message">{error}</div>}
     </section>
@@ -434,8 +341,9 @@ export function TariffCard({ plan, business }: { plan: Plan; business?: boolean;
   const activeInstructionLimit =
     business ? plan.instructions_per_department_limit ?? plan.active_instruction_limit : plan.active_instruction_limit;
   const features = [
-		`Около ${plan.marketing_hours_hint.toLocaleString("ru-RU")} ч обработки в месяц`,
+		`Около ${plan.marketing_hours_hint.toLocaleString("ru-RU")} ч обработки за 30 дней`,
 		`Кредитов: ${plan.monthly_credit_allowance.toLocaleString("ru-RU")}`,
+    `Звонков в очереди без кредитов: ${formatPendingQueueLimit(plan.pending_credit_calls_limit)}`,
     `Активных инструкций: ${formatInstructionLimit(activeInstructionLimit)}`,
     business && plan.company_limit !== null ? `Компаний: ${plan.company_limit}` : "",
     business && plan.departments_per_company_limit !== null
@@ -457,7 +365,7 @@ export function TariffCard({ plan, business }: { plan: Plan; business?: boolean;
         <h3>{plan.name}</h3>
 				<div className="tariff-price">
 					<strong>{(plan.monthly_price_minor / 100).toLocaleString("ru-RU")} ₽</strong>
-					<span>/ месяц</span>
+					<span>/ 30 дней</span>
 				</div>
       </div>
       <ul className="tariff-feature-list">

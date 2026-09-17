@@ -41,6 +41,8 @@ import type {
 
 import { formatDate, formatDuration } from "../../shared/lib/formatters";
 import { activeDepartmentLeaderIds, isCompanyManager } from "../../shared/lib/access";
+import { enterOverlayMode } from "../../shared/lib/page-scroll";
+import { useDrawerLayout } from "../../shared/lib/drawer-layout";
 import { StatusChip } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { DateTimePicker } from "../../shared/ui/DateTimePicker";
@@ -92,7 +94,7 @@ function initialCallsURLFilters(): CallsURLFilters {
     return value && allowed.includes(value) ? value : fallback;
   };
   return {
-    status: oneOf("status", ["new", "processing", "transcribed", "analyzed", "failed", "all"] as const, "all"),
+    status: oneOf("status", ["new", "processing", "awaiting_credits", "cancelled", "transcribed", "analyzed", "failed", "all"] as const, "all"),
     scope: oneOf("scope", ["personal", "company", "department", "all"] as const, "all"),
     manager: query.get("uploaded_by_user_uuid") || "all",
     period: oneOf("period", ["all", "7d", "30d"] as const, "all"),
@@ -134,6 +136,7 @@ export function CallsPage({
   onAnalysisReady,
   onUpdateCallTitle,
   onDeleteCall,
+  onCallUpdated,
   onOpenTranscriptionEditor,
   onOpenRevisionComparison
 }: {
@@ -155,6 +158,7 @@ export function CallsPage({
   onAnalysisReady: (callId: string, analysis: AnalysisResponse) => void;
   onUpdateCallTitle?: (callId: string, title: string) => Promise<CallResponse>;
   onDeleteCall?: (callId: string) => Promise<void>;
+  onCallUpdated?: (call: CallResponse) => void;
   onOpenTranscriptionEditor?: (callId: string) => void;
   onOpenRevisionComparison?: (callId: string, revision?: number) => void;
 }) {
@@ -249,6 +253,7 @@ export function CallsPage({
   }
   const [favoriteCallIds, setFavoriteCallIds] = useState<string[]>([]);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isDrawerLayout = useDrawerLayout();
   const [callListCollapsed, setCallListCollapsed] = useState(() => window.localStorage.getItem("verbatrace:calls-list-collapsed") === "1");
   const effectiveScopeFilter =
     companies.length === 0 && (scopeFilter === "company" || scopeFilter === "department")
@@ -310,14 +315,13 @@ export function CallsPage({
 
   useEffect(() => {
     if (!mobileSidebarOpen) return;
-    const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMobileSidebarOpen(false);
     };
-    document.body.style.overflow = "hidden";
+    const leaveOverlay = enterOverlayMode();
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      leaveOverlay();
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [mobileSidebarOpen]);
@@ -443,7 +447,7 @@ export function CallsPage({
     sortFilter !== "occurred_at" || sortOrder !== "desc"
   ].filter(Boolean).length;
   const activeFilterChips: Array<{ key: string; label: string; clear: () => void }> = [];
-  if (statusFilter !== "all") activeFilterChips.push({ key: "status", label: `Статус: ${{ new: "новые", processing: "в обработке", transcribed: "расшифрованы", analyzed: "анализ готов", failed: "ошибки" }[statusFilter]}`, clear: () => setStatusFilter("all") });
+  if (statusFilter !== "all") activeFilterChips.push({ key: "status", label: `Статус: ${{ new: "новые", processing: "в обработке", awaiting_credits: "ждут кредитов", cancelled: "обработка отменена", transcribed: "расшифрованы", analyzed: "анализ готов", failed: "ошибки" }[statusFilter]}`, clear: () => setStatusFilter("all") });
   if (effectiveScopeFilter !== "all") activeFilterChips.push({ key: "scope", label: `Область: ${{ personal: "личные", company: "компания", department: "отдел" }[effectiveScopeFilter]}`, clear: () => setScopeFilter("all") });
   if (managerFilter !== "all") activeFilterChips.push({ key: "manager", label: `Загрузил: ${managerOptions.find((item) => item.id === managerFilter) ? managerLabel(managerOptions.find((item) => item.id === managerFilter)!, session) : "пользователь"}`, clear: () => setManagerFilter("all") });
   if (companyFilter !== "all") activeFilterChips.push({ key: "company", label: `Компания: ${companies.find((item) => item.id === companyFilter)?.name || "выбрана"}`, clear: () => { setCompanyFilter("all"); setDepartmentFilter("all"); setConnectionFilter("all"); } });
@@ -1173,7 +1177,7 @@ export function CallsPage({
             {filtersChanged && <button className="text-button" type="button" onClick={resetFilters}>Сбросить всё</button>}
           </div>
           <div className="call-filter-grid">
-            <label><span>Статус</span><SelectControl aria-label="Статус" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as CallStatus | "all")}><option value="all">Все статусы</option><option value="new">Новые</option><option value="processing">В обработке</option><option value="transcribed">Расшифрованы</option><option value="analyzed">Анализ готов</option><option value="failed">Ошибки</option></SelectControl></label>
+            <label><span>Статус</span><SelectControl aria-label="Статус" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as CallStatus | "all")}><option value="all">Все статусы</option><option value="new">Новые</option><option value="processing">В обработке</option><option value="awaiting_credits">Ждут кредитов</option><option value="cancelled">Обработка отменена</option><option value="transcribed">Расшифрованы</option><option value="analyzed">Анализ готов</option><option value="failed">Ошибки</option></SelectControl></label>
             {companies.length > 0 && <label><span>Сотрудник</span><SelectControl aria-label="Сотрудник" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value)}><option value="all">Все сотрудники</option>{participantOptions.map((member) => <option key={member.user_uuid} value={member.user_uuid}>{[member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || "Пользователь"}</option>)}</SelectControl></label>}
             {companies.length > 0 && <label><span>Компания</span><SelectControl aria-label="Компания" value={companyFilter} onChange={(event) => { const companyId = event.target.value; setCompanyFilter(companyId); setDepartmentFilter("all"); setConnectionFilter("all"); }}><option value="all">Все компании</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</SelectControl></label>}
             {companies.length > 0 && <label><span>Отдел</span><SelectControl aria-label="Отдел" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}><option value="all">Все отделы</option>{departments.filter((department) => companyFilter === "all" || department.company_uuid === companyFilter).map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</SelectControl></label>}
@@ -1370,7 +1374,12 @@ export function CallsPage({
         tabIndex={mobileSidebarOpen ? 0 : -1}
         onClick={() => setMobileSidebarOpen(false)}
       />
-      {!callListCollapsed && <CustomScrollbar targetRef={callsSidebarScrollRef} className="mobile-call-drawer-scroll-thumb" />}
+      {/* The list's scrollbar belongs to the list. As a drawer the list is only
+          on screen while it is open, and the bar was left drawn over the page
+          after it closed. */}
+      {(isDrawerLayout ? mobileSidebarOpen : !callListCollapsed) && (
+        <CustomScrollbar targetRef={callsSidebarScrollRef} className="mobile-call-drawer-scroll-thumb" />
+      )}
 
       <section className="call-overview glass custom-scroll-target" ref={callOverviewScrollRef}>
         <CallDetailPanel
@@ -1386,6 +1395,7 @@ export function CallsPage({
           onNavigate={onNavigate}
           onAnalysisReady={onAnalysisReady}
           onDeleteCall={onDeleteCall ? deleteCallAndSync : undefined}
+          onCallUpdated={onCallUpdated}
           onOpenTranscriptionEditor={onOpenTranscriptionEditor}
           onOpenRevisionComparison={onOpenRevisionComparison}
           folders={callFolders}

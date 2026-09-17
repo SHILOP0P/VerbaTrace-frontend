@@ -675,6 +675,10 @@ export function UploadPage({
         />
         {error && <div className="form-error">{error}</div>}
         <p className="upload-processing-hint">«Транскрибировать» — получить текст разговора. «Анализировать» — получить текст и анализ по выбранным инструкциям. Транскрипция доступна на всех тарифах; анализ можно запустить позже.</p>
+        {/* Running out of credits does not lose the upload: the call is accepted
+            and starts by itself. Saying so here keeps the wait from looking
+            like a failure. */}
+        <p className="upload-processing-hint">Если лимит кредитов исчерпан, звонок примут и поставят в очередь — обработка начнётся сама, как только лимит обновится. Очередь ограничена тарифом: когда она заполнена, загрузку придётся повторить позже.</p>
         <div className="form-actions">
           <button className="ghost-button" type="submit" name="processing_mode" value="transcribe" disabled={busy}><FileText size={18} />{busy ? "Загружаю…" : uploadMode === "multiple" ? "Транскрибировать всё" : "Транскрибировать"}</button>
           <button className="primary-button" type="submit" name="processing_mode" value="analyze" disabled={busy}>

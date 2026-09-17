@@ -1,6 +1,7 @@
 import { ListFilter } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { drawerLayoutQuery } from "../lib/drawer-layout";
 
 export function MobileCallDrawerTrigger({
   open,
@@ -11,22 +12,33 @@ export function MobileCallDrawerTrigger({
 }) {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const [showHeaderTrigger, setShowHeaderTrigger] = useState(false);
+  const [headerHost, setHeaderHost] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     const anchor = anchorRef.current;
-    const mobileQuery = window.matchMedia("(max-width: 760px)");
+    const mobileQuery = window.matchMedia(drawerLayoutQuery);
     if (!anchor) return;
 
     let frameId = 0;
     const updateHeaderTrigger = () => {
       window.cancelAnimationFrame(frameId);
       frameId = window.requestAnimationFrame(() => {
+        // The button joins the row of header icons — notifications, theme,
+        // avatar — because that is where the header's controls live. Hung off
+        // the body instead it sat underneath the header, which paints above it.
+        setHeaderHost(document.querySelector<HTMLElement>(".app-header .profile-block") ?? document.body);
+
         if (!mobileQuery.matches) {
           setShowHeaderTrigger(false);
           return;
         }
 
-        setShowHeaderTrigger(anchor.getBoundingClientRect().bottom <= 84);
+        // Once the button in the page has scrolled behind the header, the copy
+        // in the header takes over. The header's own height is the threshold,
+        // because it is what hides the original.
+        const header = document.querySelector<HTMLElement>(".app-header");
+        const hiddenBelow = header ? header.getBoundingClientRect().bottom : 84;
+        setShowHeaderTrigger(anchor.getBoundingClientRect().bottom <= hiddenBelow);
       });
     };
 
@@ -57,9 +69,11 @@ export function MobileCallDrawerTrigger({
           <span>Звонки и фильтры</span>
         </button>
       </div>
-      {createPortal(
+      {headerHost && createPortal(
         <button
-          className={`mobile-call-drawer-header-trigger ${showHeaderTrigger || open ? "visible" : ""} ${open ? "drawer-open" : ""}`}
+          // icon-button so it is styled by the same rules as the header's other
+          // icons, in both themes, instead of a copy that drifts from them.
+          className={`icon-button mobile-call-drawer-header-trigger ${showHeaderTrigger || open ? "visible" : ""} ${open ? "drawer-open" : ""}`}
           type="button"
           aria-label={open ? "Закрыть звонки и фильтры" : "Открыть звонки и фильтры"}
           aria-controls="mobile-call-drawer"
@@ -69,7 +83,7 @@ export function MobileCallDrawerTrigger({
         >
           <ListFilter size={20} />
         </button>,
-        document.body
+        headerHost
       )}
     </>
   );

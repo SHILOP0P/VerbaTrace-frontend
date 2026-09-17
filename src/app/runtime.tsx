@@ -157,7 +157,7 @@ export function pageFromPath(pathname: string): AppPage {
   if (pathname === "/app/instructions/new") return "instructionCreate";
   if (/^\/app\/instructions\/[^/]+\/compare$/.test(pathname)) return "instructionCompare";
   if (/^\/app\/instructions\/[^/]+$/.test(pathname)) return "instruction";
-  if (/^\/app\/admin\/(?:users|companies|actions)$/.test(pathname)) return "admin";
+  if (/^\/app\/admin\/(?:users|companies|actions|audit)$/.test(pathname)) return "admin";
   if (pathname === "/app/companies/new") return "companyCreate";
   if (/^\/app\/quality-reviews\/[^/]+$/.test(pathname)) return "qualityReview";
   if (pathname === "/app/calls/transcription-edit") return "transcriptionEdit";

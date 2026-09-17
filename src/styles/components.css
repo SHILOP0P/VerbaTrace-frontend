@@ -7197,11 +7197,57 @@ html[data-theme="light"] .app-shell .quality-list-row:hover :is(strong,span),htm
   color: var(--muted);
 }
 
+/* Without the plan selector this row has three children, not four. Left on the
+   four-column grid it would open a hole in the middle and push the status chip
+   away from the actions. */
+.subscription-company.readonly {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
 .subscription-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.subscription-hint {
+  color: var(--muted);
+}
+
+/* A page whose call is in the bin. It has to look exactly as it always does:
+   the only signal is the banner, and the cursor is deliberately left alone so a
+   control does not read as broken. */
+.frozen-region {
+  display: contents;
+}
+
+.frozen-region-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid rgba(240, 170, 90, 0.34);
+  border-radius: 12px;
+  background: rgba(240, 170, 90, 0.1);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.tariff-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.tariff-note svg {
+  flex: none;
 }
 
 .tariff-section {
@@ -8929,3 +8975,23 @@ html[data-theme="light"] .app-shell .privacy-settings-page.atmospheric-page::bef
 .analysis-stage-timeline .timeline-step strong { text-wrap: balance; }
 @media (max-width: 680px) { .analysis-stage-timeline { overflow-x: auto; grid-template-columns: repeat(5, minmax(105px, 1fr)); padding-bottom: 12px; } }
 @media (prefers-reduced-motion: reduce) { .analysis-v3-item.is-ready { animation: none; } }
+
+/* Audit trails ------------------------------------------------------------
+   Six append-only records share one shape: when, who, what, details. The
+   toolbar keeps the picker and the period on one row and the entries read as
+   a plain list, because the details differ from trail to trail. */
+.admin-audit-toolbar { flex-wrap: wrap; align-items: center; }
+.admin-audit-toolbar .select-control { flex: 1 1 200px; min-width: 180px; max-width: 320px; }
+.audit-trail-date { flex: 0 1 auto; gap: 8px; font-size: 12px; font-weight: 700; }
+.audit-trail-date > span { white-space: nowrap; }
+.audit-trail-date input { width: auto; min-width: 0; }
+.audit-trail-reason { display: grid; gap: 6px; margin: 0 18px 4px; color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; }
+.audit-trail-reason input { width: 100%; min-height: 40px; padding: 9px 11px; box-sizing: border-box; color: var(--app-text, var(--text)); font: inherit; background: var(--app-panel-soft, var(--surface-2)); border: 1px solid var(--app-border, var(--border)); border-radius: 10px; }
+.audit-trail-resolve { margin-left: auto; white-space: nowrap; }
+.audit-trail-list { display: grid; gap: 10px; margin: 0; padding: 14px; list-style: none; }
+.audit-trail-entry { display: grid; gap: 8px; min-width: 0; padding: 12px 14px; background: var(--app-panel-soft, var(--surface-2)); border: 1px solid var(--app-border, var(--border)); border-radius: 12px; }
+.audit-trail-entry-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; min-width: 0; }
+.audit-trail-entry-head time { color: var(--app-muted, var(--muted)); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.audit-trail-entry-head strong { font-size: 14px; overflow-wrap: anywhere; }
+.audit-trail-actor { color: var(--app-muted, var(--muted)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; overflow-wrap: anywhere; }
+.audit-trail-details { margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; color: var(--app-muted, var(--muted)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--app-surface, var(--surface)); border-radius: 10px; }

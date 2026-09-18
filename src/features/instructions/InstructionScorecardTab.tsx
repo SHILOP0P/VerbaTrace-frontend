@@ -1,5 +1,5 @@
-import { AlertTriangle, ChevronDown, ClipboardCheck, Link2, ListChecks, Loader2, RefreshCw, Save, Split, Undo2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, ChevronDown, ClipboardCheck, Link2, ListChecks, RefreshCw, Save, Split, Undo2 } from "lucide-react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
 import { pluralizeRu } from "../../shared/lib/plans";
 import { SelectControl } from "../../shared/ui/primitives";
@@ -193,8 +193,19 @@ function PendingState({ card }: { card: InstructionScorecard }) {
   const message = card.error?.code === "awaiting_credits" ? "Недостаточно кредитов. Соберём критерии, когда баланс пополнится."
     : card.error ? card.error.message
     : waiting ? "Инструкцию недавно меняли. Соберём критерии через пару минут после последней правки."
-    : "Обычно это занимает до минуты. Страницу можно закрыть: критерии сохранятся.";
-  return <div className="scorecard-state is-pending"><Loader2 size={26} className="scorecard-spinner"/><h3>Готовим критерии…</h3><p>{message}</p></div>;
+    : "Обычно это занимает одну-две минуты, для длинной инструкции — дольше. Страницу можно закрыть: критерии сохранятся.";
+  return <div className="scorecard-state is-pending" role="status"><AssemblingCriteria/><h3>Готовим критерии…</h3><p>{message}</p></div>;
+}
+
+// The instruction is read top to bottom while its criteria appear one by one and
+// get ticked off: what the compile actually does, rather than a bare spinner.
+function AssemblingCriteria() {
+  return <div className="scorecard-assembling" aria-hidden="true">
+    {[0, 1, 2, 3].map((row) => <span key={row} style={{ "--row": row } as CSSProperties}>
+      <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="4"/><path d="m4.5 8.4 2.3 2.3 4.7-5"/></svg>
+      <i/>
+    </span>)}
+  </div>;
 }
 
 function ChangesBar({ card, canEdit, busy, dirty, onLink, onSplit }: { card: InstructionScorecard; canEdit: boolean; busy: boolean; dirty: boolean; onLink: (key: string, canonical: string) => void; onSplit: (key: string) => void }) {

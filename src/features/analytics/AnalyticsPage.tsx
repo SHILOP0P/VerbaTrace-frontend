@@ -131,7 +131,8 @@ function TeamView({ capabilities, filters, instruction, onInstruction, onNavigat
   if (summary.calls_analyzed === 0) return <><SummaryStrip summary={summary} role={capabilities.role} /><EmptyState icon={<BarChart3 size={28} />} title="Нет проанализированных звонков за период" text="Выберите период подлиннее или загрузите звонки." /></>;
 
   const tabs: Array<[Tab, string]> = [["criteria", "Критерии"], ["employees", "Сотрудники"]];
-  if (capabilities.can_view_company) tabs.push(["departments", "Отделы"]);
+  // A leader compares their departments with the company row.
+  if (capabilities.can_view_departments) tabs.push(["departments", "Отделы"]);
   tabs.push(["matrix", "Матрица"]);
   return <>
     <SummaryStrip summary={summary} role={capabilities.role} />

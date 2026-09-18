@@ -51,6 +51,7 @@ import { AnalysisComments } from "./AnalysisComments";
 import { CreateActionDialog } from "../actions/ActionsPage";
 import { TranscriptCollapseIsland } from "./TranscriptCollapseIsland";
 import { CallWorkOnMistakes } from "../analytics/WorkOnMistakes";
+import { CallSpeechBlock } from "../../shared/ui/speech";
 
 type CardProcessState = {
   label: string;
@@ -688,6 +689,7 @@ export function CallDetailPanel({
             onOverflowChange={setTranscriptExpandable}
           />
         </InfoCard>
+        {!call.is_test && <CallSpeechBlock speech={call.speech} />}
         {!call.is_test && !transcriptionOnly && <div className="analysis-card-stack">
           {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="primary-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}>{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
           {qualityReviewError && <div className="form-error is-dismissible" role="alert">{qualityReviewError}</div>}

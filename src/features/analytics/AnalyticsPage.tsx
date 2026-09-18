@@ -5,6 +5,7 @@ import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, lastWeekPeriod, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
 import { SelectControl } from "../../shared/ui/primitives";
 import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
+import { SpeechComparison, formatSeconds as formatSpeechSeconds, formatShare, speechHints } from "../../shared/ui/speech";
 import { AnalyticsSettingsCard } from "./AnalyticsSettings";
 import type {
   AnalyticsCapabilities, AnalyticsCriteriaResponse, AnalyticsCriterionCallsResponse, AnalyticsCriterionRow, AnalyticsDepartmentRow,
@@ -225,7 +226,12 @@ function TeamLine({ label, team }: { label: string; team: AnalyticsTeamRow | nul
 function EmployeesTab({ filters }: { filters: AnalyticsFilters }) {
   const { value, error, retry } = useLoad<AnalyticsEmployeesResponse>(() => api.getAnalyticsEmployees(filters), [filters]);
   if (!value) return <LoadState error={error} retry={retry} />;
-  const columns = teamColumns<AnalyticsEmployeeRow>((row) => <span className="analytics-name"><strong>{row.full_name || "Без имени"}{row.is_me ? <em>вы</em> : null}{row.is_former_member ? <em className="is-muted">бывший сотрудник</em> : null}</strong><small>{row.department?.name ?? "Без отдела"}{row.calls_shared ? ` · совместных: ${row.calls_shared}` : ""}</small></span>, (row) => row.full_name);
+  // Speech columns come last: they are the first to go on a narrow screen.
+  const columns: DataColumn<AnalyticsEmployeeRow>[] = [
+    ...teamColumns<AnalyticsEmployeeRow>((row) => <span className="analytics-name"><strong>{row.full_name || "Без имени"}{row.is_me ? <em>вы</em> : null}{row.is_former_member ? <em className="is-muted">бывший сотрудник</em> : null}</strong><small>{row.department?.name ?? "Без отдела"}{row.calls_shared ? ` · совместных: ${row.calls_shared}` : ""}</small></span>, (row) => row.full_name),
+    { key: "talk", label: "Доля речи", priority: 7, width: 96, align: "end", render: (row) => <span title={speechHints.talk_share}>{formatShare(row.speech?.talk_share)}</span>, sortValue: (row) => row.speech?.talk_share ?? null },
+    { key: "monologue", label: "Монолог", priority: 8, width: 90, align: "end", render: (row) => <span title={speechHints.longest_monologue}>{formatSpeechSeconds(row.speech?.longest_monologue_seconds)}</span>, sortValue: (row) => row.speech?.longest_monologue_seconds ?? null },
+  ];
   return <>
     <TeamLine label="Команда" team={value.team} />
     <DataTable columns={columns} rows={value.employees} rowKey={(row) => row.user_uuid} pinned={(row) => row.is_me} onRowClick={(row) => openProfile(row.user_uuid)} emptyText="Сотрудников с оценёнными звонками нет." />
@@ -346,6 +352,10 @@ function ProfileView({ userId, filters, onOpenCall, onNavigate }: { userId: stri
         rows={profile.criteria} rowKey={(row) => row.criterion_key} emptyText="Оценённых критериев за период нет." />
     </section>
     <EmployeeWorkOnMistakes userId={userId} filters={filters} onOpenCall={(callId) => onOpenCall(callId)} />
+    {profile.speech !== undefined && <section className="analytics-block">
+      <h2>Речь</h2>
+      <SpeechComparison own={profile.speech?.own ?? null} median={profile.speech?.team_median ?? null} />
+    </section>}
     <section className="analytics-block">
       <h2>Стоит послушать</h2>
       <WorthListening items={profile.worth_listening} onOpenCall={onOpenCall} />

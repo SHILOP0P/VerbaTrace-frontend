@@ -9733,3 +9733,33 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
 .bitrix-crm-toggle > span { display: grid; gap: 3px; min-width: 0; }
 .bitrix-crm-toggle small { color: var(--app-muted); font-size: 12px; line-height: 1.45; }
 .form-notice { padding: 10px 12px; color: var(--app-text, #2d221b); font-size: 14px; line-height: 1.45; background: color-mix(in srgb, #2f9e57 12%, transparent); border: 1px solid color-mix(in srgb, #2f9e57 30%, transparent); border-radius: 10px; }
+
+.speech-block { display: grid; gap: 10px; padding: 14px 16px; background: var(--app-glass); border: 1px solid var(--app-border); border-radius: 16px; }
+.speech-block header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.speech-title { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; }
+.speech-title svg { color: var(--app-accent); }
+.speech-block header small, .speech-call { color: var(--app-muted); font-size: 12px; }
+.speech-share-bar { display: flex; gap: 2px; height: 8px; overflow: hidden; border-radius: 999px; }
+.speech-share-bar span { min-width: 4px; background: var(--app-panel-soft); border: 1px solid var(--app-border); }
+.speech-share-bar span.is-subject { background: var(--app-accent); border-color: var(--app-accent); }
+.speech-speakers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.speech-speakers li { display: grid; gap: 6px; padding: 10px 12px; background: var(--app-panel-soft); border: 1px solid var(--app-border); border-radius: 12px; }
+.speech-speakers li.is-subject { border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border)); }
+.speech-speakers strong { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.speech-speakers em { padding: 1px 7px; color: var(--app-accent-strong); font-size: 11px; font-style: normal; font-weight: 800; background: var(--app-active); border-radius: 999px; }
+.speech-speakers dl { display: grid; gap: 3px; margin: 0; }
+.speech-speakers dl div, .speech-comparison [role="row"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 8px; font-size: 13px; }
+.speech-speakers dt { display: inline-flex; align-items: center; gap: 4px; color: var(--app-muted); }
+.speech-speakers dd { margin: 0; font-weight: 700; white-space: nowrap; }
+.speech-call { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.speech-call span { display: inline-flex; align-items: center; gap: 4px; }
+.speech-hint { display: inline-flex; color: var(--app-muted); cursor: help; }
+.speech-comparison { display: grid; gap: 6px; max-width: 560px; }
+.speech-comparison [role="row"] { grid-template-columns: minmax(0, 1fr) 90px 130px; padding: 4px 0; border-top: 1px solid var(--app-border); }
+.speech-comparison [role="row"].is-head { border-top: 0; color: var(--app-muted); font-size: 12px; font-weight: 800; }
+.speech-comparison [role="rowheader"] { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.speech-comparison [role="cell"], .speech-comparison [role="columnheader"]:not(:first-child) { text-align: right; white-space: nowrap; }
+.speech-comparison small { color: var(--app-muted); font-size: 12px; }
+@media (max-width: 480px) {
+  .speech-comparison [role="row"] { grid-template-columns: minmax(0, 1fr) 70px 90px; }
+}

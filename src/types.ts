@@ -430,6 +430,7 @@ export interface CallResponse {
   is_shared?: boolean;
   is_internal?: boolean;
   subjects_changed_manually?: boolean;
+  speech?: CallSpeech | null;
   created_at: string;
   privacy?: CallPrivacy;
 }
@@ -2008,11 +2009,11 @@ export interface AnalyticsCriterionRow {
 }
 export interface AnalyticsCriteriaResponse { period: AnalyticsPeriod; criteria: AnalyticsCriterionRow[]; total: number }
 export interface AnalyticsWeakestCriterion { criterion_key: string; title: string; avg_score: number }
-export interface AnalyticsTeamRow { calls: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample; trend: AnalyticsTrendPoint[] }
+export interface AnalyticsTeamRow { calls: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample; trend: AnalyticsTrendPoint[]; speech?: AnalyticsSpeech | null }
 export interface AnalyticsEmployeeRow {
   user_uuid: string; full_name: string; avatar_url: string | null; department: { uuid: string; name: string } | null;
   is_former_member: boolean; is_me: boolean; calls: number; calls_shared: number; avg_score: number | null; avg_criteria_score: number | null;
-  delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number; weakest_criterion: AnalyticsWeakestCriterion | null; speech: unknown; trend: AnalyticsTrendPoint[];
+  delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number; weakest_criterion: AnalyticsWeakestCriterion | null; speech: AnalyticsSpeech | null; trend: AnalyticsTrendPoint[];
 }
 export interface AnalyticsEmployeesResponse { period: AnalyticsPeriod; team: AnalyticsTeamRow | null; employees: AnalyticsEmployeeRow[]; total: number }
 export interface AnalyticsDepartmentRow {
@@ -2034,6 +2035,7 @@ export interface AnalyticsProfile {
   reference: { label: string; avg_score: number | null; trend: AnalyticsTrendPoint[]; hidden: boolean };
   criteria: Array<{ criterion_key: string; title: string; instruction: AnalyticsInstructionRef; own_avg: number | null; own_n: number; reference_avg: number | null; delta: AnalyticsDelta; sample: AnalyticsSample }>;
   worth_listening: AnalyticsWorthListening[];
+  speech?: { own: AnalyticsSpeech | null; team_median: AnalyticsSpeech | null } | null;
 }
 export type ProgressVerdict = "fixed" | "repeated" | "new" | "holding" | "first_time";
 export interface CallProgressCriterion {
@@ -2069,6 +2071,20 @@ export interface AnalyticsCriterionCall {
 export interface AnalyticsCriterionCallsResponse {
   criterion: { criterion_key: string; title: string; instruction: AnalyticsInstructionRef };
   calls: AnalyticsCriterionCall[]; total: number; limit: number; offset: number;
+}
+/** Speech numbers of a call, measured from word timings; shares are fractions. */
+export interface CallSpeech {
+  speaker_switches_per_5min: number | null;
+  pauses_over_threshold: number;
+  longest_pause_seconds: number;
+  speakers: Array<{
+    speaker_key: string; display_name: string; is_subject: boolean; talk_seconds: number; talk_share: number; words: number;
+    words_per_minute: number | null; longest_monologue_seconds: number; questions: number; questions_per_hour: number | null; response_pause_median_ms: number | null;
+  }>;
+}
+export interface AnalyticsSpeech {
+  talk_share: number | null; longest_monologue_seconds: number | null; words_per_minute: number | null;
+  questions_per_hour: number | null; response_pause_median_ms: number | null; n: number;
 }
 export interface NotificationSubscription {
   kind: "weekly_digest" | "critical_call_alert";

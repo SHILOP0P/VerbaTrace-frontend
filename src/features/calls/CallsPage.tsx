@@ -1600,7 +1600,7 @@ export function CallsPage({
                               : [...current.instruction_uuids, instruction.id]
                           }))}
                         />
-                        <span title={instruction.original_filename}>{instruction.original_filename}</span>
+                        <span>{instruction.title || instruction.original_filename}</span>
                       </label>
                     ))}
                   </div>

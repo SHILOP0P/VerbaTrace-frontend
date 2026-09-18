@@ -4150,6 +4150,59 @@ html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
   gap: 12px;
 }
 
+/* A form, not a poster: a small heading and switches as wide as their words,
+   side by side, so the text of the instruction starts high on the page. */
+.instruction-create-page .instructions-form {
+  gap: 18px;
+}
+
+.instruction-create-page .instructions-form .settings-heading {
+  --settings-heading-icon-size: 56px;
+}
+
+.instruction-create-page .instructions-form .settings-heading-icon {
+  width: 56px;
+  height: 56px;
+}
+
+.instruction-create-page .instructions-form .app-page-heading h1 {
+  font-size: clamp(24px, 2vw, 30px);
+}
+
+.instruction-create-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.instruction-create-page .instructions-form .segmented.scope {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(150px, 1fr);
+  width: auto;
+  margin: 0;
+}
+
+.instruction-create-page .instructions-form .segmented.scope button {
+  justify-content: center;
+  padding-inline: 18px;
+}
+
+.instruction-create-page .instruction-live-editor-field .live-markdown-editor {
+  min-height: 360px;
+}
+
+@media (max-width: 560px) {
+  .instruction-create-options > .segmented {
+    flex: 1 1 100%;
+  }
+
+  .instruction-create-page .instructions-form .segmented.scope {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+}
+
 .instruction-template-example-content .instruction-article {
   margin: 12px 0 0;
   padding: 18px 20px;
@@ -4281,6 +4334,18 @@ html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
 
 .instruction-row-link small {
   color: var(--app-muted, #746861);
+}
+
+.instruction-row-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.instruction-row-name small {
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 html[data-theme="light"] .app-shell .live-markdown-editor {

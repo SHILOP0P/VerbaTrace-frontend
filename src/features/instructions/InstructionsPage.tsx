@@ -293,7 +293,11 @@ export function InstructionRow({
     <div className="instruction-row">
       <button className="instruction-row-link" type="button" onClick={() => { window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(instruction.id)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>
         <FileText size={20} />
-        <strong>{instruction.original_filename}</strong>
+        {/* The name the owner gave comes first; the file it came from is a detail. */}
+        <span className="instruction-row-name">
+          <strong>{instruction.title || instruction.original_filename}</strong>
+          {instruction.original_filename && ![instruction.title, `${instruction.title}.md`].includes(instruction.original_filename) ? <small>{instruction.original_filename}</small> : null}
+        </span>
       </button>
       <div className="instruction-row-footer">
         <small>

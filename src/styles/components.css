@@ -759,6 +759,12 @@ html[data-theme="dark"] .instruction-file-editor-drop em { color:#ff9a7d; backgr
   border: 1px solid var(--app-border);
   border-radius: 16px;
 }
+/* The editor takes focus itself, so Ctrl+A and the clipboard keys stay inside
+   it; the whole text then shows as selected. */
+.live-markdown-editor:focus { outline: none; }
+.live-markdown-editor.is-all-selected { border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border)); }
+.live-markdown-editor.is-all-selected .live-markdown-rendered-line { background: color-mix(in srgb, var(--app-accent) 16%, transparent); }
+.live-markdown-editor.is-all-selected ::selection { background: transparent; }
 .instruction-live-editor-field {
   display: grid;
   gap: 10px;

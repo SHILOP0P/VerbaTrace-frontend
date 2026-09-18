@@ -57,26 +57,43 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   // The weekly digest opens the page on the week it summed up.
   const [period, setPeriod] = useState<PeriodValue>(() => new URLSearchParams(window.location.search).get("period") === "last_week" ? lastWeekPeriod() : { preset: "30" });
   const [department, setDepartment] = useState("");
-  const [instruction, setInstruction] = useState("");
+  const [employee, setEmployee] = useState<FilterOption | null>(null);
+  const [instruction, setInstruction] = useState<FilterOption | null>(null);
   const [includeInternal, setIncludeInternal] = useState(false);
   const [excludeShared, setExcludeShared] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setCapabilities(undefined); setCapabilitiesError(""); setDepartment(""); setInstruction("");
+    setCapabilities(undefined); setCapabilitiesError(""); setDepartment(""); setEmployee(null); setInstruction(null);
     api.getAnalyticsCapabilities(base).then((value) => { if (!cancelled) setCapabilities(value); })
       .catch((cause) => { if (!cancelled) setCapabilitiesError(cause instanceof Error ? cause.message : "Не удалось открыть аналитику"); });
     return () => { cancelled = true; };
   }, [base]);
 
-  const filters = useMemo<AnalyticsFilters>(() => ({
-    ...base, ...periodRange(period), department_uuid: department || undefined, instruction_uuid: instruction || undefined,
-    include_internal: includeInternal || undefined, exclude_shared: excludeShared || undefined,
-  }), [base, period, department, instruction, includeInternal, excludeShared]);
-  const profileFilters = useMemo<AnalyticsFilters>(() => ({ ...filters, department_uuid: undefined }), [filters]);
-
   const ownOnly = capabilities?.own_profile_only;
+  const teamView = Boolean(capabilities) && !ownOnly && !profileUserId;
+
+  // One's own analytics lives at /analytics/me, so the address says what is shown.
+  useEffect(() => {
+    if (ownOnly && window.location.pathname === "/app/analytics") {
+      window.history.replaceState(window.history.state, "", `/app/analytics/me${window.location.search}`);
+    }
+  }, [ownOnly]);
+
+  // The filters that narrow the choices: everything except the choice itself.
+  const scopeFilters = useMemo<AnalyticsFilters>(() => ({
+    ...base, ...periodRange(period), department_uuid: department || undefined,
+    include_internal: includeInternal || undefined, exclude_shared: excludeShared || undefined,
+  }), [base, period, department, includeInternal, excludeShared]);
+  const filters = useMemo<AnalyticsFilters>(() => ({
+    ...scopeFilters, employee_uuid: employee?.id, instruction_uuid: instruction?.id,
+  }), [scopeFilters, employee, instruction]);
+  // A profile is one person across instructions; filters it has no control for
+  // are not carried into it.
+  const profileFilters = useMemo<AnalyticsFilters>(() => ({ ...scopeFilters, department_uuid: undefined }), [scopeFilters]);
+  const options = useFilterOptions(teamView && capabilities?.team_analytics_enabled ? scopeFilters : null, Boolean(capabilities?.can_view_employees));
+
   const companyDepartments = useMemo(() => departments.filter((item) => item.company_uuid === workspace && (!capabilities?.department_uuids.length || capabilities.department_uuids.includes(item.id))), [capabilities, departments, workspace]);
 
   if (capabilitiesError) return <section className="app-page analytics-page"><EmptyState icon={<AlertTriangle size={28} />} title="Аналитика недоступна" text={capabilitiesError} /></section>;
@@ -88,8 +105,14 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   // A profile belongs to one person, so the department filter only matters on the team view.
   const header = <div className="analytics-toolbar">
     <PeriodSelect value={period} onChange={setPeriod} retentionDays={capabilities.retention_days} />
-    {!ownOnly && !profileUserId && companyDepartments.length > 1 ? <SelectControl aria-label="Отдел" value={department} onChange={(event) => setDepartment(event.target.value)}>
+    {teamView && companyDepartments.length > 1 ? <SelectControl aria-label="Отдел" value={department} onChange={(event) => { setDepartment(event.target.value); setEmployee(null); }}>
       <option value="">Все отделы</option>{companyDepartments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+    </SelectControl> : null}
+    {teamView && capabilities.can_view_employees ? <SelectControl aria-label="Сотрудник" value={employee?.id ?? ""} onChange={(event) => setEmployee(withSelected(options.employees, employee).find((item) => item.id === event.target.value) ?? null)}>
+      <option value="">Все сотрудники</option>{withSelected(options.employees, employee).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+    </SelectControl> : null}
+    {teamView ? <SelectControl aria-label="Инструкция" value={instruction?.id ?? ""} onChange={(event) => setInstruction(withSelected(options.instructions, instruction).find((item) => item.id === event.target.value) ?? null)}>
+      <option value="">Все инструкции</option>{withSelected(options.instructions, instruction).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
     </SelectControl> : null}
     {/* Shared and internal calls exist only in a company. */}
     {capabilities.scope === "company" ? <>
@@ -112,12 +135,39 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
     <div className="app-page-heading"><div><h1>Аналитика</h1><p>Средние баллы по критериям, сотрудникам и отделам — из проверенных звонков.</p></div></div>
     {header}
     {settingsCard}
-    <TeamView capabilities={capabilities} filters={filters} instruction={instruction} onInstruction={setInstruction} onNavigate={onNavigate} onOpenCall={onOpenCall} />
+    <TeamView capabilities={capabilities} filters={filters} instructions={options.instructions} onNavigate={onNavigate} onOpenCall={onOpenCall} />
   </section>;
 }
 
-function TeamView({ capabilities, filters, instruction, onInstruction, onNavigate, onOpenCall }: {
-  capabilities: AnalyticsCapabilities; filters: AnalyticsFilters; instruction: string; onInstruction: (value: string) => void;
+type FilterOption = { id: string; name: string };
+
+// A chosen person or instruction stays in the list after the period changes and they drop out
+// of it, so the control never shows a filter it cannot name.
+function withSelected(list: FilterOption[], selected: FilterOption | null) {
+  return selected && !list.some((item) => item.id === selected.id) ? [...list, selected] : list;
+}
+
+/** Employees and instructions that have scored calls under the other filters. */
+function useFilterOptions(filters: AnalyticsFilters | null, withEmployees: boolean) {
+  const [options, setOptions] = useState<{ employees: FilterOption[]; instructions: FilterOption[] }>({ employees: [], instructions: [] });
+  useEffect(() => {
+    if (!filters) return;
+    let cancelled = false;
+    Promise.all([
+      withEmployees ? api.getAnalyticsEmployees(filters).then((value) => value.employees.map((row) => ({ id: row.user_uuid, name: row.full_name || "Без имени" }))).catch(() => []) : Promise.resolve([]),
+      api.getAnalyticsCriteria(filters).then((value) => {
+        const seen = new Map<string, string>();
+        value.criteria.forEach((row) => seen.set(row.instruction.uuid, row.instruction.title));
+        return Array.from(seen, ([id, name]) => ({ id, name }));
+      }).catch(() => []),
+    ]).then(([employees, instructions]) => { if (!cancelled) setOptions({ employees, instructions }); });
+    return () => { cancelled = true; };
+  }, [filters, withEmployees]);
+  return options;
+}
+
+function TeamView({ capabilities, filters, instructions, onNavigate, onOpenCall }: {
+  capabilities: AnalyticsCapabilities; filters: AnalyticsFilters; instructions: FilterOption[];
   onNavigate: (page: AppPage) => void; onOpenCall: OpenCallAt;
 }) {
   const [tab, setTab] = useState<Tab>("criteria");
@@ -147,8 +197,9 @@ function TeamView({ capabilities, filters, instruction, onInstruction, onNavigat
   if (summary.calls_analyzed === 0) return <><SummaryStrip summary={summary} role={capabilities.role} /><EmptyState icon={<BarChart3 size={28} />} title="Нет проанализированных звонков за период" text="Выберите период подлиннее или загрузите звонки." /></>;
 
   const tabs: Array<[Tab, string]> = [["criteria", "Критерии"], ["employees", "Сотрудники"]];
-  // A leader compares their departments with the company row.
-  if (capabilities.can_view_departments) tabs.push(["departments", "Отделы"]);
+  // The owner and the deputy compare departments; a department leader sees
+  // "my department / company" in the summary instead (spec 4.7).
+  if (capabilities.can_view_departments && capabilities.role !== "department_leader") tabs.push(["departments", "Отделы"]);
   tabs.push(["matrix", "Матрица"]);
   return <>
     <SummaryStrip summary={summary} role={capabilities.role} />
@@ -159,7 +210,7 @@ function TeamView({ capabilities, filters, instruction, onInstruction, onNavigat
     {tab === "criteria" ? <CriteriaTab filters={filters} onOpen={(key) => setOpenCriterion({ key })} onNavigate={onNavigate} /> : null}
     {tab === "employees" ? <EmployeesTab filters={filters} /> : null}
     {tab === "departments" ? <DepartmentsTab filters={filters} /> : null}
-    {tab === "matrix" ? <MatrixTab filters={filters} instruction={instruction} onInstruction={onInstruction} onOpen={(key, employee) => setOpenCriterion({ key, employee })} /> : null}
+    {tab === "matrix" ? <MatrixTab filters={filters} onOpen={(key, employee) => setOpenCriterion({ key, employee })} /> : null}
     {openCriterion ? <CriterionPanel criterionKey={openCriterion.key} employee={openCriterion.employee} filters={filters} onClose={() => setOpenCriterion(undefined)} onOpenCall={onOpenCall} /> : null}
   </>;
 }
@@ -252,19 +303,21 @@ function DepartmentsTab({ filters }: { filters: AnalyticsFilters }) {
   </>;
 }
 
-function MatrixTab({ filters, instruction, onInstruction, onOpen }: { filters: AnalyticsFilters; instruction: string; onInstruction: (value: string) => void; onOpen: (key: string, employee: string) => void }) {
+// The grid is always one instruction: the one chosen in the filter, or the first
+// with criteria when the filter says "all".
+function MatrixTab({ filters, onOpen }: { filters: AnalyticsFilters; onOpen: (key: string, employee: string) => void }) {
   const criteria = useLoad<AnalyticsCriteriaResponse>(() => api.getAnalyticsCriteria({ ...filters, instruction_uuid: undefined }), [filters]);
   const instructions = useMemo(() => {
     const seen = new Map<string, string>();
     criteria.value?.criteria.forEach((row) => seen.set(row.instruction.uuid, row.instruction.title));
     return Array.from(seen, ([uuid, title]) => ({ uuid, title }));
   }, [criteria.value]);
-  const selected = instruction || instructions[0]?.uuid || "";
+  const selected = filters.instruction_uuid || instructions[0]?.uuid || "";
   const matrix = useLoad<AnalyticsMatrixResponse | undefined>(() => selected ? api.getAnalyticsMatrix({ ...filters, instruction_uuid: selected }) : Promise.resolve(undefined), [filters, selected]);
   if (!criteria.value) return <LoadState error={criteria.error} retry={criteria.retry} />;
   if (instructions.length === 0) return <EmptyState icon={<ListChecks size={28} />} title="Нет инструкций с критериями" />;
   return <div className="analytics-matrix">
-    <SelectControl aria-label="Инструкция" value={selected} onChange={(event) => onInstruction(event.target.value)}>{instructions.map((item) => <option key={item.uuid} value={item.uuid}>{item.title}</option>)}</SelectControl>
+    {!filters.instruction_uuid && instructions.length > 1 ? <p className="analytics-muted">Матрица по инструкции «{instructions[0].title}». Другую выберите в фильтре «Инструкция» выше.</p> : null}
     {!matrix.value ? <LoadState error={matrix.error} retry={matrix.retry} /> : <div className="analytics-matrix-scroll">
       <table>
         <thead><tr><th>Сотрудник</th>{matrix.value.criteria.map((criterion) => <th key={criterion.criterion_key}><HoverHint focusable={false} className="analytics-matrix-head" label={criterion.title}>{criterion.title}</HoverHint></th>)}</tr></thead>

@@ -113,7 +113,7 @@ export function AuthenticatedShell({
   const calendarPopoverRef = useRef<HTMLDivElement>(null);
   const profilePopoverRef = useRef<HTMLDivElement>(null);
   const themeLabel = theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему";
-  const activeSidebarPage = activePage === "transcriptionCompare" ? "calls" : activePage === "qualityReview" ? "qualityReviews" : activePage === "settingsCompanies" ? "settingsCompanies" : isSettingsPage(activePage) ? "settings" : activePage;
+  const activeSidebarPage = activePage === "transcriptionCompare" ? "calls" : activePage === "qualityReview" ? "qualityReviews" : activePage === "teamAnalyticsEmployee" ? "teamAnalytics" : activePage === "settingsCompanies" ? "settingsCompanies" : isSettingsPage(activePage) ? "settings" : activePage;
   const fullName = `${session.user.full_name} ${session.user.full_surname}`.trim();
   const avatarInitial = profileInitial(session.user.full_surname || session.user.full_name || session.user.username);
   const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
@@ -138,7 +138,7 @@ export function AuthenticatedShell({
   ], [adminCapabilities]);
 
   function navigateFromMobileBar(nextPage: AppPage) {
-    const currentMobilePage = isSettingsPage(activePage) ? "settings" : activePage;
+    const currentMobilePage = isSettingsPage(activePage) ? "settings" : activePage === "teamAnalyticsEmployee" ? "teamAnalytics" : activePage;
     const currentIndex = MOBILE_NAV_PAGES.indexOf(currentMobilePage);
     const nextIndex = MOBILE_NAV_PAGES.indexOf(nextPage);
 

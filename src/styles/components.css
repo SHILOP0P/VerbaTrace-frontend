@@ -9528,7 +9528,9 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
 .analytics-summary small { color: var(--app-muted); font-size: 12px; font-weight: 700; }
 .analytics-summary strong { font-size: 24px; line-height: 1.15; }
 .analytics-summary > div > span { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--app-muted); font-size: 12px; }
-.analytics-toolbar > .select-control, .analytics-matrix > .select-control { flex: 0 1 260px; width: auto; min-width: 200px; }
+.analytics-toolbar > .select-control { flex: 0 1 260px; width: auto; min-width: 200px; }
+/* On a phone each filter has its own line, so it takes the whole of it. */
+@media (max-width: 760px) { .analytics-toolbar > .select-control { flex-basis: 100%; } }
 .analytics-trend-card, .analytics-block { padding: 14px 16px; background: var(--app-glass); border: 1px solid var(--app-border); border-radius: 16px; }
 .analytics-block h2 { margin: 0 0 10px; font-size: 17px; }
 .analytics-tabs { justify-self: start; grid-auto-columns: auto; }
@@ -9688,7 +9690,6 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
 .analytics-panel-pages { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--app-muted); font-size: 13px; }
 
 .analytics-matrix { display: grid; gap: 10px; }
-.analytics-matrix > .select-control { justify-self: start; }
 .analytics-matrix-scroll { overflow-x: auto; background: var(--app-glass); border: 1px solid var(--app-border); border-radius: 14px; }
 .analytics-matrix table { border-collapse: collapse; }
 .analytics-matrix th, .analytics-matrix td { padding: 6px; border-bottom: 1px solid var(--app-border); text-align: center; }

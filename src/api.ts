@@ -1868,6 +1868,10 @@ export const api = {
     return request<import("./types").BitrixConnectionHealth>(`/integrations/${encodeURIComponent(connectionId)}/pause`, { method: "POST", headers: { "If-Match": String(lockVersion) } });
   },
 
+  setBitrixCRMNoteMode(connectionId: string, mode: "off" | "auto", lockVersion: number) {
+    return request<import("./types").BitrixConnectionHealth>(`/integrations/${encodeURIComponent(connectionId)}/crm-notes`, { method: "PUT", headers: { "If-Match": String(lockVersion) }, body: JSON.stringify({ mode }) });
+  },
+
   resumeBitrixConnection(connectionId: string, lockVersion: number) {
     return request<import("./types").BitrixConnectionHealth>(`/integrations/${encodeURIComponent(connectionId)}/resume`, { method: "POST", headers: { "If-Match": String(lockVersion) } });
   },

@@ -1113,6 +1113,9 @@ export interface BitrixConnectionHealth {
   reconnect_required: boolean;
   oauth_configured: boolean;
   connector_verified: boolean;
+  /** Comments in CRM cards need the crm scope; old connections have to authorise again. */
+  crm_notes_writable?: boolean;
+  crm_note_mode?: "off" | "auto";
   last_success_at?: string | null;
   last_error_code?: string | null;
 }

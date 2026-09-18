@@ -9728,3 +9728,7 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
   .notification-matrix-cell { justify-content: flex-start; }
   .notification-matrix-channel { display: inline; }
 }
+.bitrix-crm-toggle { align-items: flex-start; gap: 10px; padding: 12px 14px; background: var(--app-panel-soft); border: 1px solid var(--app-border); border-radius: 12px; }
+.bitrix-crm-toggle input { margin-top: 3px; }
+.bitrix-crm-toggle > span { display: grid; gap: 3px; min-width: 0; }
+.bitrix-crm-toggle small { color: var(--app-muted); font-size: 12px; line-height: 1.45; }

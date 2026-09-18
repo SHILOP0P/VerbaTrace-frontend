@@ -4,18 +4,21 @@ import type { CSSProperties } from "react";
 import { api } from "../../api";
 import type { CallResponse, CallSubjectCandidate, PrivacyCorrectionPreview, PrivacyCorrectionRequest, PrivacyEntityType, TranscriptionResponse, TranscriptionSpeakerAssignment, TranscriptionSpeakerRole, TranscriptionWordResponse, UserResponse } from "../../types";
 import { formatSegmentTimeRange, speakerLabel } from "../../shared/lib/formatters";
+import { speakerColor as colorOfSpeaker } from "../../shared/lib/speaker-colors";
 import { SelectControl } from "../../shared/ui/primitives";
 
 type DraftWord = { text: string; speaker: string };
 
 export function TranscriptionEditPage({
   call,
+  currentUser,
   transcription,
   loading,
   onBack,
   onSaved
 }: {
   call?: CallResponse;
+  currentUser?: UserResponse;
   transcription?: TranscriptionResponse;
   loading?: boolean;
   onBack: () => void;
@@ -64,10 +67,17 @@ export function TranscriptionEditPage({
   const changed = new Set(changedIndexes);
   const participantsChanged = JSON.stringify(assignments) !== savedAssignments;
   const employeeIds = useMemo(() => new Set(employees.map((item) => item.user_uuid)), [employees]);
-  const people = useMemo(() => [
-    ...contacts.map((contact) => ({ id: contact.id, name: `${contact.full_name} ${contact.full_surname}`.trim(), label: `${contact.full_name} ${contact.full_surname} · ${contact.username}` })),
-    ...employees.filter((item) => !contacts.some((contact) => contact.id === item.user_uuid)).map((item) => ({ id: item.user_uuid, name: item.full_name, label: `Сотрудник компании · ${item.full_name}` })),
-  ], [contacts, employees]);
+  // The editor comes first: marking their own voice is what tells whose work a
+  // personal call shows, so speech and growth areas count for them.
+  const people = useMemo(() => {
+    const me = currentUser ? [{ id: currentUser.id, name: `${currentUser.full_name} ${currentUser.full_surname}`.trim(), label: `Это я · ${currentUser.full_name} ${currentUser.full_surname}`.trim() }] : [];
+    const isMe = (id: string) => id === currentUser?.id;
+    return [
+      ...me,
+      ...contacts.filter((contact) => !isMe(contact.id)).map((contact) => ({ id: contact.id, name: `${contact.full_name} ${contact.full_surname}`.trim(), label: `${contact.full_name} ${contact.full_surname} · ${contact.username}` })),
+      ...employees.filter((item) => !isMe(item.user_uuid) && !contacts.some((contact) => contact.id === item.user_uuid)).map((item) => ({ id: item.user_uuid, name: item.full_name, label: `Сотрудник компании · ${item.full_name}` })),
+    ];
+  }, [contacts, currentUser, employees]);
 
   function updateWord(index: number, patch: Partial<DraftWord>) {
     setDraft((current) => current.map((word, wordIndex) => wordIndex === index ? { ...word, ...patch } : word));
@@ -196,7 +206,8 @@ export function TranscriptionEditPage({
             <label><span>Роль</span><SelectControl aria-label={`Роль спикера ${assignment.speaker_key}`} value={assignment.role} onChange={(event) => setAssignments((current) => current.map((item) => item.speaker_key === assignment.speaker_key ? { ...item, role: event.target.value as TranscriptionSpeakerRole, custom_role: event.target.value === "other" ? item.custom_role : undefined } : item))}><option value="unknown">Не определена</option><option value="client">Клиент</option><option value="manager">Менеджер</option><option value="operator">Оператор</option><option value="partner">Партнёр</option><option value="other">Другая</option></SelectControl></label>
             {assignment.role === "other" && <label><span>Название роли</span><input value={assignment.custom_role ?? ""} placeholder="Например, юрист" onChange={(event) => setAssignments((current) => current.map((item) => item.speaker_key === assignment.speaker_key ? { ...item, custom_role: event.target.value } : item))} /></label>}
             <label><span>Контакт</span><SelectControl aria-label={`Контакт спикера ${assignment.speaker_key}`} value={assignment.contact_user_uuid ?? ""} onChange={(event) => { const person = people.find((item) => item.id === event.target.value); setAssignments((current) => current.map((item) => item.speaker_key === assignment.speaker_key ? { ...item, contact_user_uuid: person?.id || undefined, display_name: person ? person.name : item.display_name } : item)); }}><option value="">Не привязан</option>{people.map((person) => <option value={person.id} key={person.id}>{person.label}</option>)}</SelectControl></label>
-            {assignment.contact_user_uuid && employeeIds.has(assignment.contact_user_uuid) && ["manager", "operator", "unknown"].includes(assignment.role) && <p className="speaker-access-warning">Он получит доступ к звонку на чтение, а оценка попадёт в его показатели.</p>}
+            {assignment.contact_user_uuid && assignment.contact_user_uuid === currentUser?.id && ["manager", "operator", "unknown"].includes(assignment.role) && <p className="speaker-access-warning">Это вы: речь этого спикера и зоны роста после следующего анализа попадут в ваш прогресс.</p>}
+            {assignment.contact_user_uuid && assignment.contact_user_uuid !== currentUser?.id && employeeIds.has(assignment.contact_user_uuid) && ["manager", "operator", "unknown"].includes(assignment.role) && <p className="speaker-access-warning">Он получит доступ к звонку на чтение, а оценка попадёт в его показатели.</p>}
             {removingSpeaker === assignment.speaker_key && <div className="transcription-participant-transfer"><strong>Кому передать реплики?</strong><div>{assignments.filter((item) => item.speaker_key !== assignment.speaker_key).map((item) => <button type="button" key={item.speaker_key} onClick={() => removeSpeaker(assignment.speaker_key, item.speaker_key)}>{item.display_name || item.speaker_key}</button>)}</div><button className="ghost-button small" type="button" onClick={() => setRemovingSpeaker(undefined)}>Отмена</button></div>}
           </article>;
         })}
@@ -266,13 +277,6 @@ function groupDraftWords(words: TranscriptionWordResponse[], draft: DraftWord[])
   return groups;
 }
 
-const SPEAKER_COLORS = ["#ff7657", "#63a7ff", "#ad7cff", "#42bd96", "#e1b54f", "#ef6cae", "#57b8c8", "#9caf52"];
-
 function speakerColor(speaker: string, assignments: TranscriptionSpeakerAssignment[]) {
-  const normalizedSpeaker = speaker.trim().toLocaleLowerCase("ru") || "unknown";
-  const orderedKeys = Array.from(new Set(assignments.map((item) => item.speaker_key.trim().toLocaleLowerCase("ru") || "unknown"))).sort((left, right) => left.localeCompare(right, "ru"));
-  const index = Math.max(0, orderedKeys.indexOf(normalizedSpeaker));
-  if (index < SPEAKER_COLORS.length) return SPEAKER_COLORS[index];
-  const hue = Math.round((index * 137.508) % 360);
-  return `hsl(${hue} 68% 56%)`;
+  return colorOfSpeaker(speaker, assignments.map((item) => item.speaker_key));
 }

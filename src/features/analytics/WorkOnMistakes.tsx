@@ -25,8 +25,12 @@ const growthVerdictLabels: Record<string, string> = {
 const unavailableTexts: Record<string, string> = {
   shared_call: "Совместный звонок: по общему разговору нельзя сказать, кто исправил или повторил ошибку, поэтому он не сравнивается с прошлыми.",
   internal_call: "Внутренний звонок: разговор коллег не сравнивается с рабочими звонками по критериям.",
-  no_fixed_scorecard: "Звонок оценён без постоянных критериев инструкции — сравнивать с прошлыми звонками не по чему.",
 };
+
+// Says what would make the block appear, since both of its layers are missing.
+function noScorecardText(personal: boolean) {
+  return `Сравнивать с прошлыми звонками пока не по чему: у звонка нет постоянных критериев инструкции и зон роста. Критерии появятся при анализе по инструкции с оценочной картой, зоны роста — при следующем анализе, если в редакторе расшифровки отметить ${personal ? "себя спикером («Это я»)" : "сотрудника спикером"}.`;
+}
 
 // Opens a card of another call: the calls page reads the call and the card from
 // the address.
@@ -41,7 +45,7 @@ function openCallItem(callId: string, itemId: string) {
  * criterion in the employee's previous call. It stays silent when the viewer
  * may not see it or the call has not been analysed yet.
  */
-export function CallWorkOnMistakes({ callId, analysisId, onOpenItem }: { callId: string; analysisId?: string; onOpenItem: (itemId: string) => void }) {
+export function CallWorkOnMistakes({ callId, analysisId, personal = false, onOpenItem }: { callId: string; analysisId?: string; personal?: boolean; onOpenItem: (itemId: string) => void }) {
   const [progress, setProgress] = useState<CallProgress>();
   const [open, setOpen] = useState(false);
 
@@ -57,7 +61,7 @@ export function CallWorkOnMistakes({ callId, analysisId, onOpenItem }: { callId:
 
   if (!progress) return null;
   if (!progress.available) {
-    const text = progress.unavailable_reason ? unavailableTexts[progress.unavailable_reason] : undefined;
+    const text = progress.unavailable_reason === "no_fixed_scorecard" ? noScorecardText(personal) : progress.unavailable_reason ? unavailableTexts[progress.unavailable_reason] : undefined;
     return text ? <section className="mistakes-block is-muted" aria-label="Работа над ошибками"><History size={16} /><p>{text}</p></section> : null;
   }
   const { counts } = progress;
@@ -132,7 +136,7 @@ export function EmployeeWorkOnMistakes({ userId, filters, onOpenCall }: { userId
       <div>
         <h3>Открытые ошибки</h3>
         {progress.open.length === 0 ? <p className="analytics-muted">Нет критериев, которые проваливаются сейчас.</p> : <ul className="mistakes-list">
-          {progress.open.map((row) => <li key={row.criterion_key} className="mistakes-row verdict-repeated">
+          {progress.open.map((row) => <li key={row.criterion_key} className="mistakes-row is-plain verdict-repeated">
             <div className="mistakes-main">
               <strong>{row.title || "Критерий"}</strong>
               <small>Последний балл {row.last_score}{row.repeat_streak > 1 ? ` · подряд: ${row.repeat_streak}` : ""} · с {formatDate(row.first_failed_at)}</small>

@@ -753,6 +753,7 @@ function App() {
       {page === "transcriptionEdit" && (
         <TranscriptionEditPage
           call={selectedCall}
+          currentUser={session.user}
           transcription={selectedCall ? transcriptions[selectedCall.id] : undefined}
           loading={selectedCallDetailsLoading}
           onBack={() => selectedCall ? openCallPage(selectedCall.id) : navigate("calls")}

@@ -1604,6 +1604,36 @@ button.sidebar-plan-card:focus-visible {
   color: var(--app-accent-strong);
 }
 
+/* Placeholders take the place and size of what they stand for, so nothing
+   jumps when the numbers arrive. */
+.dashboard-kpi-card .overview-kpi-value-skeleton {
+  width: 92px;
+  height: 31px;
+  margin-top: 18px;
+  border-radius: 10px;
+}
+
+.dashboard-kpi-card .overview-kpi-chart-skeleton {
+  position: absolute;
+  right: 28px;
+  bottom: 30px;
+  left: 28px;
+  width: auto;
+  height: 26px;
+  border-radius: 10px;
+}
+
+.overview-donut-skeleton {
+  justify-self: center;
+  width: 124px;
+  height: 124px;
+}
+
+.analytics-insight-card .overview-trend-skeleton {
+  height: 160px;
+  border-radius: 12px;
+}
+
 .mini-chart {
   --mini-chart-colour: var(--app-accent);
   position: absolute;
@@ -1786,6 +1816,58 @@ html[data-theme="light"] .app-shell .chart-tooltip {
 
 html[data-theme="light"] .app-shell .chart-tooltip::after {
   border-color: rgba(141, 101, 79, 0.18);
+}
+
+/* Hints outside the charts wear the same tooltip. The cursor stays as it is:
+   a hint is something to read, not a control. */
+.hover-hint {
+  cursor: default;
+  outline: 0;
+}
+
+:is(button, a, .is-clickable) .hover-hint {
+  cursor: inherit;
+}
+
+.hover-hint:focus-visible {
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--app-accent-line, rgba(255, 102, 55, 0.56));
+}
+
+/* The width follows the text, not the distance to the viewport edge, so a hint
+   near the edge does not wrap on its second placement. */
+.chart-tooltip.hover-hint-tooltip {
+  position: fixed;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 16px));
+  transform: translateY(4px);
+}
+
+.chart-tooltip.hover-hint-tooltip.is-above {
+  transform: translateY(-4px);
+}
+
+.chart-tooltip.hover-hint-tooltip.is-placed {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+}
+
+.chart-tooltip.hover-hint-tooltip span {
+  overflow: visible;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.chart-tooltip.hover-hint-tooltip::after {
+  left: var(--hint-arrow);
+}
+
+.chart-tooltip.hover-hint-tooltip.is-above::after {
+  top: auto;
+  bottom: -5px;
+  transform: translateX(-50%) rotate(225deg);
 }
 
 html[data-theme="light"] .app-shell .quality-donut {

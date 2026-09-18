@@ -1,5 +1,8 @@
-import { AudioLines, Info } from "lucide-react";
+import { AudioLines } from "lucide-react";
+import type { CSSProperties } from "react";
 import type { AnalyticsSpeech, CallSpeech } from "../../types";
+import { speakerColor } from "../lib/speaker-colors";
+import { HoverHint, InfoHint } from "./hover-hint";
 
 // Vendor reference points go into tooltips only, with their source: the numbers
 // are observations, not a grade, and nothing is called good or bad.
@@ -27,40 +30,48 @@ function formatPause(ms: number | null | undefined) {
   return ms === null || ms === undefined ? "—" : `${(ms / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} с`;
 }
 
-function Hint({ text }: { text: string }) {
-  return <span className="speech-hint" title={text} aria-label={text} tabIndex={0}><Info size={13} /></span>;
-}
-
 /** The «Речь» block of a call page: who spoke how much and how. */
 export function CallSpeechBlock({ speech }: { speech?: CallSpeech | null }) {
   if (!speech || speech.speakers.length === 0) return null;
+  const keys = speech.speakers.map((speaker) => speaker.speaker_key);
+  const name = (speaker: CallSpeech["speakers"][number]) => speaker.display_name || `Спикер ${speaker.speaker_key}`;
+  const color = (speaker: CallSpeech["speakers"][number]) => ({ "--speaker-color": speakerColor(speaker.speaker_key, keys) } as CSSProperties);
   return <section className="speech-block" aria-label="Речь">
     <header><span className="speech-title"><AudioLines size={17} />Речь</span><small>Наблюдения по таймингу слов, в оценку не входят</small></header>
-    <div className="speech-share-bar" aria-hidden="true">
-      {speech.speakers.map((speaker) => <span key={speaker.speaker_key} className={speaker.is_subject ? "is-subject" : ""} style={{ flexGrow: Math.max(speaker.talk_share, 0.01) }} />)}
+    {/* Who held the floor, at a glance; the colours match the cards below. */}
+    <div className="speech-share">
+      <span className="speech-share-label">Доля речи в разговоре <InfoHint label="Доля речи" text={speechHints.talk_share} /></span>
+      <div className="speech-share-bar" role="img" aria-label={speech.speakers.map((speaker) => `${name(speaker)}: ${formatShare(speaker.talk_share)}`).join(", ")}>
+        {speech.speakers.map((speaker) => <HoverHint key={speaker.speaker_key} focusable={false} className="speech-share-segment" style={{ ...color(speaker), flexGrow: Math.max(speaker.talk_share, 0.01) }}
+          label={`${name(speaker)} — ${formatShare(speaker.talk_share)}`} detail={`время речи ${formatSeconds(speaker.talk_seconds)}`} />)}
+      </div>
+      <ul className="speech-share-legend">
+        {speech.speakers.map((speaker) => <li key={speaker.speaker_key} style={color(speaker)}><i />{name(speaker)} <b>{formatShare(speaker.talk_share)}</b></li>)}
+      </ul>
     </div>
     <ul className="speech-speakers">
-      {speech.speakers.map((speaker) => <li key={speaker.speaker_key} className={speaker.is_subject ? "is-subject" : ""}>
-        <strong>{speaker.display_name || `Спикер ${speaker.speaker_key}`}{speaker.is_subject ? <em>сотрудник</em> : null}</strong>
+      {speech.speakers.map((speaker) => <li key={speaker.speaker_key} className={speaker.is_subject ? "is-subject" : ""} style={color(speaker)}>
+        <strong><i className="speech-speaker-dot" />{name(speaker)}{speaker.is_subject ? <em>сотрудник</em> : null}</strong>
         <dl>
-          <div><dt>Доля речи <Hint text={speechHints.talk_share} /></dt><dd>{formatShare(speaker.talk_share)}</dd></div>
-          <div><dt>Самый длинный монолог <Hint text={speechHints.longest_monologue} /></dt><dd>{formatSeconds(speaker.longest_monologue_seconds)}</dd></div>
-          <div><dt>Темп <Hint text={speechHints.words_per_minute} /></dt><dd>{speaker.words_per_minute ?? "—"} сл/мин</dd></div>
-          <div><dt>Вопросов в час <Hint text={speechHints.questions_per_hour} /></dt><dd>{speaker.questions_per_hour?.toLocaleString("ru-RU") ?? "—"}</dd></div>
-          <div><dt>Выдержка перед ответом <Hint text={speechHints.response_pause} /></dt><dd>{formatPause(speaker.response_pause_median_ms)}</dd></div>
+          <div><dt>Самый длинный монолог <InfoHint label="Самый длинный монолог" text={speechHints.longest_monologue} /></dt><dd>{formatSeconds(speaker.longest_monologue_seconds)}</dd></div>
+          <div><dt>Темп <InfoHint label="Темп" text={speechHints.words_per_minute} /></dt><dd>{speaker.words_per_minute ?? "—"} сл/мин</dd></div>
+          <div><dt>Вопросов в час <InfoHint label="Вопросов в час" text={speechHints.questions_per_hour} /></dt><dd>{speaker.questions_per_hour?.toLocaleString("ru-RU") ?? "—"}</dd></div>
+          <div><dt>Выдержка перед ответом <InfoHint label="Выдержка перед ответом" text={speechHints.response_pause} /></dt><dd>{formatPause(speaker.response_pause_median_ms)}</dd></div>
         </dl>
       </li>)}
     </ul>
     <p className="speech-call">
-      <span>Смен говорящего за 5 минут: <b>{speech.speaker_switches_per_5min?.toLocaleString("ru-RU") ?? "—"}</b> <Hint text={speechHints.switches} /></span>
-      <span>Долгих пауз: <b>{speech.pauses_over_threshold}</b>, самая длинная {formatSeconds(speech.longest_pause_seconds)} <Hint text={speechHints.pauses} /></span>
+      <span>Смен говорящего за 5 минут: <b>{speech.speaker_switches_per_5min?.toLocaleString("ru-RU") ?? "—"}</b> <InfoHint label="Живость диалога" text={speechHints.switches} /></span>
+      <span>Долгих пауз: <b>{speech.pauses_over_threshold}</b>, самая длинная {formatSeconds(speech.longest_pause_seconds)} <InfoHint label="Долгие паузы" text={speechHints.pauses} /></span>
     </p>
   </section>;
 }
 
 /** One line of an employee's speech against the team median. */
-export function SpeechComparison({ own, median }: { own: AnalyticsSpeech | null; median: AnalyticsSpeech | null }) {
-  if (!own) return <p className="analytics-muted">Нет звонков, где сотрудник привязан к спикеру: речь считается только по своему спикеру.</p>;
+export function SpeechComparison({ own, median, personal = false }: { own: AnalyticsSpeech | null; median: AnalyticsSpeech | null; personal?: boolean }) {
+  if (!own) return <p className="analytics-muted">{personal
+    ? "Нет звонков, где вы отмечены спикером: речь считается только по своему спикеру. Отметьте себя в редакторе расшифровки — «Это я»."
+    : "Нет звонков, где сотрудник привязан к спикеру: речь считается только по своему спикеру."}</p>;
   const rows: Array<[string, string, string, string]> = [
     ["Доля речи", formatShare(own.talk_share), formatShare(median?.talk_share), speechHints.talk_share],
     ["Самый длинный монолог", formatSeconds(own.longest_monologue_seconds), formatSeconds(median?.longest_monologue_seconds), speechHints.longest_monologue],
@@ -68,10 +79,11 @@ export function SpeechComparison({ own, median }: { own: AnalyticsSpeech | null;
     ["Вопросов в час", own.questions_per_hour?.toLocaleString("ru-RU") ?? "—", median?.questions_per_hour?.toLocaleString("ru-RU") ?? "—", speechHints.questions_per_hour],
     ["Выдержка перед ответом", formatPause(own.response_pause_median_ms), formatPause(median?.response_pause_median_ms), speechHints.response_pause],
   ];
-  return <div className="speech-comparison" role="table" aria-label="Речь сотрудника и медиана команды">
-    <div role="row" className="is-head"><span role="columnheader">Показатель</span><span role="columnheader">Свой</span><span role="columnheader">Медиана команды</span></div>
+  // A personal account has no team, so there is nothing to compare with.
+  return <div className={`speech-comparison${median ? "" : " is-solo"}`} role="table" aria-label={median ? "Речь сотрудника и медиана команды" : "Речь"}>
+    <div role="row" className="is-head"><span role="columnheader">Показатель</span><span role="columnheader">Свой</span>{median ? <span role="columnheader">Медиана команды</span> : null}</div>
     {rows.map(([label, value, team, hint]) => <div role="row" key={label}>
-      <span role="rowheader">{label} <Hint text={hint} /></span><b role="cell">{value}</b><span role="cell">{median ? team : "—"}</span>
+      <span role="rowheader">{label} <InfoHint label={label} text={hint} /></span><b role="cell">{value}</b>{median ? <span role="cell">{team}</span> : null}
     </div>)}
     <small>По {own.n} {own.n % 10 === 1 && own.n % 100 !== 11 ? "звонку" : "звонкам"} с привязкой к спикеру. Наблюдение, не оценка.</small>
   </div>;

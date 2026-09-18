@@ -23,8 +23,11 @@ import {
   formatScore
 } from "../../shared/lib/analysis";
 import { formatDuration } from "../../shared/lib/formatters";
+import { useReloadScrollRestoration } from "../../shared/lib/reload-scroll";
+import { useDrawProgress } from "../../shared/lib/use-draw-progress";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { TrendChart } from "../../shared/ui/analytics-ui";
+import { TextBlockSkeleton } from "../../shared/ui/loading";
 import { WorthListening, type OpenCallAt } from "../analytics/AnalyticsPage";
 import { sparklineCoordinates, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./sparkline-geometry";
 
@@ -51,12 +54,18 @@ export function OverviewPage({
 }) {
   const workspaceCompanyId = useWorkspaceCompanyId();
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverviewResponse | null>(null);
-  // The team's dynamics and the calls worth listening to come from the facts;
+  // The dynamics and the calls worth listening to come from the facts;
   // a plan without them simply leaves the two cards empty.
   const [teamSummary, setTeamSummary] = useState<AnalyticsSummary | null>(null);
   const [processingMonitoring, setProcessingMonitoring] = useState<ProcessingMonitoringResponse | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  // Placeholders stand in until the first answer for the chosen workspace; a
+  // later refresh keeps the numbers on screen instead of blinking.
+  const scopeKey = workspaceCompanyId ?? "all";
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const loaded = loadedScope === scopeKey;
+  useReloadScrollRestoration("overview", loaded);
   const avgDuration = analyticsOverview?.average_duration_seconds === null || analyticsOverview === null
     ? "Нет данных"
     : formatDuration(Math.round(analyticsOverview.average_duration_seconds));
@@ -83,6 +92,7 @@ export function OverviewPage({
         setAnalyticsOverview(overview);
         setTeamSummary(summary);
         setRefreshing(false);
+        setLoadedScope(workspaceCompanyId ?? "all");
       }
     }
 
@@ -124,18 +134,20 @@ export function OverviewPage({
   return (
     <section className="dashboard-page app-page">
       <div className="dashboard-kpi-grid">
-        <MetricCard icon={<BarChart3 size={20} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
+        <MetricCard loading={!loaded} icon={<BarChart3 size={20} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
         <MetricCard
+          loading={!loaded}
           icon={<Phone size={20} />}
           title="Новые сегодня"
           value={metricCount(analyticsOverview?.calls_created_today)}
           points={recentUploads}
           note="за последние 24 часа"
         />
-        <MetricCard icon={<Activity size={20} />} title="Звонки в обработке" value={metricCount(analyticsOverview?.calls_processing)} note={`${processingMonitoring?.queue.running ?? 0} задач выполняется`} />
-        <MetricCard icon={<CheckCircle2 size={20} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} tone="success" points={chartSeries.analyzedCalls} note="готовый результат анализа" />
-        <MetricCard icon={<Clock3 size={20} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} />
+        <MetricCard loading={!loaded} icon={<Activity size={20} />} title="Звонки в обработке" value={metricCount(analyticsOverview?.calls_processing)} note={`${processingMonitoring?.queue.running ?? 0} задач выполняется`} />
+        <MetricCard loading={!loaded} icon={<CheckCircle2 size={20} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} tone="success" points={chartSeries.analyzedCalls} note="готовый результат анализа" />
+        <MetricCard loading={!loaded} icon={<Clock3 size={20} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} />
         <MetricCard
+          loading={!loaded}
           icon={<Star size={20} />}
           title="Средняя оценка"
           value={analyticsScore.score === null ? "Нет данных" : `${formatScore(analyticsScore.score)} / ${analyticsScore.scale}`}
@@ -160,8 +172,23 @@ export function OverviewPage({
         </button>
       </div>
 
-      <AnalyticsOverviewInsights overview={analyticsOverview} summary={teamSummary} onNavigate={onNavigate} onOpenCall={onOpenCall} />
+      {loaded ? (
+        <AnalyticsOverviewInsights overview={analyticsOverview} summary={teamSummary} onNavigate={onNavigate} onOpenCall={onOpenCall} />
+      ) : (
+        <OverviewInsightsSkeleton />
+      )}
     </section>
+  );
+}
+
+function OverviewInsightsSkeleton() {
+  return (
+    <div className="analytics-insight-grid" aria-busy="true" aria-label="Загрузка аналитики">
+      <InsightCard title="Распределение оценок" note="шкала 0-100"><TextBlockSkeleton rows={5} /></InsightCard>
+      <InsightCard title="Слабые критерии" note="по пропущенным и частичным критериям"><TextBlockSkeleton rows={4} /></InsightCard>
+      <InsightCard title="Динамика" note="средний балл по дням"><span className="skeleton-line overview-trend-skeleton" /></InsightCard>
+      <InsightCard title="Стоит послушать" note="слабые звонки и критичные пропуски"><TextBlockSkeleton rows={4} /></InsightCard>
+    </div>
   );
 }
 
@@ -251,7 +278,7 @@ function AnalyticsOverviewInsights({
         )}
       </InsightCard>
 
-      <InsightCard title="Динамика команды" note="средний балл по дням">
+      <InsightCard title="Динамика" note="средний балл по дням">
         {!summary ? (
           <p className="analysis-empty">Динамика появится, когда накопятся оценённые звонки.</p>
         ) : (
@@ -306,7 +333,8 @@ function MetricCard({
   points,
   note,
   donutPercent,
-  donutLabel
+  donutLabel,
+  loading = false
 }: {
   icon: React.ReactNode;
   title: string;
@@ -316,8 +344,28 @@ function MetricCard({
   note?: string;
   donutPercent?: number;
   donutLabel?: string;
+  loading?: boolean;
 }) {
   const hasDonut = typeof donutPercent === "number";
+
+  if (loading) {
+    return (
+      <article className={`dashboard-kpi-card glass-panel ${tone} ${hasDonut ? "with-donut" : ""}`} aria-busy="true">
+        <div>
+          <span className="metric-icon">{icon}</span>
+          <span>{title}</span>
+        </div>
+        {hasDonut ? (
+          <span className="skeleton-circle overview-donut-skeleton" />
+        ) : (
+          <>
+            <span className="skeleton-line overview-kpi-value-skeleton" />
+            <span className="skeleton-line overview-kpi-chart-skeleton" />
+          </>
+        )}
+      </article>
+    );
+  }
 
   return (
     <article className={`dashboard-kpi-card glass-panel ${tone} ${hasDonut ? "with-donut" : ""}`}>
@@ -439,36 +487,6 @@ const issueCodeLabels: Record<string, string> = {
 
 function issueCodeLabel(code: string, index: number) {
   return issueCodeLabels[code] ?? `Код проблемы ${index + 1}`;
-}
-
-function useDrawProgress(key: string, durationMs: number) {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    let frameId = 0;
-    let startedAt = 0;
-
-    setProgress(0);
-
-    const tick = (time: number) => {
-      if (!startedAt) startedAt = time;
-      const rawProgress = Math.min(1, (time - startedAt) / durationMs);
-      const easedProgress = 1 - Math.pow(1 - rawProgress, 3);
-      setProgress(easedProgress);
-
-      if (rawProgress < 1) {
-        frameId = window.requestAnimationFrame(tick);
-      }
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [durationMs, key]);
-
-  return progress;
 }
 
 function buildOverviewChartSeries(overview: AnalyticsOverviewResponse | null) {

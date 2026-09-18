@@ -45,6 +45,7 @@ import { CallMediaPlayer } from "../../shared/ui/audio";
 import { isCallBeingProcessed } from "../../shared/lib/call-status";
 import { InfoCard, StatusChip, StatusTimeline, TranscriptPreview } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
+import { HoverHint } from "../../shared/ui/hover-hint";
 import { CallDetailSkeleton } from "../../shared/ui/loading";
 import { ReportExportPanel } from "../reports/ReportExportPanel";
 import { AnalysisComments } from "./AnalysisComments";
@@ -693,7 +694,7 @@ export function CallDetailPanel({
         {!call.is_test && !transcriptionOnly && <div className="analysis-card-stack">
           {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="primary-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}>{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
           {qualityReviewError && <div className="form-error is-dismissible" role="alert">{qualityReviewError}</div>}
-          <CallWorkOnMistakes callId={call.id} analysisId={isAnalysisDone(analysis) ? analysis?.id : undefined} onOpenItem={openAnalysisItem} />
+          <CallWorkOnMistakes callId={call.id} personal={!call.company_uuid} analysisId={isAnalysisDone(analysis) ? analysis?.id : undefined} onOpenItem={openAnalysisItem} />
           <InfoCard
             title="AI-анализ"
             cardRef={analysisCardRef}
@@ -909,9 +910,9 @@ function CallSubjectMarks({ call, onChanged }: { call: CallResponse; onChanged: 
   return <div className="call-subject-marks">
     {names.length > 0 && <span className="call-subject-names"><Users size={14} />{names.join(", ")}</span>}
     {call.access?.can_manage_subjects && !call.is_test && <button className="text-link call-subject-edit" type="button" onClick={() => setEditing(true)}>Изменить</button>}
-    {call.is_shared && <span className="call-subject-chip" title="В разговоре несколько сотрудников компании: оценка засчитывается каждому">Совместный</span>}
-    {call.is_internal && <span className="call-subject-chip" title="Все участники — сотрудники компании. По умолчанию такой звонок не входит в аналитику">Внутренний</span>}
-    {call.subjects_changed_manually && <span className="call-subject-chip is-muted" title="Состав сотрудников звонка меняли вручную">Состав менялся вручную</span>}
+    {call.is_shared && <HoverHint className="call-subject-chip" label="Совместный звонок" detail="В разговоре несколько сотрудников компании: оценка засчитывается каждому">Совместный</HoverHint>}
+    {call.is_internal && <HoverHint className="call-subject-chip" label="Внутренний звонок" detail="Все участники — сотрудники компании. По умолчанию такой звонок не входит в аналитику">Внутренний</HoverHint>}
+    {call.subjects_changed_manually && <HoverHint className="call-subject-chip is-muted" label="Состав менялся вручную" detail="Сотрудников звонка указывали вручную, а не по спикерам">Состав менялся вручную</HoverHint>}
     {call.access && <span className="call-access-line">{call.access.via === "subject"
       ? "Вас отметили в звонке: вы видите его, а менять могут загрузивший и руководство."
       : `Доступен загрузившему и руководству${marked.length ? `, а также отмеченным: ${marked.join(", ")}` : ""}.`}</span>}

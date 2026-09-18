@@ -286,10 +286,10 @@ export function CallsPage({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isDrawerLayout = useDrawerLayout();
   const [callListCollapsed, setCallListCollapsed] = useState(() => window.localStorage.getItem("verbatrace:calls-list-collapsed") === "1");
-  const effectiveScopeFilter =
-    companies.length === 0 && (scopeFilter === "company" || scopeFilter === "department")
-      ? "all"
-      : scopeFilter;
+  // Without a company every call is personal, so there is no scope to choose:
+  // neither the tabs nor a chip for it are shown.
+  const hasScopes = companies.length > 0;
+  const effectiveScopeFilter = hasScopes ? scopeFilter : "all";
   const filterValidationError = (() => {
     const minDuration = durationMin === "" ? undefined : Number(durationMin);
     const maxDuration = durationMax === "" ? undefined : Number(durationMax);
@@ -434,12 +434,8 @@ export function CallsPage({
   const scopeOptions: Array<[VisibilityScope | "all", string]> = [
     ["all", "Все"],
     ["personal", "Личные"],
-    ...(companies.length > 0
-      ? ([
-        ["company", "Компания"],
-        ["department", "Отдел"]
-      ] as Array<[VisibilityScope, string]>)
-      : [])
+    ["company", "Компания"],
+    ["department", "Отдел"]
   ];
   const filtersChanged =
     statusFilter !== "all" ||
@@ -1242,17 +1238,19 @@ export function CallsPage({
           </span>
           <span>Только избранные</span>
         </label>
-        <div className="call-scope-tabs segmented scope">
-          {scopeOptions.map(([value, label]) => (
-            <button
-              key={value}
-              className={effectiveScopeFilter === value ? "active" : ""}
-              onClick={() => setScopeFilter(value as VisibilityScope | "all")}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {hasScopes && (
+          <div className="call-scope-tabs segmented scope">
+            {scopeOptions.map(([value, label]) => (
+              <button
+                key={value}
+                className={effectiveScopeFilter === value ? "active" : ""}
+                onClick={() => setScopeFilter(value as VisibilityScope | "all")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <section className="call-folder-panel">
           <div className="call-folder-heading">
             <div>

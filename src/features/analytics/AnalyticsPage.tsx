@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, lastWeekPeriod, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
+import { HoverHint, InfoHint } from "../../shared/ui/hover-hint";
 import { SelectControl } from "../../shared/ui/primitives";
 import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
 import { SpeechComparison, formatSeconds as formatSpeechSeconds, formatShare, speechHints } from "../../shared/ui/speech";
@@ -90,8 +91,11 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
     {!ownOnly && !profileUserId && companyDepartments.length > 1 ? <SelectControl aria-label="Отдел" value={department} onChange={(event) => setDepartment(event.target.value)}>
       <option value="">Все отделы</option>{companyDepartments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
     </SelectControl> : null}
-    <label className="checkbox-row analytics-toggle"><input type="checkbox" checked={excludeShared} onChange={(event) => setExcludeShared(event.target.checked)} /><span>Без совместных</span></label>
-    <label className="checkbox-row analytics-toggle"><input type="checkbox" checked={includeInternal} onChange={(event) => setIncludeInternal(event.target.checked)} /><span>Включая внутренние</span></label>
+    {/* Shared and internal calls exist only in a company. */}
+    {capabilities.scope === "company" ? <>
+      <label className="checkbox-row analytics-toggle"><input type="checkbox" checked={excludeShared} onChange={(event) => setExcludeShared(event.target.checked)} /><span>Без совместных</span></label>
+      <label className="checkbox-row analytics-toggle"><input type="checkbox" checked={includeInternal} onChange={(event) => setIncludeInternal(event.target.checked)} /><span>Включая внутренние</span></label>
+    </> : null}
     {canSetUp && <button className="ghost-button small analytics-settings-button" type="button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((value) => !value)}><Settings2 size={16} />Настройки</button>}
   </div>;
   const settingsCard = settingsOpen && canSetUp ? <AnalyticsSettingsCard companyId={workspace || undefined} onClose={() => setSettingsOpen(false)} /> : null;
@@ -166,7 +170,7 @@ function SummaryStrip({ summary, role }: { summary: AnalyticsSummary; role: Anal
     <div><small>Средний балл</small><strong><ScoreValue value={summary.avg_score} sample={summary.sample} /></strong><span><DeltaBadge delta={summary.delta} /> к прошлому периоду</span></div>
     {role === "department_leader" ? <div><small>Мой отдел / компания</small><strong>{summary.avg_score ?? "—"} / {summary.company_avg_score ?? "—"}</strong><span>средний балл</span></div> : null}
     <div><small>Критичных пропусков</small><strong className={summary.critical_missed ? "tone-danger" : ""}>{summary.critical_missed}</strong><span>критерии с отметкой «Критичный»</span></div>
-    <div title="Их требования подобраны разово, поэтому их нет в разрезе по критериям"><small>Без постоянных критериев</small><strong>{summary.calls_without_fixed_scorecard}</strong><span>не входят в разрез по критериям</span></div>
+    <div><small>Без постоянных критериев <InfoHint label="Без постоянных критериев" text="Их требования подобраны разово, поэтому их нет в разрезе по критериям" /></small><strong>{summary.calls_without_fixed_scorecard}</strong><span>не входят в разрез по критериям</span></div>
   </div>;
 }
 
@@ -200,7 +204,7 @@ function CriteriaTab({ filters, onOpen, onNavigate }: { filters: AnalyticsFilter
     { key: "avg", label: "Средний", priority: 1, width: 150, render: (row) => <span className="analytics-score-cell"><ScoreValue value={row.avg_score} sample={row.sample} /><DistributionBar distribution={row.distribution} /></span>, sortValue: (row) => row.avg_score },
     { key: "delta", label: "Дельта", priority: 2, width: 76, align: "end", render: (row) => <DeltaBadge delta={row.delta} />, sortValue: (row) => row.delta.value },
     { key: "pass", label: "Выполнено", priority: 3, width: 96, align: "end", render: (row) => row.pass_rate === null ? "—" : `${Math.round(row.pass_rate * 100)}%`, sortValue: (row) => row.pass_rate },
-    { key: "n", label: "Оценок", priority: 4, width: 110, align: "end", render: (row) => <span title={`Не применимо: ${row.n_not_applicable}, не удалось оценить: ${row.n_unassessed}`}>{row.n_scored}{row.n_not_applicable || row.n_unassessed ? <small className="analytics-muted"> +{row.n_not_applicable + row.n_unassessed}</small> : null}</span>, sortValue: (row) => row.n_scored },
+    { key: "n", label: "Оценок", priority: 4, width: 110, align: "end", render: (row) => <HoverHint focusable={false} label={`Оценено: ${row.n_scored}`} detail={`Не применимо: ${row.n_not_applicable}, не удалось оценить: ${row.n_unassessed}`}>{row.n_scored}{row.n_not_applicable || row.n_unassessed ? <small className="analytics-muted"> +{row.n_not_applicable + row.n_unassessed}</small> : null}</HoverHint>, sortValue: (row) => row.n_scored },
     { key: "trend", label: "Тренд", priority: 5, width: 96, render: (row) => <MiniTrend points={row.trend} /> },
   ];
   return <DataTable columns={columns} rows={value.criteria} rowKey={(row) => row.criterion_key} onRowClick={(row) => onOpen(row.criterion_key)} />;
@@ -229,8 +233,8 @@ function EmployeesTab({ filters }: { filters: AnalyticsFilters }) {
   // Speech columns come last: they are the first to go on a narrow screen.
   const columns: DataColumn<AnalyticsEmployeeRow>[] = [
     ...teamColumns<AnalyticsEmployeeRow>((row) => <span className="analytics-name"><strong>{row.full_name || "Без имени"}{row.is_me ? <em>вы</em> : null}{row.is_former_member ? <em className="is-muted">бывший сотрудник</em> : null}</strong><small>{row.department?.name ?? "Без отдела"}{row.calls_shared ? ` · совместных: ${row.calls_shared}` : ""}</small></span>, (row) => row.full_name),
-    { key: "talk", label: "Доля речи", priority: 7, width: 96, align: "end", render: (row) => <span title={speechHints.talk_share}>{formatShare(row.speech?.talk_share)}</span>, sortValue: (row) => row.speech?.talk_share ?? null },
-    { key: "monologue", label: "Монолог", priority: 8, width: 90, align: "end", render: (row) => <span title={speechHints.longest_monologue}>{formatSpeechSeconds(row.speech?.longest_monologue_seconds)}</span>, sortValue: (row) => row.speech?.longest_monologue_seconds ?? null },
+    { key: "talk", label: "Доля речи", priority: 7, width: 96, align: "end", render: (row) => <HoverHint focusable={false} label="Доля речи" detail={speechHints.talk_share}>{formatShare(row.speech?.talk_share)}</HoverHint>, sortValue: (row) => row.speech?.talk_share ?? null },
+    { key: "monologue", label: "Монолог", priority: 8, width: 90, align: "end", render: (row) => <HoverHint focusable={false} label="Самый длинный монолог" detail={speechHints.longest_monologue}>{formatSpeechSeconds(row.speech?.longest_monologue_seconds)}</HoverHint>, sortValue: (row) => row.speech?.longest_monologue_seconds ?? null },
   ];
   return <>
     <TeamLine label="Команда" team={value.team} />
@@ -263,9 +267,9 @@ function MatrixTab({ filters, instruction, onInstruction, onOpen }: { filters: A
     <SelectControl aria-label="Инструкция" value={selected} onChange={(event) => onInstruction(event.target.value)}>{instructions.map((item) => <option key={item.uuid} value={item.uuid}>{item.title}</option>)}</SelectControl>
     {!matrix.value ? <LoadState error={matrix.error} retry={matrix.retry} /> : <div className="analytics-matrix-scroll">
       <table>
-        <thead><tr><th>Сотрудник</th>{matrix.value.criteria.map((criterion) => <th key={criterion.criterion_key} title={criterion.title}><span>{criterion.title}</span></th>)}</tr></thead>
+        <thead><tr><th>Сотрудник</th>{matrix.value.criteria.map((criterion) => <th key={criterion.criterion_key}><HoverHint focusable={false} className="analytics-matrix-head" label={criterion.title}>{criterion.title}</HoverHint></th>)}</tr></thead>
         <tbody>{matrix.value.rows.map((row) => <tr key={row.user_uuid}><th>{row.full_name}</th>{row.cells.map((cell) => <td key={cell.criterion_key}>
-          <button type="button" className={`analytics-matrix-cell ${cell.avg_score === null ? "is-empty" : `band-${band(cell.avg_score)}`}`} title={`Оценок: ${cell.n}`} onClick={() => onOpen(cell.criterion_key, row.user_uuid)}>{cell.avg_score ?? "—"}</button>
+          <button type="button" className={`analytics-matrix-cell ${cell.avg_score === null ? "is-empty" : `band-${band(cell.avg_score)}`}`} onClick={() => onOpen(cell.criterion_key, row.user_uuid)}><HoverHint focusable={false} label={cell.avg_score === null ? "Нет балла" : `${cell.avg_score} / 100`} detail={`Оценок: ${cell.n}`}>{cell.avg_score ?? "—"}</HoverHint></button>
         </td>)}</tr>)}</tbody>
       </table>
     </div>}
@@ -327,25 +331,28 @@ function ProfileView({ userId, filters, onOpenCall, onNavigate }: { userId: stri
     action={<button className="primary-button" type="button" onClick={() => onNavigate("settingsTariffs")}>Перейти к тарифам</button>} />;
   if (error) return <EmptyState icon={<AlertTriangle size={28} />} title="Профиль недоступен" text={error.message} action={<button className="ghost-button" type="button" onClick={() => setAttempt((value) => value + 1)}><RefreshCw size={16} />Повторить</button>} />;
   if (!profile) return <div className="analytics-skeleton" />;
+  // A personal account has no department or company to compare with.
+  const solo = profile.reference.hidden && !profile.reference.label;
+  const referenceName = profile.reference.label ? profile.reference.label.charAt(0).toLowerCase() + profile.reference.label.slice(1) : "";
   return <div className="analytics-profile">
     <header className="analytics-profile-head">
       <span className="analytics-profile-avatar" aria-hidden="true"><Users size={22} /></span>
-      <div><h1>{profile.employee.full_name || "Сотрудник"}</h1><p>{profile.employee.department?.name ?? "Без отдела"}{profile.employee.is_former_member ? " · бывший сотрудник" : ""} · {formatBucket(profile.period.from.slice(0, 10))} — {formatBucket(profile.period.to.slice(0, 10))}</p></div>
+      <div><h1>{profile.employee.full_name || "Сотрудник"}</h1><p>{solo ? "" : `${profile.employee.department?.name ?? "Без отдела"}${profile.employee.is_former_member ? " · бывший сотрудник" : ""} · `}{formatBucket(profile.period.from.slice(0, 10))} — {formatBucket(profile.period.to.slice(0, 10))}</p></div>
     </header>
     <div className="analytics-summary">
       <div><small>Звонков</small><strong>{profile.totals.calls}</strong></div>
       <div><small>Средний балл</small><strong><ScoreValue value={profile.totals.avg_score} sample={profile.totals.sample} /></strong><span><DeltaBadge delta={profile.totals.delta} /> к прошлому периоду</span></div>
       <div><small>По критериям</small><strong>{profile.totals.avg_criteria_score ?? "—"}</strong><span>только критерии инструкций</span></div>
-      <div><small>{profile.reference.label || "Сравнение"}</small><strong>{profile.reference.hidden ? "—" : profile.reference.avg_score ?? "—"}</strong><span>{profile.reference.hidden ? "в отделе меньше трёх человек со звонками" : "средний балл"}</span></div>
+      {solo ? null : <div><small>{profile.reference.label || "Сравнение"}</small><strong>{profile.reference.hidden ? "—" : profile.reference.avg_score ?? "—"}</strong><span>{profile.reference.hidden ? "в отделе меньше трёх человек со звонками" : "средний балл"}</span></div>}
     </div>
     <div className="analytics-trend-card"><TrendChart points={profile.trend} reference={profile.reference.hidden ? undefined : profile.reference.trend} label="Свой балл" referenceLabel={profile.reference.label} /></div>
     <section className="analytics-block">
-      <h2>Критерии: свой балл и {profile.reference.hidden ? "команда" : profile.reference.label.charAt(0).toLowerCase() + profile.reference.label.slice(1)}</h2>
+      <h2>{solo ? "Критерии" : `Критерии: свой балл и ${referenceName}`}</h2>
       <DataTable
         columns={[
           { key: "title", label: "Критерий", priority: 0, render: (row) => <span className="analytics-name"><strong>{row.title}</strong><small>{row.instruction.title}</small></span>, sortValue: (row) => row.title },
           { key: "own", label: "Свой", priority: 1, width: 110, render: (row) => <ScoreValue value={row.own_avg} sample={row.sample} />, sortValue: (row) => row.own_avg },
-          { key: "ref", label: "Команда", priority: 2, width: 90, align: "end", render: (row) => row.reference_avg ?? "—", sortValue: (row) => row.reference_avg },
+          ...(solo ? [] : [{ key: "ref", label: profile.reference.label || "Сравнение", priority: 2, width: 90, align: "end" as const, render: (row: AnalyticsProfile["criteria"][number]) => row.reference_avg ?? "—", sortValue: (row: AnalyticsProfile["criteria"][number]) => row.reference_avg }]),
           { key: "delta", label: "Дельта", priority: 3, width: 76, align: "end", render: (row) => <DeltaBadge delta={row.delta} />, sortValue: (row) => row.delta.value },
           { key: "n", label: "Оценок", priority: 4, width: 80, align: "end", render: (row) => row.own_n, sortValue: (row) => row.own_n },
         ]}
@@ -354,7 +361,7 @@ function ProfileView({ userId, filters, onOpenCall, onNavigate }: { userId: stri
     <EmployeeWorkOnMistakes userId={userId} filters={filters} onOpenCall={(callId) => onOpenCall(callId)} />
     {profile.speech !== undefined && <section className="analytics-block">
       <h2>Речь</h2>
-      <SpeechComparison own={profile.speech?.own ?? null} median={profile.speech?.team_median ?? null} />
+      <SpeechComparison own={profile.speech?.own ?? null} median={profile.speech?.team_median ?? null} personal={solo} />
     </section>}
     <section className="analytics-block">
       <h2>Стоит послушать</h2>

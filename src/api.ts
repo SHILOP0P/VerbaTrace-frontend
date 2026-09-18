@@ -1,5 +1,6 @@
 import type {
   CallProgress,
+  EmployeeGrowthArea,
   EmployeeProgress,
   AdminCapabilitiesResponse,
   AdminCompanyLifecycleResponse,
@@ -292,6 +293,9 @@ const apiErrorMessages: Record<string, string> = {
   call_edit_forbidden: "Вы можете только просматривать этот звонок",
   personal_progress_access_denied: "Личный прогресс доступен на тарифах Plus и Pro",
   analytics_settings_conflict: "Настройки изменили в другом окне",
+  growth_area_not_found: "Зона роста не найдена или скрывать её вам нельзя",
+  invalid_growth_area_reason: "Укажите, почему зона скрывается",
+  growth_area_not_dismissed: "Зона уже не скрыта",
   invalid_call_subjects: "Сотрудниками звонка могут быть только активные участники его компании",
   call_subjects_locked: "У личного звонка один сотрудник — тот, кто его загрузил",
   scorecard_not_found: "Критерии этой версии не найдены",
@@ -2684,6 +2688,26 @@ export const api = {
 
   updateCompanyAnalyticsSettings(companyId: string, input: { lock_version: number; critical_alert_threshold?: number; growth_areas_enabled?: boolean }) {
     return request<AnalyticsSettings>(`/companies/${encodeURIComponent(companyId)}/analytics-settings`, { method: "PATCH", body: JSON.stringify(input) });
+  },
+
+  getPersonalAnalyticsSettings() {
+    return request<AnalyticsSettings>("/analytics/personal-settings");
+  },
+
+  updatePersonalAnalyticsSettings(input: { critical_alert_threshold?: number; growth_areas_enabled?: boolean }) {
+    return request<AnalyticsSettings>("/analytics/personal-settings", { method: "PATCH", body: JSON.stringify(input) });
+  },
+
+  getEmployeeGrowthAreas(userId: string, filters: AnalyticsFilters & { status?: "open" | "resolved" | "dismissed" }) {
+    return request<{ areas: EmployeeGrowthArea[] }>(`/analytics/employees/${encodeURIComponent(userId)}/growth-areas${queryString(filters)}`);
+  },
+
+  dismissGrowthArea(areaId: string, reason: string) {
+    return request<void>(`/growth-areas/${encodeURIComponent(areaId)}/dismiss`, { method: "POST", body: JSON.stringify({ reason }) });
+  },
+
+  reopenGrowthArea(areaId: string) {
+    return request<void>(`/growth-areas/${encodeURIComponent(areaId)}/reopen`, { method: "POST" });
   },
 
   getAnalyticsOverview(filters?: {

@@ -1,7 +1,7 @@
 import { ArrowRight, CheckCircle2, ChevronDown, History, Repeat2, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import type { AnalyticsFilters, CallProgress, CallProgressCriterion, EmployeeProgress, ProgressVerdict } from "../../types";
+import type { AnalyticsFilters, CallProgress, CallProgressCriterion, EmployeeGrowthArea, EmployeeProgress, ProgressVerdict } from "../../types";
 
 const dayFormat = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 function formatDate(value: string) {
@@ -10,6 +10,16 @@ function formatDate(value: string) {
 
 const verdictLabels: Record<ProgressVerdict, string> = {
   fixed: "Исправлено", repeated: "Повторилось", new: "Новая ошибка", holding: "Держит", first_time: "Впервые",
+};
+
+function times(n: number) {
+  const tens = n % 100, ones = n % 10;
+  // 1 раз, 2–4 раза, 5–20 раз; 11–14 are "раз" whatever the last digit.
+  return (tens >= 11 && tens <= 14) || ones < 2 || ones > 4 ? `${n} раз` : `${n} раза`;
+}
+
+const growthVerdictLabels: Record<string, string> = {
+  new: "Новая зона", repeated: "Повторилось", improved: "Справился", not_applicable: "Не было ситуации",
 };
 
 const unavailableTexts: Record<string, string> = {
@@ -56,22 +66,25 @@ export function CallWorkOnMistakes({ callId, analysisId, onOpenItem }: { callId:
     <button className="mistakes-head" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
       <span className="mistakes-title"><History size={17} />Работа над ошибками{progress.employee?.full_name ? <small>{progress.employee.full_name}</small> : null}</span>
       <span className="mistakes-counts">
-        {compared === 0 ? <span>Первый звонок с этими критериями — сравнивать пока не с чем</span> : <>
-          <span className="tone-good">Исправлено {counts.fixed}</span>
-          <span className="tone-danger">Повторилось {counts.repeated}</span>
-          <span className="tone-warning">Новых {counts.new}</span>
-          <span>Держит {counts.holding}</span>
-        </>}
+        {progress.criteria.length === 0 ? <span>Зоны роста: {progress.growth_areas.length}</span>
+          : compared === 0 ? <span>Первый звонок с этими критериями — сравнивать пока не с чем</span> : <>
+            <span className="tone-good">Исправлено {counts.fixed}</span>
+            <span className="tone-danger">Повторилось {counts.repeated}</span>
+            <span className="tone-warning">Новых {counts.new}</span>
+            <span>Держит {counts.holding}</span>
+          </>}
       </span>
       <ChevronDown className="mistakes-chevron" size={16} />
     </button>
     {open && <div className="mistakes-body">
-      <h4>По критериям инструкции</h4>
-      <ul className="mistakes-list">{progress.criteria.map((row) => <CriterionRow key={row.criterion_key} row={row} onOpenItem={onOpenItem} />)}</ul>
+      {progress.criteria.length > 0 && <>
+        <h4>По критериям инструкции</h4>
+        <ul className="mistakes-list">{progress.criteria.map((row) => <CriterionRow key={row.criterion_key} row={row} onOpenItem={onOpenItem} />)}</ul>
+      </>}
       {progress.growth_areas.length > 0 && <>
         <h4>Зоны роста <em>сопоставлено автоматически, проверьте по цитатам</em></h4>
         <ul className="mistakes-list">{progress.growth_areas.map((area) => <li key={area.area_uuid} className={`mistakes-row verdict-${area.verdict}`}>
-          <span className="mistakes-verdict">{area.verdict === "repeated" ? "Повторилось" : area.verdict === "improved" ? "Справился" : "Не было ситуации"}</span>
+          <span className="mistakes-verdict">{growthVerdictLabels[area.verdict]}</span>
           <div className="mistakes-main"><strong>{area.title}</strong>{area.note ? <small>{area.note}</small> : null}</div>
           {area.item_ids[0] && <div className="mistakes-links"><button className="text-link" type="button" onClick={() => onOpenItem(area.item_ids[0])}>Карточка</button></div>}
         </li>)}</ul>
@@ -138,5 +151,83 @@ export function EmployeeWorkOnMistakes({ userId, filters, onOpenCall }: { userId
         </ul>}
       </div>
     </div>}
+    <GrowthAreas userId={userId} filters={filters} />
   </section>;
+}
+
+const areaStatusLabels: Record<EmployeeGrowthArea["status"], string> = { open: "Открыта", resolved: "Закрыта", dismissed: "Скрыта" };
+
+/**
+ * The approximate layer: shortcomings outside the criteria that the analysis
+ * matched between calls. Marked as automatic, each area opens into the calls it
+ * was seen in, and it can be hidden when the model got it wrong.
+ */
+function GrowthAreas({ userId, filters }: { userId: string; filters: AnalyticsFilters }) {
+  const [areas, setAreas] = useState<EmployeeGrowthArea[]>();
+  const [hidden, setHidden] = useState<EmployeeGrowthArea[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api.getEmployeeGrowthAreas(userId, filters), api.getEmployeeGrowthAreas(userId, { ...filters, status: "dismissed" })])
+      .then(([visible, dismissed]) => { if (!cancelled) { setAreas(visible.areas); setHidden(dismissed.areas); } })
+      .catch(() => { if (!cancelled) setAreas([]); });
+    return () => { cancelled = true; };
+  }, [userId, filters, reload]);
+
+  if (!areas || (areas.length === 0 && hidden.length === 0)) return null;
+  return <div className="growth-areas">
+    <h3>Зоны роста <em>сопоставлено автоматически, проверьте по цитатам</em></h3>
+    {areas.length === 0 ? <p className="analytics-muted">Открытых и закрытых зон нет.</p>
+      : <ul className="mistakes-list">{areas.map((area) => <GrowthAreaRow key={area.area_uuid} area={area} onChanged={() => setReload((value) => value + 1)} />)}</ul>}
+    {hidden.length > 0 && <>
+      <button className="text-link growth-hidden-toggle" type="button" onClick={() => setShowHidden((value) => !value)}>{showHidden ? "Свернуть скрытые" : `Скрытые зоны: ${hidden.length}`}</button>
+      {showHidden && <ul className="mistakes-list">{hidden.map((area) => <GrowthAreaRow key={area.area_uuid} area={area} onChanged={() => setReload((value) => value + 1)} />)}</ul>}
+    </>}
+  </div>;
+}
+
+function GrowthAreaRow({ area, onChanged }: { area: EmployeeGrowthArea; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [hiding, setHiding] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const act = async (action: () => Promise<void>) => {
+    setBusy(true); setError("");
+    try { await action(); onChanged(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось сохранить"); } finally { setBusy(false); }
+  };
+  return <li className={`growth-area is-${area.status}`}>
+    <div className="growth-area-head">
+      <div className="mistakes-main">
+        <strong>{area.title}{area.returned && area.status === "open" ? <em className="growth-returned">вернулась</em> : null}</strong>
+        <small>{areaStatusLabels[area.status]} · встречалась {times(area.occurrences)}{area.clean_streak > 0 ? ` · справился подряд: ${area.clean_streak}` : ""}</small>
+        <small>{area.description}</small>
+      </div>
+      <div className="mistakes-links">
+        {area.observations.length > 0 && <button className="text-link" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? "Свернуть" : `Звонки: ${area.observations.length}`}</button>}
+        {area.status === "dismissed"
+          ? <button className="text-link" type="button" disabled={busy} onClick={() => void act(() => api.reopenGrowthArea(area.area_uuid))}>Вернуть</button>
+          : <button className="text-link" type="button" onClick={() => setHiding((value) => !value)}>Скрыть</button>}
+      </div>
+    </div>
+    {hiding && area.status !== "dismissed" && <div className="growth-hide-form">
+      <label htmlFor={`growth-reason-${area.area_uuid}`}>Почему это не ошибка или модель ошиблась</label>
+      <textarea id={`growth-reason-${area.area_uuid}`} rows={2} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} />
+      <div className="growth-hide-actions">
+        <button className="primary-button small" type="button" disabled={busy || !reason.trim()} onClick={() => void act(() => api.dismissGrowthArea(area.area_uuid, reason))}>Скрыть зону</button>
+        <button className="ghost-button small" type="button" disabled={busy} onClick={() => setHiding(false)}>Отмена</button>
+      </div>
+    </div>}
+    {error && <small className="form-error">{error}</small>}
+    {open && <ul className="growth-feed">{area.observations.map((observation) => <li key={`${observation.call_uuid}-${observation.occurred_at}`}>
+      <span className={`mistakes-verdict verdict-${observation.verdict}`}>{growthVerdictLabels[observation.verdict]}</span>
+      <div className="mistakes-main">
+        <small>{formatDate(observation.occurred_at)}{observation.call_uuid ? "" : " · звонок недоступен вам"}</small>
+        {observation.note ? <span>{observation.note}</span> : null}
+      </div>
+      {observation.call_uuid && <button className="text-link" type="button" onClick={() => openCallItem(observation.call_uuid, observation.item_ids[0] ?? "")}>Карточка</button>}
+    </li>)}</ul>}
+  </li>;
 }

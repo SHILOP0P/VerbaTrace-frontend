@@ -2038,7 +2038,7 @@ export interface CallProgressCriterion {
   previous: { call_uuid: string; occurred_at: string; score: number; item_id: string; can_open: boolean } | null;
   repeat_streak: number;
 }
-export interface CallGrowthObservation { area_uuid: string; title: string; verdict: "repeated" | "improved" | "not_applicable"; note: string; item_ids: string[] }
+export interface CallGrowthObservation { area_uuid: string; title: string; verdict: "new" | "repeated" | "improved" | "not_applicable"; note: string; item_ids: string[] }
 export interface CallProgress {
   available: boolean;
   unavailable_reason: "shared_call" | "internal_call" | "no_fixed_scorecard" | "no_analysis" | null;

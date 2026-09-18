@@ -1,10 +1,11 @@
-import { AlertTriangle, ArrowLeft, BarChart3, FileText, Headphones, ListChecks, Lock, RefreshCw, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, FileText, Headphones, ListChecks, Lock, RefreshCw, Settings2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
 import { SelectControl } from "../../shared/ui/primitives";
 import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
+import { AnalyticsSettingsCard } from "./AnalyticsSettings";
 import type {
   AnalyticsCapabilities, AnalyticsCriteriaResponse, AnalyticsCriterionCallsResponse, AnalyticsCriterionRow, AnalyticsDepartmentRow,
   AnalyticsDepartmentsResponse, AnalyticsEmployeeRow, AnalyticsEmployeesResponse, AnalyticsFilters, AnalyticsMatrixResponse,
@@ -56,6 +57,7 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   const [instruction, setInstruction] = useState("");
   const [includeInternal, setIncludeInternal] = useState(false);
   const [excludeShared, setExcludeShared] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +79,9 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   if (capabilitiesError) return <section className="app-page analytics-page"><EmptyState icon={<AlertTriangle size={28} />} title="Аналитика недоступна" text={capabilitiesError} /></section>;
   if (!capabilities) return <section className="app-page analytics-page"><div className="analytics-skeleton" /></section>;
 
+  // The company's settings are the owner's and the deputy's; a personal account
+  // sets up its own.
+  const canSetUp = capabilities.scope === "personal" || capabilities.role === "company_manager" || capabilities.role === "company_deputy";
   // A profile belongs to one person, so the department filter only matters on the team view.
   const header = <div className="analytics-toolbar">
     <PeriodSelect value={period} onChange={setPeriod} retentionDays={capabilities.retention_days} />
@@ -85,18 +90,22 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
     </SelectControl> : null}
     <label className="checkbox-row analytics-toggle"><input type="checkbox" checked={excludeShared} onChange={(event) => setExcludeShared(event.target.checked)} /><span>Без совместных</span></label>
     <label className="checkbox-row analytics-toggle"><input type="checkbox" checked={includeInternal} onChange={(event) => setIncludeInternal(event.target.checked)} /><span>Включая внутренние</span></label>
+    {canSetUp && <button className="ghost-button small analytics-settings-button" type="button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((value) => !value)}><Settings2 size={16} />Настройки</button>}
   </div>;
+  const settingsCard = settingsOpen && canSetUp ? <AnalyticsSettingsCard companyId={workspace || undefined} onClose={() => setSettingsOpen(false)} /> : null;
 
   if (ownOnly || profileUserId) {
     return <section className="app-page analytics-page">
       {!ownOnly ? <button className="ghost-button small analytics-back" type="button" onClick={backToTeam}><ArrowLeft size={16} />К команде</button> : null}
       {header}
+      {settingsCard}
       <ProfileView userId={ownOnly ? "me" : profileUserId!} filters={profileFilters} onOpenCall={onOpenCall} onNavigate={onNavigate} />
     </section>;
   }
   return <section className="app-page analytics-page">
     <div className="app-page-heading"><div><h1>Аналитика</h1><p>Средние баллы по критериям, сотрудникам и отделам — из проверенных звонков.</p></div></div>
     {header}
+    {settingsCard}
     <TeamView capabilities={capabilities} filters={filters} instruction={instruction} onInstruction={setInstruction} onNavigate={onNavigate} onOpenCall={onOpenCall} />
   </section>;
 }

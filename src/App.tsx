@@ -678,6 +678,7 @@ function App() {
           <OverviewPage
             calls={calls}
             callsVersion={calls.map((call) => `${call.id}:${call.status}:${call.created_at}`).join("|")}
+            onNavigate={navigate}
           />
       )}
 

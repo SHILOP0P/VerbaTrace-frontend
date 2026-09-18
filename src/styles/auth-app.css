@@ -5723,6 +5723,41 @@ html[data-theme="light"] .app-shell .timeline-step.processing::before {
   color: var(--app-muted);
 }
 
+.overview-insights-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin: 24px 0 0;
+}
+
+.overview-insights-head h2 {
+  margin: 0;
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 18px;
+}
+
+.overview-insights-head .icon-button {
+  flex: none;
+  color: var(--app-muted);
+}
+
+.overview-insights-head .is-spinning {
+  animation: overview-refresh-spin 0.9s linear infinite;
+}
+
+@keyframes overview-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-insights-head .is-spinning {
+    animation: none;
+  }
+}
+
 .analytics-insight-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

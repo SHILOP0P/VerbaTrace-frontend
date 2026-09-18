@@ -4,12 +4,14 @@ import {
   CheckCircle2,
   Clock3,
   Phone,
+  RefreshCw,
   Star
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api";
 import type {
   AnalyticsOverviewResponse,
+  AppPage,
   CallResponse,
   ProcessingMonitoringResponse
 } from "../../types";
@@ -20,11 +22,33 @@ import {
   formatScore
 } from "../../shared/lib/analysis";
 import { formatDuration } from "../../shared/lib/formatters";
+import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { sparklineCoordinates, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./sparkline-geometry";
 
-export function OverviewPage({ calls, callsVersion }: { calls: CallResponse[]; callsVersion: string }) {
+/**
+ * The overview follows the company chosen in the header, like the calls list:
+ * a company shows that company, the personal workspace shows only personal
+ * calls, and a device where nothing was chosen yet sees everything it can reach.
+ */
+function overviewFilters(workspaceCompanyId: string | null): Parameters<typeof api.getAnalyticsOverview>[0] {
+  if (workspaceCompanyId === null) return {};
+  return workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" };
+}
+
+export function OverviewPage({
+  calls,
+  callsVersion,
+  onNavigate
+}: {
+  calls: CallResponse[];
+  callsVersion: string;
+  onNavigate?: (page: AppPage) => void;
+}) {
+  const workspaceCompanyId = useWorkspaceCompanyId();
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverviewResponse | null>(null);
   const [processingMonitoring, setProcessingMonitoring] = useState<ProcessingMonitoringResponse | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const avgDuration = analyticsOverview?.average_duration_seconds === null || analyticsOverview === null
     ? "Нет данных"
     : formatDuration(Math.round(analyticsOverview.average_duration_seconds));
@@ -36,16 +60,17 @@ export function OverviewPage({ calls, callsVersion }: { calls: CallResponse[]; c
     ? "нет данных"
     : `${formatScore(analyticsScore.score)} / ${analyticsScore.scale}`;
 
+  // The aggregates read every visible analysis, so they are fetched when the
+  // calls change, when the tab comes back and on request — never on a timer.
   useEffect(() => {
     let cancelled = false;
-    let intervalId = 0;
 
     async function loadOverview() {
-      const overview = await api.getAnalyticsOverview().catch(() => null);
-      const monitoring = await api.getProcessingMonitoring().catch(() => null);
+      setRefreshing(true);
+      const overview = await api.getAnalyticsOverview(overviewFilters(workspaceCompanyId)).catch(() => null);
       if (!cancelled) {
         setAnalyticsOverview(overview);
-        setProcessingMonitoring(monitoring);
+        setRefreshing(false);
       }
     }
 
@@ -54,17 +79,35 @@ export function OverviewPage({ calls, callsVersion }: { calls: CallResponse[]; c
     }
 
     void loadOverview();
-    intervalId = window.setInterval(loadOverview, 5000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
     };
-  }, [callsVersion]);
+  }, [callsVersion, workspaceCompanyId, refreshToken]);
+
+  // The queue counters are cheap and move by the second, so they keep polling.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMonitoring() {
+      const monitoring = await api
+        .getProcessingMonitoring(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : undefined)
+        .catch(() => null);
+      if (!cancelled) setProcessingMonitoring(monitoring);
+    }
+
+    void loadMonitoring();
+    const intervalId = window.setInterval(loadMonitoring, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [workspaceCompanyId]);
 
   return (
     <section className="dashboard-page app-page">
@@ -91,12 +134,32 @@ export function OverviewPage({ calls, callsVersion }: { calls: CallResponse[]; c
         />
       </div>
 
-      <AnalyticsOverviewInsights overview={analyticsOverview} />
+      <div className="overview-insights-head">
+        <h2>Качество разговоров</h2>
+        <button
+          className="icon-button"
+          type="button"
+          onClick={() => setRefreshToken((token) => token + 1)}
+          disabled={refreshing}
+          title="Обновить"
+          aria-label="Обновить аналитику"
+        >
+          <RefreshCw size={18} className={refreshing ? "is-spinning" : undefined} />
+        </button>
+      </div>
+
+      <AnalyticsOverviewInsights overview={analyticsOverview} onNavigate={onNavigate} />
     </section>
   );
 }
 
-function AnalyticsOverviewInsights({ overview }: { overview: AnalyticsOverviewResponse | null; }) {
+function AnalyticsOverviewInsights({
+  overview,
+  onNavigate
+}: {
+  overview: AnalyticsOverviewResponse | null;
+  onNavigate?: (page: AppPage) => void;
+}) {
   const distribution = overview?.score_distribution;
   const distributionRows = distribution
     ? [
@@ -113,24 +176,49 @@ function AnalyticsOverviewInsights({ overview }: { overview: AnalyticsOverviewRe
   const outcomes = overview?.business_outcomes ?? [];
   const nextSteps = overview?.next_step_summary;
   const topics = overview?.top_topics ?? [];
+  // Older servers do not send the flag; they had no plan check at all.
+  const teamAnalytics = overview?.team_analytics_enabled !== false;
+
+  const distributionCard = (
+    <InsightCard title="Распределение оценок" note="шкала 0-100">
+      {distributionRows.length === 0 ? (
+        <p className="analysis-empty">Нет данных по распределению.</p>
+      ) : (
+        <div className="score-distribution-list">
+          {distributionRows.map(([key, label, count]) => (
+            <div className="score-distribution-row" key={key}>
+              <span>{label}</span>
+              <strong>{count}</strong>
+              <i style={{ "--bar": overview?.calls_analyzed ? `${Math.min(100, (count / overview.calls_analyzed) * 100)}%` : "0%" } as React.CSSProperties} />
+            </div>
+          ))}
+        </div>
+      )}
+    </InsightCard>
+  );
+
+  if (!teamAnalytics) {
+    return (
+      <div className="analytics-insight-grid">
+        {distributionCard}
+        <InsightCard title="Командная аналитика" note="не входит в тариф компании">
+          <p className="analysis-empty">
+            Разбор по критериям, темам и итогам звонков доступен на старших бизнес-тарифах.
+            Общий балл и распределение оценок остаются на любом тарифе.
+          </p>
+          {onNavigate ? (
+            <button className="ghost-button small" type="button" onClick={() => onNavigate("settingsTariffs")}>
+              Посмотреть тарифы
+            </button>
+          ) : null}
+        </InsightCard>
+      </div>
+    );
+  }
 
   return (
     <div className="analytics-insight-grid">
-      <InsightCard title="Распределение оценок" note="шкала 0-100">
-        {distributionRows.length === 0 ? (
-          <p className="analysis-empty">Нет данных по распределению.</p>
-        ) : (
-          <div className="score-distribution-list">
-            {distributionRows.map(([key, label, count]) => (
-              <div className="score-distribution-row" key={key}>
-                <span>{label}</span>
-                <strong>{count}</strong>
-                <i style={{ "--bar": overview?.calls_analyzed ? `${Math.min(100, (count / overview.calls_analyzed) * 100)}%` : "0%" } as React.CSSProperties} />
-              </div>
-            ))}
-          </div>
-        )}
-      </InsightCard>
+      {distributionCard}
 
       <InsightCard title="Слабые критерии" note="по пропущенным и частичным критериям">
         {weakCriteria.length === 0 ? (

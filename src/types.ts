@@ -1306,6 +1306,8 @@ export interface AnalyticsOverviewResponse {
     duration_by_day: Array<{ date: string; average_duration_seconds: number }>;
     risks_by_day: Array<{ date: string; count: number }>;
   };
+  /** False when a company's plan has no team analytics: the breakdowns come empty. */
+  team_analytics_enabled?: boolean;
 }
 
 export interface CallFolderResponse {

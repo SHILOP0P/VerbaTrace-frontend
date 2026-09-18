@@ -276,7 +276,7 @@ export function analysisV3Result(analysis?: AnalysisResponse): AnalysisV3Result 
       status:(stringValue(raw.status) as AnalysisV3Result["items"][number]["status"]) ?? "not_assessed",
       weight:finiteNumber(raw.weight) ?? 1, score:finiteNumber(raw.score), explanation:stringValue(raw.explanation) ?? "", strengths:stringList(raw.strengths), gaps,
       improvement_kind:(stringValue(raw.improvement_kind) as AnalysisV3Result["items"][number]["improvement_kind"]) ?? "not_needed",
-      improvement:stringValue(raw.improvement) ?? null, evidence:evidenceList(raw.evidence), instruction_sources:stringList(raw.instruction_sources),
+      improvement:stringValue(raw.improvement) ?? null, evidence:evidenceList(raw.evidence), instruction_sources:stringList(raw.instruction_sources), instruction_titles:stringList(raw.instruction_titles),
       criterion_key:stringValue(raw.criterion_key), scorecard_uuid:stringValue(raw.scorecard_uuid), is_critical:raw.is_critical === true
     }];
   }).sort((a,b)=>a.order-b.order);

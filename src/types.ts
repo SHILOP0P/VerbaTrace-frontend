@@ -1909,7 +1909,7 @@ export interface AnalysisV3Item {
   fulfilled_earlier: boolean; answer_summary: string | null; status: AnalysisV3Status; weight: number; score: number | null;
   explanation: string; strengths: string[]; gaps: AnalysisV3Gap[];
   improvement_kind: "grounded_answer" | "advice" | "clarification_needed" | "not_needed";
-  improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[];
+  improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[]; instruction_titles: string[];
   // Set on requirement cards scored by an instruction's scorecard.
   criterion_key?: string; scorecard_uuid?: string; is_critical?: boolean;
 }

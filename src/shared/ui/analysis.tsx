@@ -263,7 +263,7 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
       <div className="analysis-v3-items">{visibleItems.map(item=><details id={`analysis-item-${item.id}`} className={`analysis-v3-item ${item.processing_status === "pending" ? "is-pending" : "is-ready"}`} key={item.id}>
         <summary><span className="analysis-item-icon"><CircleHelp size={19}/></span><span className="analysis-item-title"><strong>{displayText(item.title)}{item.is_critical && <span className="analysis-critical-badge">Критичный</span>}</strong><small>{item.kind === "question" && itemSpeaker(item) ? transcriptionSpeakerLabel(itemSpeaker(item), speakerAssignments) : kindLabels[item.kind]}{item.fulfilled_earlier ? " · Ответ прозвучал ранее" : ""}</small></span><span className={`analysis-score-badge ${scoreTone(item.score)}`}>{item.processing_status === "pending" ? "Ожидает" : item.score === null ? statusLabels[item.status] ?? item.status : <><strong>{formatScore(item.score)}</strong><small>баллов</small></>}</span><ChevronDown className="analysis-item-chevron" size={18}/></summary>
         <div className="analysis-v3-item-body">
-          {(item.question_parts?.length ?? 0) > 1 && <div className="analysis-detail-box neutral"><b>Части вопроса</b><AnalysisStringList items={item.question_parts!.map(displayText)} emptyLabel="" /></div>}
+          {item.kind === "question" && (item.question_parts?.length ?? 0) > 1 && <div className="analysis-detail-box neutral"><b>Части вопроса</b><AnalysisStringList items={item.question_parts!.map(displayText)} emptyLabel="" /></div>}
           {item.processing_status !== "pending" && item.kind === "question" && <div className="analysis-detail-box neutral"><b>Покрытие вопроса</b><p>{item.asked === true ? "Вопрос задан явно" : item.asked === false ? "Отдельный вопрос не задавался" : "Нельзя однозначно определить, задавался ли вопрос"}{item.information_status ? ` · Ответ ${informationLabels[item.information_status] ?? item.information_status}` : ""}{item.fulfilled_earlier ? " · Нужная информация прозвучала раньше и засчитана без штрафа" : ""}.</p></div>}
           {item.answer_summary && <div className="analysis-detail-box answer"><MessageSquareText/><div><b>{item.kind === "question" ? "Ответ" : "Что произошло"}</b><p>{displayText(item.answer_summary)}</p></div></div>}
           <div className="analysis-detail-box feedback"><Sparkles/><div><b>Разбор ответа</b><p>{displayText(item.explanation)}</p></div></div>
@@ -271,12 +271,18 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
           {item.gaps.length > 0 && <div className="analysis-detail-box warning"><TriangleAlert/><div><b>Что не раскрыто</b><ul className="analysis-list">{item.gaps.map((gap,index)=><li key={`${item.id}-gap-${index}`}><span>{displayText(gap.text)}</span>{gap.explanation && <small>{displayText(gap.explanation)}</small>}</li>)}</ul></div></div>}
           {item.improvement_kind !== "not_needed" && <div className="analysis-detail-box reference"><BookOpen/><div><b>{improvementLabels[item.improvement_kind]}</b><p>{displayText(item.improvement ?? "Недостаточно фактов для готового варианта ответа.")}</p></div></div>}
           {item.criterion_key && item.instruction_sources[0] ? <div className="analysis-detail-box neutral"><b>Основание в инструкции</b><p><button className="analysis-criterion-link" type="button" onClick={() => openInstructionCriterion(item.instruction_sources[0], item.criterion_key!)}><ListChecks size={15}/>Критерий в инструкции</button></p></div>
-            : item.instruction_sources.length > 0 && <div className="analysis-detail-box neutral"><b>Основание в инструкции</b><AnalysisStringList items={item.instruction_sources} emptyLabel="" /></div>}
+            : item.instruction_sources.length > 0 && <div className="analysis-detail-box neutral"><b>Основание в инструкции</b><AnalysisStringList items={instructionNames(item)} emptyLabel="" /></div>}
           {item.evidence.length > 0 && <div className="analysis-detail-box evidence"><Quote/><div><CriterionEvidence evidence={item.evidence} quote="" onActivate={onEvidenceActivate} /></div></div>}
         </div>
       </details>)}</div>{visibleItems.length === 0 && <p className="analysis-empty">У выбранного спикера вопросы не найдены.</p>}
     </AnalysisSection>
   </div>;
+}
+
+// A card names its instruction by title. Analyses saved before titles were
+// stored have identifiers only, and an identifier is never shown.
+function instructionNames(item: { instruction_sources: string[]; instruction_titles: string[] }) {
+  return item.instruction_sources.map((_, index) => item.instruction_titles[index] || "Инструкция звонка");
 }
 
 function openInstructionCriterion(instructionId: string, criterionKey: string) {

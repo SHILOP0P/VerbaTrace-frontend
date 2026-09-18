@@ -1067,7 +1067,7 @@ export function CallsPage({
           <Play size={14} fill="currentColor" />
         </span>
         <span className="call-row-main">
-          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} />
+          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
           <strong>{call.title}</strong>
           <small>
             {formatDate(call.display_time || call.occurred_at || call.created_at)} · {formatDuration(call.duration_seconds)}

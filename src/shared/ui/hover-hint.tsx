@@ -18,8 +18,8 @@ function hintHost() {
 }
 
 /** A small info icon beside a label that explains it. */
-export function InfoHint({ label, text }: { label: string; text: string }) {
-  return <HoverHint className="info-hint" label={label} detail={text}><Info size={13} aria-label={text} /></HoverHint>;
+export function InfoHint({ label, text }: { label: string; text: string | string[] }) {
+  return <HoverHint className="info-hint" label={label} detail={text}><Info size={13} aria-label={typeof text === "string" ? text : text.join(" ")} /></HoverHint>;
 }
 
 /**
@@ -29,7 +29,8 @@ export function InfoHint({ label, text }: { label: string; text: string }) {
  */
 export function HoverHint({ label, detail, children, className = "", style, focusable = true }: {
   label: ReactNode;
-  detail?: ReactNode;
+  /** A list is shown line by line: what the number is, then what to compare it with. */
+  detail?: ReactNode | string[];
   children?: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -87,7 +88,7 @@ export function HoverHint({ label, detail, children, className = "", style, focu
       style={{ left: placement?.left ?? 0, top: placement?.top ?? 0, "--hint-arrow": `${placement?.arrow ?? 0}px` } as CSSProperties}
     >
       <strong>{label}</strong>
-      {detail ? <span>{detail}</span> : null}
+      {Array.isArray(detail) ? detail.map((line, index) => <span key={index}>{line}</span>) : detail ? <span>{detail}</span> : null}
     </span>, hintHost()) : null}
   </span>;
 }

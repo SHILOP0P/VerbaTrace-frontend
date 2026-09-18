@@ -2401,6 +2401,28 @@ html[data-theme="dark"] .app-shell .select-menu {
   color: var(--app-accent-strong);
 }
 
+/* A test call is not a processing state, so it gets a colour of its own
+   rather than the orange that means "in progress". */
+.app-shell .status-chip.test {
+  color: #8cc4ff;
+  background: rgba(99, 167, 255, 0.14);
+  border: 1px solid rgba(140, 196, 255, 0.3);
+}
+
+.app-shell :is(.call-row, .dashboard-call-row, .selected-call-card) .status-chip.test {
+  color: #8cc4ff;
+}
+
+html[data-theme="light"] .app-shell .status-chip.test,
+html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row, .selected-call-card) .status-chip.test {
+  color: #2a6fb8;
+}
+
+html[data-theme="light"] .app-shell .status-chip.test {
+  background: rgba(99, 167, 255, 0.16);
+  border-color: rgba(42, 111, 184, 0.24);
+}
+
 .dashboard-detail-panel {
   display: grid;
   gap: 18px;
@@ -7917,7 +7939,7 @@ html[data-theme="dark"] .app-shell :is(.instruction-mini-list strong, .instructi
 }
 
 .app-shell :is(.call-row, .dashboard-call-row) .status-chip,
-html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row) .status-chip:is(.ok, .warn, .bad) {
+html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row) .status-chip:is(.ok, .warn, .bad, .test) {
   background: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;

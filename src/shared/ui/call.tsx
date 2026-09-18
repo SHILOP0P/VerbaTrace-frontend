@@ -37,15 +37,19 @@ export function StatusChip({
   status,
   analysisStatus,
   label,
-  transcriptionOnly = false
+  transcriptionOnly = false,
+  isTest = false
 }: {
   status: CallStatus;
   analysisStatus?: AnalysisResponse["status"];
   label?: string;
   transcriptionOnly?: boolean;
+  /** A test call is marked in its own blue, apart from the processing colours. */
+  isTest?: boolean;
 }) {
   const transcriptReady = transcriptionOnly && status === "transcribed" && !analysisStatus;
-  return <span className={`status-chip ${transcriptReady ? "ok" : callStatusTone(status, analysisStatus)}`}>{label ?? (transcriptReady ? "Транскрипция готова" : callStatusChip(status, analysisStatus))}</span>;
+  const tone = isTest ? "test" : transcriptReady ? "ok" : callStatusTone(status, analysisStatus);
+  return <span className={`status-chip ${tone}`}>{label ?? (transcriptReady ? "Транскрипция готова" : callStatusChip(status, analysisStatus))}</span>;
 }
 
 export function StatusTimeline({

@@ -618,7 +618,7 @@ export function CallDetailPanel({
           <PhoneCall size={22} />
         </div>
         <div className="selected-call-main">
-          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} />
+          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
           <strong>{call.title}</strong>
           <small>
             {formatDate(call.created_at)} · {formatDuration(call.duration_seconds)} ·{" "}

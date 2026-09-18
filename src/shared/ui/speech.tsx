@@ -4,16 +4,17 @@ import type { AnalyticsSpeech, CallSpeech } from "../../types";
 import { speakerColor } from "../lib/speaker-colors";
 import { HoverHint, InfoHint } from "./hover-hint";
 
-// Vendor reference points go into tooltips only, with their source: the numbers
-// are observations, not a grade, and nothing is called good or bad.
+// Each hint is two short lines: what the number is, then a reference point with
+// its source. The numbers are observations, not a grade, so nothing is called
+// good or bad.
 export const speechHints = {
-  talk_share: "Доля речи — длительность реплик спикера к сумме всех реплик. Ориентиры: Gong — 43 : 57 у продавца и клиента; Avoma — 40–60 %.",
-  longest_monologue: "Самая длинная реплика без перерыва (реплики склеиваются при паузе меньше 3 с, как в AWS). Ориентиры: Gong — до 2:30; Fathom помечает монологи от 90 с.",
-  words_per_minute: "Слов в минуту внутри своих реплик (AWS AverageWordsPerMinute). Ориентир Avoma — 100–180.",
-  questions_per_hour: "Вопросы — предложения с «?», приведённые к часу разговора. Ориентир Gong — от 18 в час.",
-  response_pause: "Выдержка перед ответом — медиана паузы «собеседник закончил → спикер начал» (Gong patience). Ориентиры: Gong — 0,6–1 с; Avoma — от 1,25 с.",
-  switches: "Живость диалога — смены говорящего за 5 минут; реплики короче трёх слов («да», «угу») не считаются (Gong interactivity).",
-  pauses: "Долгие паузы — разрывы между репликами от 4 с (UIS).",
+  talk_share: ["Какую часть разговора говорил спикер.", "Ориентир для продавца: 40–60 % (Gong, Avoma)."],
+  longest_monologue: ["Самая долгая речь без перерыва. Паузы короче 3 с её не прерывают.", "Ориентир: не дольше 1,5–2,5 мин (Fathom, Gong)."],
+  words_per_minute: ["Сколько слов в минуту, пока спикер говорит.", "Ориентир: 100–180 (Avoma)."],
+  questions_per_hour: ["Сколько вопросов задано в пересчёте на час разговора.", "Ориентир: от 18 (Gong)."],
+  response_pause: ["Сколько спикер обычно ждёт, прежде чем ответить.", "Ориентир: 0,6–1 с (Gong)."],
+  switches: ["Сколько раз за 5 минут сменился говорящий. Короткие «да», «угу» не считаются."],
+  pauses: ["Молчание между репликами от 4 секунд."],
 };
 
 export function formatSeconds(seconds: number | null | undefined) {
@@ -61,7 +62,7 @@ export function CallSpeechBlock({ speech }: { speech?: CallSpeech | null }) {
       </li>)}
     </ul>
     <p className="speech-call">
-      <span>Смен говорящего за 5 минут: <b>{speech.speaker_switches_per_5min?.toLocaleString("ru-RU") ?? "—"}</b> <InfoHint label="Живость диалога" text={speechHints.switches} /></span>
+      <span>Смен говорящего за 5 минут: <b>{speech.speaker_switches_per_5min?.toLocaleString("ru-RU") ?? "—"}</b> <InfoHint label="Смены говорящего" text={speechHints.switches} /></span>
       <span>Долгих пауз: <b>{speech.pauses_over_threshold}</b>, самая длинная {formatSeconds(speech.longest_pause_seconds)} <InfoHint label="Долгие паузы" text={speechHints.pauses} /></span>
     </p>
   </section>;
@@ -72,7 +73,7 @@ export function SpeechComparison({ own, median, personal = false }: { own: Analy
   if (!own) return <p className="analytics-muted">{personal
     ? "Нет звонков, где вы отмечены спикером: речь считается только по своему спикеру. Отметьте себя в редакторе расшифровки — «Это я»."
     : "Нет звонков, где сотрудник привязан к спикеру: речь считается только по своему спикеру."}</p>;
-  const rows: Array<[string, string, string, string]> = [
+  const rows: Array<[string, string, string, string[]]> = [
     ["Доля речи", formatShare(own.talk_share), formatShare(median?.talk_share), speechHints.talk_share],
     ["Самый длинный монолог", formatSeconds(own.longest_monologue_seconds), formatSeconds(median?.longest_monologue_seconds), speechHints.longest_monologue],
     ["Темп, сл/мин", String(own.words_per_minute ?? "—"), String(median?.words_per_minute ?? "—"), speechHints.words_per_minute],

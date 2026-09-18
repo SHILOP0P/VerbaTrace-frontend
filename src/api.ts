@@ -298,6 +298,7 @@ const apiErrorMessages: Record<string, string> = {
   invalid_growth_area_reason: "Укажите, почему зона скрывается",
   growth_area_not_dismissed: "Зона уже не скрыта",
   notification_channel_unavailable: "Почта и Telegram появятся позже",
+  invalid_password_reset_token: "Ссылка устарела или уже использована. Запросите новую",
   invalid_notification_subscription: "Неизвестное событие или канал",
   invalid_call_subjects: "Сотрудниками звонка могут быть только активные участники его компании",
   call_subjects_locked: "У личного звонка один сотрудник — тот, кто его загрузил",
@@ -1177,6 +1178,18 @@ export const api = {
       `/admin/users/${encodeURIComponent(userId)}/calls${queryString(input)}`,
     );
   },
+  getAuthCapabilities() {
+    return request<{ password_reset_enabled: boolean }>("/auth/capabilities");
+  },
+
+  requestPasswordReset(email: string) {
+    return request<void>("/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email }) });
+  },
+
+  confirmPasswordReset(token: string, newPassword: string) {
+    return request<void>("/auth/password-reset/confirm", { method: "POST", body: JSON.stringify({ token, new_password: newPassword }) });
+  },
+
   login(input: LoginRequest) {
     return request<AuthResponse>("/auth/login", {
       method: "POST",

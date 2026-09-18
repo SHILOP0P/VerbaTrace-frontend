@@ -9732,3 +9732,4 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
 .bitrix-crm-toggle input { margin-top: 3px; }
 .bitrix-crm-toggle > span { display: grid; gap: 3px; min-width: 0; }
 .bitrix-crm-toggle small { color: var(--app-muted); font-size: 12px; line-height: 1.45; }
+.form-notice { padding: 10px 12px; color: var(--app-text, #2d221b); font-size: 14px; line-height: 1.45; background: color-mix(in srgb, #2f9e57 12%, transparent); border: 1px solid color-mix(in srgb, #2f9e57 30%, transparent); border-radius: 10px; }

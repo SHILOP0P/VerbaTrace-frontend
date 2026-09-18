@@ -150,6 +150,21 @@ export function CallDetailPanel({
   const analysisCardRef = useRef<HTMLDivElement | null>(null);
   const displayedAnalysis = applyEffectiveAnalysis(analysis, reviewContext?.effective_analysis);
   const score = analysisScore100(displayedAnalysis);
+  // A link from analytics names the card a number rests on: open it once the
+  // analysis is on the page.
+  useEffect(() => {
+    if (!call?.id || !analysis) return;
+    const query = new URLSearchParams(window.location.search);
+    const item = query.get("item");
+    if (query.get("call") !== call.id || !item) return;
+    requestAnimationFrame(() => {
+      const card = document.getElementById(`analysis-item-${item}`);
+      if (card instanceof HTMLDetailsElement) {
+        card.open = true;
+        card.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    });
+  }, [call?.id, analysis]);
   const canEditAnalysis = !call?.is_test && reviewContext?.capabilities.can_edit_analysis === true;
   const canDisputeAnalysis = !call?.is_test && reviewContext?.capabilities.can_dispute_analysis === true;
 

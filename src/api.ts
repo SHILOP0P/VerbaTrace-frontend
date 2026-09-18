@@ -85,6 +85,16 @@ import type {
   ScorecardCriterionEdit,
   CallSubject,
   CallSubjectCandidate,
+  AnalyticsCapabilities,
+  AnalyticsCriteriaResponse,
+  AnalyticsCriterionCallsResponse,
+  AnalyticsDepartmentsResponse,
+  AnalyticsEmployeesResponse,
+  AnalyticsFilters,
+  AnalyticsMatrixResponse,
+  AnalyticsProfile,
+  AnalyticsSettings,
+  AnalyticsSummary,
   SupportAccessJournalEntry,
   SearchResponse,
   Subscription,
@@ -278,6 +288,8 @@ const apiErrorMessages: Record<string, string> = {
     "Этот анализ уже находится на пересмотре",
   quality_review_failed: "Не удалось сохранить изменения анализа",
   call_edit_forbidden: "Вы можете только просматривать этот звонок",
+  personal_progress_access_denied: "Личный прогресс доступен на тарифах Plus и Pro",
+  analytics_settings_conflict: "Настройки изменили в другом окне",
   invalid_call_subjects: "Сотрудниками звонка могут быть только активные участники его компании",
   call_subjects_locked: "У личного звонка один сотрудник — тот, кто его загрузил",
   scorecard_not_found: "Критерии этой версии не найдены",
@@ -2621,6 +2633,47 @@ export const api = {
     return request<void>(`/reports/${encodeURIComponent(reportId)}`, {
       method: "DELETE",
     });
+  },
+
+  getAnalyticsCapabilities(filters: AnalyticsFilters) {
+    return request<AnalyticsCapabilities>(`/analytics/capabilities${queryString(filters)}`);
+  },
+
+  getAnalyticsSummary(filters: AnalyticsFilters) {
+    return request<AnalyticsSummary>(`/analytics/summary${queryString(filters)}`);
+  },
+
+  getAnalyticsCriteria(filters: AnalyticsFilters & { sort?: string; order?: "asc" | "desc" }) {
+    return request<AnalyticsCriteriaResponse>(`/analytics/criteria${queryString(filters)}`);
+  },
+
+  getAnalyticsEmployees(filters: AnalyticsFilters) {
+    return request<AnalyticsEmployeesResponse>(`/analytics/employees${queryString(filters)}`);
+  },
+
+  getAnalyticsDepartments(filters: AnalyticsFilters) {
+    return request<AnalyticsDepartmentsResponse>(`/analytics/departments${queryString(filters)}`);
+  },
+
+  getAnalyticsMatrix(filters: AnalyticsFilters & { instruction_uuid: string }) {
+    return request<AnalyticsMatrixResponse>(`/analytics/matrix${queryString(filters)}`);
+  },
+
+  // "me" is the viewer's own profile.
+  getAnalyticsProfile(userId: string, filters: AnalyticsFilters) {
+    return request<AnalyticsProfile>(`/analytics/employees/${encodeURIComponent(userId)}${queryString(filters)}`);
+  },
+
+  getAnalyticsCriterionCalls(criterionKey: string, filters: AnalyticsFilters & { status?: string; sort?: "occurred_at" | "score"; limit?: number; offset?: number }) {
+    return request<AnalyticsCriterionCallsResponse>(`/analytics/criteria/${encodeURIComponent(criterionKey)}/calls${queryString(filters)}`);
+  },
+
+  getCompanyAnalyticsSettings(companyId: string) {
+    return request<AnalyticsSettings>(`/companies/${encodeURIComponent(companyId)}/analytics-settings`);
+  },
+
+  updateCompanyAnalyticsSettings(companyId: string, input: { lock_version: number; critical_alert_threshold?: number; growth_areas_enabled?: boolean }) {
+    return request<AnalyticsSettings>(`/companies/${encodeURIComponent(companyId)}/analytics-settings`, { method: "PATCH", body: JSON.stringify(input) });
   },
 
   getAnalyticsOverview(filters?: {

@@ -36,6 +36,7 @@ import { ActionDetailPage, ActionsPage } from "./features/actions/ActionsPage";
 import { ContactsPage } from "./features/contacts/ContactsPage";
 import { InstructionsPage } from "./features/instructions/InstructionsPage";
 import { InstructionHistoryPage } from "./features/instructions/InstructionHistoryPage";
+import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { InstructionComparePage } from "./features/instructions/InstructionComparePage";
 import { NewInstructionPage } from "./features/instructions/NewInstructionPage";
 import { InvitationsPage } from "./features/invitations/InvitationsPage";
@@ -423,6 +424,16 @@ function App() {
     }
   }
 
+  // openCallAt opens a call on the analysis card an analytics number rests on,
+  // and plays the recording from that moment.
+  function openCallAt(callId: string, itemId?: string, seconds?: number | null) {
+    openCallPage(callId);
+    const url = new URL(window.location.href);
+    if (itemId) url.searchParams.set("item", itemId);
+    if (seconds !== undefined && seconds !== null) url.searchParams.set("evidence_time", String(seconds));
+    window.history.replaceState({}, "", url);
+  }
+
   function openCallPage(callId: string, nextPage: AppPage = "calls") {
     setShowPublicLanding(false);
     setPage(nextPage);
@@ -679,11 +690,21 @@ function App() {
       onToggleTheme={toggleTheme}
       onLogout={logout}
     >
+      {(page === "teamAnalytics" || page === "teamAnalyticsEmployee") && (
+        <AnalyticsPage
+          departments={departments}
+          profileUserId={page === "teamAnalyticsEmployee" ? decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "") : undefined}
+          onNavigate={navigate}
+          onOpenCall={openCallAt}
+        />
+      )}
+
       {page === "overview" && (
           <OverviewPage
             calls={calls}
             callsVersion={calls.map((call) => `${call.id}:${call.status}:${call.created_at}`).join("|")}
             onNavigate={navigate}
+            onOpenCall={openCallAt}
           />
       )}
 

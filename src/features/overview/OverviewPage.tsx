@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api";
 import type {
   AnalyticsOverviewResponse,
+  AnalyticsSummary,
   AppPage,
   CallResponse,
   ProcessingMonitoringResponse
@@ -23,6 +24,8 @@ import {
 } from "../../shared/lib/analysis";
 import { formatDuration } from "../../shared/lib/formatters";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
+import { TrendChart } from "../../shared/ui/analytics-ui";
+import { WorthListening, type OpenCallAt } from "../analytics/AnalyticsPage";
 import { sparklineCoordinates, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./sparkline-geometry";
 
 /**
@@ -38,14 +41,19 @@ function overviewFilters(workspaceCompanyId: string | null): Parameters<typeof a
 export function OverviewPage({
   calls,
   callsVersion,
-  onNavigate
+  onNavigate,
+  onOpenCall
 }: {
   calls: CallResponse[];
   callsVersion: string;
   onNavigate?: (page: AppPage) => void;
+  onOpenCall?: OpenCallAt;
 }) {
   const workspaceCompanyId = useWorkspaceCompanyId();
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverviewResponse | null>(null);
+  // The team's dynamics and the calls worth listening to come from the facts;
+  // a plan without them simply leaves the two cards empty.
+  const [teamSummary, setTeamSummary] = useState<AnalyticsSummary | null>(null);
   const [processingMonitoring, setProcessingMonitoring] = useState<ProcessingMonitoringResponse | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,9 +75,13 @@ export function OverviewPage({
 
     async function loadOverview() {
       setRefreshing(true);
-      const overview = await api.getAnalyticsOverview(overviewFilters(workspaceCompanyId)).catch(() => null);
+      const [overview, summary] = await Promise.all([
+        api.getAnalyticsOverview(overviewFilters(workspaceCompanyId)).catch(() => null),
+        api.getAnalyticsSummary(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" }).catch(() => null),
+      ]);
       if (!cancelled) {
         setAnalyticsOverview(overview);
+        setTeamSummary(summary);
         setRefreshing(false);
       }
     }
@@ -148,17 +160,21 @@ export function OverviewPage({
         </button>
       </div>
 
-      <AnalyticsOverviewInsights overview={analyticsOverview} onNavigate={onNavigate} />
+      <AnalyticsOverviewInsights overview={analyticsOverview} summary={teamSummary} onNavigate={onNavigate} onOpenCall={onOpenCall} />
     </section>
   );
 }
 
 function AnalyticsOverviewInsights({
   overview,
-  onNavigate
+  summary,
+  onNavigate,
+  onOpenCall
 }: {
   overview: AnalyticsOverviewResponse | null;
+  summary: AnalyticsSummary | null;
   onNavigate?: (page: AppPage) => void;
+  onOpenCall?: OpenCallAt;
 }) {
   const distribution = overview?.score_distribution;
   const distributionRows = distribution
@@ -171,11 +187,6 @@ function AnalyticsOverviewInsights({
     ] as Array<[string, string, number]>
     : [];
   const weakCriteria = overview?.top_weak_criteria ?? [];
-  const criteriaSummary = overview?.criteria_summary ?? [];
-  const issueCodes = overview?.top_issue_codes ?? [];
-  const outcomes = overview?.business_outcomes ?? [];
-  const nextSteps = overview?.next_step_summary;
-  const topics = overview?.top_topics ?? [];
   // Older servers do not send the flag; they had no plan check at all.
   const teamAnalytics = overview?.team_analytics_enabled !== false;
 
@@ -240,83 +251,24 @@ function AnalyticsOverviewInsights({
         )}
       </InsightCard>
 
-      <InsightCard title="Критерии" note="«Не применимо» считается отдельно">
-        {criteriaSummary.length === 0 ? (
-          <p className="analysis-empty">Сводка критериев пока пустая.</p>
+      <InsightCard title="Динамика команды" note="средний балл по дням">
+        {!summary ? (
+          <p className="analysis-empty">Динамика появится, когда накопятся оценённые звонки.</p>
         ) : (
-          <div className="analytics-list">
-            {criteriaSummary.slice(0, 6).map((item, index) => (
-              <div className="analytics-list-row criteria" key={item.code}>
-                <div>
-                  <strong>{item.title || `Критерий ${index + 1}`}</strong>
-                  <small>
-                    {item.met} выполнено · {item.partially_met} частично · {item.missed} пропущено ·{" "}
-                    {item.not_applicable} не применимо
-                  </small>
-                </div>
-                <span>{formatNullableScore(item.average_score)}</span>
-              </div>
-            ))}
-          </div>
+          <TrendChart points={summary.trend} markers={summary.markers} label="Средний балл" />
         )}
       </InsightCard>
 
-      <InsightCard title="Коды проблем" note="частые коды проблем">
-        {issueCodes.length === 0 ? (
-          <p className="analysis-empty">Коды проблем не указаны.</p>
+      <InsightCard title="Стоит послушать" note="слабые звонки и критичные пропуски">
+        {!summary || !onOpenCall ? (
+          <p className="analysis-empty">Слабых звонков за период нет.</p>
         ) : (
-          <div className="topic-list analytics-topic-list">
-            {issueCodes.slice(0, 10).map((item, index) => (
-              <span key={item.code}>{issueCodeLabel(item.code, index)} · {item.count}</span>
-            ))}
-          </div>
-        )}
-      </InsightCard>
-
-      <InsightCard title="Темы" note="самые частые темы">
-        {topics.length === 0 ? (
-          <p className="analysis-empty">Темы пока не найдены.</p>
-        ) : (
-          <div className="topic-list analytics-topic-list">
-            {topics.slice(0, 10).map((item) => (
-              <span key={item.title}>{item.title} · {item.count}</span>
-            ))}
-          </div>
-        )}
-      </InsightCard>
-
-      <InsightCard title="Итоги звонков" note="бизнес-результат разговора">
-        {outcomes.length === 0 ? (
-          <p className="analysis-empty">Итоги звонков не указаны.</p>
-        ) : (
-          <div className="analytics-list compact">
-            {outcomes.slice(0, 6).map((item) => (
-              <div className="analytics-list-row" key={item.status}>
-                <strong>{enumLabel(item.status, businessOutcomeLabels) ?? "Неясный итог"}</strong>
-                <span>{item.count}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </InsightCard>
-
-      <InsightCard title="Следующий шаг" note="качество договоренности">
-        {!nextSteps ? (
-          <p className="analysis-empty">Сводка следующих шагов пустая.</p>
-        ) : (
-          <div className="analytics-list compact">
-            <MetricLine label="Есть шаг" value={nextSteps.with_next_step} />
-            <MetricLine label="Конкретный" value={nextSteps.specific} />
-            <MetricLine label="Со сроком" value={nextSteps.with_deadline} />
-            <MetricLine label="С ответственным" value={nextSteps.with_responsible_person} />
-            <MetricLine label="Отсутствует" value={nextSteps.missing} />
-          </div>
+          <WorthListening items={summary.worth_listening ?? []} onOpenCall={onOpenCall} />
         )}
       </InsightCard>
     </div>
   );
 }
-
 function InsightCard({
   title,
   note,

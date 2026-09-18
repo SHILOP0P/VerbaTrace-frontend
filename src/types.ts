@@ -1,5 +1,7 @@
 export type AppPage =
   | "overview"
+  | "teamAnalytics"
+  | "teamAnalyticsEmployee"
   | "calls"
   | "transcriptionEdit"
   | "transcriptionCompare"
@@ -1972,4 +1974,72 @@ export interface AdminAuditTrailResponse {
   total: number;
   limit: number;
   offset: number;
+}
+// Analytics built on facts (spec, section 18).
+export type AnalyticsSample = "none" | "low" | "thin" | "ok";
+export interface AnalyticsPeriod { from: string; to: string; previous_from: string; previous_to: string; bucket: "day" | "week" | "month"; timezone: string }
+export interface AnalyticsDelta { value: number | null; significant: boolean; comparable: boolean; criteria_changed: boolean }
+export interface AnalyticsTrendPoint { bucket: string; avg: number | null; n: number }
+export interface AnalyticsMarker { date: string; kind: "instruction_version" | "judge_changed"; label: string }
+export interface AnalyticsCapabilities {
+  scope: "company" | "personal"; role: "company_manager" | "company_deputy" | "department_leader" | "employee" | "personal";
+  team_analytics_enabled: boolean; personal_progress_enabled: boolean; can_view_company: boolean; can_view_departments: boolean;
+  can_view_employees: boolean; department_uuids: string[]; own_profile_only: boolean; min_sample: number; thin_sample: number;
+  timezone: string; retention_days: number;
+}
+export interface AnalyticsSummary {
+  period: AnalyticsPeriod; calls_total: number; calls_analyzed: number; calls_without_fixed_scorecard: number; calls_shared: number;
+  calls_internal_excluded: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample;
+  critical_missed: number; trend: AnalyticsTrendPoint[]; markers: AnalyticsMarker[]; company_avg_score?: number | null;
+  worth_listening?: AnalyticsWorthListening[];
+}
+export interface AnalyticsInstructionRef { uuid: string; title: string; deleted: boolean }
+export interface AnalyticsDistribution { met: number; mostly_met: number; partially_met: number; minimally_met: number; missed: number }
+export interface AnalyticsCriterionRow {
+  criterion_key: string; title: string; instruction: AnalyticsInstructionRef; weight: number; is_critical: boolean;
+  n_scored: number; n_not_applicable: number; n_unassessed: number; avg_score: number | null; pass_rate: number | null;
+  delta: AnalyticsDelta; sample: AnalyticsSample; distribution: AnalyticsDistribution; trend: AnalyticsTrendPoint[]; sort_rank: number;
+}
+export interface AnalyticsCriteriaResponse { period: AnalyticsPeriod; criteria: AnalyticsCriterionRow[]; total: number }
+export interface AnalyticsWeakestCriterion { criterion_key: string; title: string; avg_score: number }
+export interface AnalyticsTeamRow { calls: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample; trend: AnalyticsTrendPoint[] }
+export interface AnalyticsEmployeeRow {
+  user_uuid: string; full_name: string; avatar_url: string | null; department: { uuid: string; name: string } | null;
+  is_former_member: boolean; is_me: boolean; calls: number; calls_shared: number; avg_score: number | null; avg_criteria_score: number | null;
+  delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number; weakest_criterion: AnalyticsWeakestCriterion | null; speech: unknown; trend: AnalyticsTrendPoint[];
+}
+export interface AnalyticsEmployeesResponse { period: AnalyticsPeriod; team: AnalyticsTeamRow | null; employees: AnalyticsEmployeeRow[]; total: number }
+export interface AnalyticsDepartmentRow {
+  department_uuid: string; name: string; employees: number; calls: number; avg_score: number | null; avg_criteria_score: number | null;
+  delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number; weakest_criterion: AnalyticsWeakestCriterion | null; trend: AnalyticsTrendPoint[];
+}
+export interface AnalyticsDepartmentsResponse { period: AnalyticsPeriod; company: AnalyticsTeamRow | null; departments: AnalyticsDepartmentRow[]; total: number }
+export interface AnalyticsMatrixResponse {
+  period: AnalyticsPeriod; instruction: AnalyticsInstructionRef;
+  criteria: Array<{ criterion_key: string; title: string; is_critical: boolean }>;
+  rows: Array<{ user_uuid: string; full_name: string; cells: Array<{ criterion_key: string; avg_score: number | null; n: number; sample: AnalyticsSample }> }>;
+}
+export interface AnalyticsWorthListening { call_uuid: string; title: string; occurred_at: string; overall_score: number | null; critical_missed: number; can_open: boolean }
+export interface AnalyticsProfile {
+  period: AnalyticsPeriod;
+  employee: { user_uuid: string; full_name: string; department: { uuid: string; name: string } | null; is_former_member: boolean };
+  totals: { calls: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number };
+  trend: AnalyticsTrendPoint[];
+  reference: { label: string; avg_score: number | null; trend: AnalyticsTrendPoint[]; hidden: boolean };
+  criteria: Array<{ criterion_key: string; title: string; instruction: AnalyticsInstructionRef; own_avg: number | null; own_n: number; reference_avg: number | null; delta: AnalyticsDelta; sample: AnalyticsSample }>;
+  worth_listening: AnalyticsWorthListening[];
+}
+export interface AnalyticsCriterionCall {
+  call_uuid: string; title: string; occurred_at: string; employees: Array<{ user_uuid: string; full_name: string }>;
+  status: string; score: number | null; score_source: "ai" | "human"; item_id: string; evidence_start_seconds: number | null;
+  is_shared: boolean; subjects_changed_manually: boolean; can_open: boolean;
+}
+export interface AnalyticsCriterionCallsResponse {
+  criterion: { criterion_key: string; title: string; instruction: AnalyticsInstructionRef };
+  calls: AnalyticsCriterionCall[]; total: number; limit: number; offset: number;
+}
+export interface AnalyticsSettings { critical_alert_threshold: number; growth_areas_enabled: boolean; lock_version: number; updated_at: string }
+export interface AnalyticsFilters {
+  company_uuid?: string; scope?: "personal"; department_uuid?: string; employee_uuid?: string; instruction_uuid?: string;
+  from?: string; to?: string; include_internal?: boolean; exclude_shared?: boolean;
 }

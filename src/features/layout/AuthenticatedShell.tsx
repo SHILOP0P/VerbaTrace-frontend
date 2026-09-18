@@ -41,7 +41,7 @@ import { notificationPresentation } from "../../shared/ui/notification-presentat
 import { ToolButton } from "../assistant/AssistantControls";
 import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
 
-const MOBILE_NAV_PAGES: AppPage[] = ["overview", "calls", "actions", "reports"];
+const MOBILE_NAV_PAGES: AppPage[] = ["overview", "teamAnalytics", "calls", "qualityReviews"];
 
 export function AuthenticatedShell({
   activePage,

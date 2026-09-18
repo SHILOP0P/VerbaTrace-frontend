@@ -28,6 +28,7 @@ export function notificationPresentation(notification: NotificationResponse) {
   if (type === "scorecard_review_needed") return { tone: "warning" as const, label: "Проверьте критерии", icon: ListChecks };
   if (type === "critical_call_alert") return { tone: "danger" as const, label: "Провальный звонок", icon: CircleAlert };
   if (type === "weekly_digest_ready") return { tone: "info" as const, label: "Итоги недели", icon: BarChart3 };
+  if (type === "password_changed") return { tone: "warning" as const, label: "Пароль изменён", icon: ShieldAlert };
   if (type === "call_subject_marked" || type === "call_subjects_changed") return { tone: "info" as const, label: type === "call_subject_marked" ? "Отметка в звонке" : "Состав звонка", icon: Users };
   if (type === "invitation") return { tone: "invitation" as const, label: "Приглашение", icon: UserPlus };
   if (type === "action_completed" || type === "report_ready") return { tone: "success" as const, label: type === "report_ready" ? "Отчёт готов" : "Выполнено", icon: type === "report_ready" ? FileCheck2 : CheckCircle2 };

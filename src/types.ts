@@ -25,6 +25,7 @@ export type AppPage =
   | "settingsCompanies"
   | "settingsInstructions"
   | "settingsPrivacy"
+  | "settingsNotifications"
   | "settingsInvitations"
   | "profile"
   | "profileEdit"
@@ -2065,6 +2066,12 @@ export interface AnalyticsCriterionCall {
 export interface AnalyticsCriterionCallsResponse {
   criterion: { criterion_key: string; title: string; instruction: AnalyticsInstructionRef };
   calls: AnalyticsCriterionCall[]; total: number; limit: number; offset: number;
+}
+export interface NotificationSubscription {
+  kind: "weekly_digest" | "critical_call_alert";
+  channel: "in_app" | "email" | "telegram";
+  enabled: boolean;
+  available: boolean;
 }
 export interface AnalyticsSettings { critical_alert_threshold: number; growth_areas_enabled: boolean; lock_version: number; updated_at: string }
 export interface AnalyticsFilters {

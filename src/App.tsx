@@ -49,6 +49,7 @@ import { DevicesPage, ProfileEditPage, ProfilePage } from "./features/profile/Pr
 import { AiReportsPage } from "./features/reports/AiReportsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { PrivacySettingsPage } from "./features/settings/PrivacySettingsPage";
+import { NotificationSettingsPage } from "./features/settings/NotificationSettingsPage";
 import { TariffsPage } from "./features/tariffs/TariffsPage";
 import { IntegrationsPage } from "./features/integrations/IntegrationsPage";
 import { UploadPage } from "./features/upload/UploadPage";
@@ -481,6 +482,11 @@ function App() {
       openCallPage(notification.entity_uuid);
       return;
     }
+    if (notification.type === "weekly_digest_ready") {
+      window.history.pushState({}, "", "/app/analytics?period=last_week");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     if (notification.entity_type === "company" && notification.entity_uuid) {
       openCompany(notification.entity_uuid);
       return;
@@ -844,6 +850,7 @@ function App() {
 
       {page === "settings" && <SettingsPage onNavigate={navigate} />}
       {page === "settingsPrivacy" && <PrivacySettingsPage companies={companies} departments={departments} onBack={() => navigate("settings")} />}
+      {page === "settingsNotifications" && <NotificationSettingsPage onBack={() => navigate("settings")} />}
 
       {page === "settingsInstructions" && (
         <InstructionsPage

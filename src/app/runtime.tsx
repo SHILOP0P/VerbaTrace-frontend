@@ -66,6 +66,7 @@ export const pageRoutes: Record<AppPage, string> = {
   settingsInstructions: "/app/instructions",
   settingsPrivacy: "/app/settings/privacy",
   settingsInvitations: "/app/settings/invitations",
+  settingsNotifications: "/app/settings/notifications",
   profile: "/app/profile",
   profileEdit: "/app/profile/edit",
   profileDevices: "/app/settings/devices",
@@ -124,6 +125,11 @@ export const settingsRoutes: Array<{ page: AppPage; label: string; description: 
     page: "settingsPrivacy",
     label: "Защита данных",
     description: "Русские смысловые маркеры, доступ к оригиналу и очищенные записи."
+  },
+  {
+    page: "settingsNotifications",
+    label: "Уведомления",
+    description: "Итоги недели и провальные звонки: что приходит и куда."
   },
   {
     page: "profileDevices",

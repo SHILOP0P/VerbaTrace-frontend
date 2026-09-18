@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowLeft, BarChart3, FileText, Headphones, ListChecks, 
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
-import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
+import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, lastWeekPeriod, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
 import { SelectControl } from "../../shared/ui/primitives";
 import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
 import { AnalyticsSettingsCard } from "./AnalyticsSettings";
@@ -52,7 +52,8 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   const base = useMemo<AnalyticsFilters>(() => workspace ? { company_uuid: workspace } : { scope: "personal" }, [workspace]);
   const [capabilities, setCapabilities] = useState<AnalyticsCapabilities>();
   const [capabilitiesError, setCapabilitiesError] = useState("");
-  const [period, setPeriod] = useState<PeriodValue>({ preset: "30" });
+  // The weekly digest opens the page on the week it summed up.
+  const [period, setPeriod] = useState<PeriodValue>(() => new URLSearchParams(window.location.search).get("period") === "last_week" ? lastWeekPeriod() : { preset: "30" });
   const [department, setDepartment] = useState("");
   const [instruction, setInstruction] = useState("");
   const [includeInternal, setIncludeInternal] = useState(false);

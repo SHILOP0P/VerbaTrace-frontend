@@ -9708,3 +9708,23 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
 .analytics-worth span { display: grid; gap: 2px; min-width: 0; }
 .analytics-worth small { color: var(--app-muted); }
 .analytics-worth b { font-size: 18px; }
+
+.notification-settings-page { display: grid; gap: 16px; align-content: start; }
+.notification-settings-page > .ghost-button { justify-self: start; }
+.notification-matrix { display: grid; padding: 6px 18px; border-radius: 18px; }
+.notification-matrix-row { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 120px); align-items: center; gap: 8px 16px; padding: 14px 0; border-top: 1px solid var(--app-border); }
+.notification-matrix-row.is-head { border-top: 0; color: var(--app-muted); font-size: 12px; font-weight: 800; }
+.notification-matrix-row.is-head em { margin-left: 6px; padding: 1px 6px; font-size: 11px; font-style: normal; background: var(--app-panel-soft); border-radius: 999px; }
+.notification-matrix-event { display: grid; gap: 3px; min-width: 0; }
+.notification-matrix-event small { color: var(--app-muted); font-size: 12px; line-height: 1.45; }
+.notification-matrix-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.notification-matrix-cell input { width: 18px; height: 18px; accent-color: var(--app-accent); }
+.notification-matrix-cell input:disabled { opacity: .45; cursor: not-allowed; }
+.notification-matrix-channel { display: none; color: var(--app-muted); font-size: 13px; }
+@media (max-width: 640px) {
+  .notification-matrix-row { grid-template-columns: minmax(0, 1fr); }
+  .notification-matrix-row.is-head { display: none; }
+  .notification-matrix-row.is-head + .notification-matrix-row { border-top: 0; }
+  .notification-matrix-cell { justify-content: flex-start; }
+  .notification-matrix-channel { display: inline; }
+}

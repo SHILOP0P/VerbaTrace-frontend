@@ -77,6 +77,18 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, pinned, initia
 
 export type PeriodValue = { preset: "7" | "30" | "90" | "custom"; from?: string; to?: string };
 
+/** The previous Monday-to-Sunday week, which the weekly digest links to. */
+export function lastWeekPeriod(): PeriodValue {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) - 7);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const day = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  return { preset: "custom", from: day(monday), to: day(sunday) };
+}
+
 /** The RFC 3339 window of a period in the viewer's zone, or nothing for the default. */
 export function periodRange(value: PeriodValue): { from?: string; to?: string } {
   const endOfToday = new Date();

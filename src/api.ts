@@ -1,4 +1,5 @@
 import type {
+  NotificationSubscription,
   CallProgress,
   EmployeeGrowthArea,
   EmployeeProgress,
@@ -296,6 +297,8 @@ const apiErrorMessages: Record<string, string> = {
   growth_area_not_found: "Зона роста не найдена или скрывать её вам нельзя",
   invalid_growth_area_reason: "Укажите, почему зона скрывается",
   growth_area_not_dismissed: "Зона уже не скрыта",
+  notification_channel_unavailable: "Почта и Telegram появятся позже",
+  invalid_notification_subscription: "Неизвестное событие или канал",
   invalid_call_subjects: "Сотрудниками звонка могут быть только активные участники его компании",
   call_subjects_locked: "У личного звонка один сотрудник — тот, кто его загрузил",
   scorecard_not_found: "Критерии этой версии не найдены",
@@ -2688,6 +2691,14 @@ export const api = {
 
   updateCompanyAnalyticsSettings(companyId: string, input: { lock_version: number; critical_alert_threshold?: number; growth_areas_enabled?: boolean }) {
     return request<AnalyticsSettings>(`/companies/${encodeURIComponent(companyId)}/analytics-settings`, { method: "PATCH", body: JSON.stringify(input) });
+  },
+
+  getNotificationSubscriptions() {
+    return request<{ items: NotificationSubscription[] }>("/notification-subscriptions");
+  },
+
+  updateNotificationSubscriptions(items: Array<Pick<NotificationSubscription, "kind" | "channel" | "enabled">>) {
+    return request<{ items: NotificationSubscription[] }>("/notification-subscriptions", { method: "PUT", body: JSON.stringify({ items }) });
   },
 
   getPersonalAnalyticsSettings() {

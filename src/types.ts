@@ -360,6 +360,8 @@ export interface UpdatePreferencesRequest {
 
 export interface CallAccess {
   can_edit: boolean;
+  // Owner, deputy or department leader: they alone say whom a call counts for.
+  can_manage_subjects?: boolean;
   via: "uploader" | "management" | "subject";
 }
 

@@ -25,6 +25,7 @@ import type {
   AppPage,
   CallFolderResponse,
   CallResponse,
+  CallSubjectCandidate,
   CallAction,
   CallStatus,
   CompanyResponse,
@@ -614,7 +615,7 @@ export function CallDetailPanel({
             {formatDate(call.created_at)} · {formatDuration(call.duration_seconds)} ·{" "}
             {contextLabel(call, companies, departments)}
           </small>
-          <CallSubjectMarks call={call} />
+          <CallSubjectMarks call={call} onChanged={(changes) => onCallUpdated?.({ ...call, ...changes })} />
           {!call.is_test && score.score !== null && (
             <span className="call-score-chip">Оценка {formatScore(score.percent)} / 100</span>
           )}
@@ -888,19 +889,72 @@ function isCompanyCall(call: CallResponse) {
 
 // Whom the call counts for, whether it is shared or internal, and who can open
 // it. A marked employee learns why they see a call they did not upload.
-function CallSubjectMarks({ call }: { call: CallResponse }) {
+function CallSubjectMarks({ call, onChanged }: { call: CallResponse; onChanged: (changes: Partial<CallResponse>) => void }) {
+  const [editing, setEditing] = useState(false);
   const subjects = call.subjects ?? [];
   if (!isCompanyCall(call) || (subjects.length === 0 && !call.access)) return null;
   const marked = subjects.filter((subject) => subject.grants_access).map((subject) => subject.full_name).filter(Boolean);
   const names = subjects.map((subject) => subject.is_primary && subjects.length > 1 ? `${subject.full_name} (основной)` : subject.full_name).filter(Boolean);
+  if (editing) return <CallSubjectsEditor call={call} onClose={() => setEditing(false)} onSaved={(changes) => { setEditing(false); onChanged(changes); }} />;
   return <div className="call-subject-marks">
     {names.length > 0 && <span className="call-subject-names"><Users size={14} />{names.join(", ")}</span>}
+    {call.access?.can_manage_subjects && !call.is_test && <button className="text-link call-subject-edit" type="button" onClick={() => setEditing(true)}>Изменить</button>}
     {call.is_shared && <span className="call-subject-chip" title="В разговоре несколько сотрудников компании: оценка засчитывается каждому">Совместный</span>}
     {call.is_internal && <span className="call-subject-chip" title="Все участники — сотрудники компании. По умолчанию такой звонок не входит в аналитику">Внутренний</span>}
     {call.subjects_changed_manually && <span className="call-subject-chip is-muted" title="Состав сотрудников звонка меняли вручную">Состав менялся вручную</span>}
     {call.access && <span className="call-access-line">{call.access.via === "subject"
       ? "Вас отметили в звонке: вы видите его, а менять могут загрузивший и руководство."
       : `Доступен загрузившему и руководству${marked.length ? `, а также отмеченным: ${marked.join(", ")}` : ""}.`}</span>}
+  </div>;
+}
+
+// Management says whom a call counts for when speaker matching got it wrong. The
+// choice holds until it is returned to automatic, and the call is marked as
+// changed by hand wherever its scores are shown.
+function CallSubjectsEditor({ call, onClose, onSaved }: { call: CallResponse; onClose: () => void; onSaved: (changes: Partial<CallResponse>) => void }) {
+  const [candidates, setCandidates] = useState<CallSubjectCandidate[]>();
+  const [selected, setSelected] = useState<string[]>(() => (call.subjects ?? []).map((subject) => subject.user_uuid));
+  const [primary, setPrimary] = useState(() => (call.subjects ?? []).find((subject) => subject.is_primary)?.user_uuid ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    api.listCallSubjectCandidates(call.id).then((value) => { if (!cancelled) setCandidates(value.items); })
+      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Не удалось загрузить сотрудников"); });
+    return () => { cancelled = true; };
+  }, [call.id]);
+
+  const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const effectivePrimary = selected.includes(primary) ? primary : selected[0] ?? "";
+  const save = async (userIds: string[]) => {
+    setBusy(true); setError("");
+    try {
+      const result = await api.setCallSubjects(call.id, userIds.length ? { user_uuids: userIds, primary_user_uuid: effectivePrimary } : { user_uuids: [] });
+      onSaved(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось сохранить");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <div className="call-subjects-editor">
+    <strong>Чьи показатели учитывают этот звонок</strong>
+    <small>Отмеченные увидят звонок на чтение. Изменение попадёт в журнал, а в аналитике у звонка будет пометка «состав менялся вручную».</small>
+    {!candidates && !error && <small>Загружаю сотрудников…</small>}
+    {candidates && <ul>
+      {candidates.map((candidate) => <li key={candidate.user_uuid}>
+        <label className="checkbox-row"><input type="checkbox" checked={selected.includes(candidate.user_uuid)} onChange={() => toggle(candidate.user_uuid)} /><span>{candidate.full_name || candidate.username}</span></label>
+        {selected.length > 1 && selected.includes(candidate.user_uuid) && <label className="call-subjects-primary"><input type="radio" name="call-subject-primary" checked={effectivePrimary === candidate.user_uuid} onChange={() => setPrimary(candidate.user_uuid)} />основной</label>}
+      </li>)}
+    </ul>}
+    {error && <small className="form-error">{error}</small>}
+    <div className="call-subjects-editor-actions">
+      <button className="primary-button small" type="button" disabled={busy || !candidates || selected.length === 0} onClick={() => void save(selected)}>Сохранить</button>
+      {(call.subjects ?? []).some((subject) => subject.source === "manual") && <button className="ghost-button small" type="button" disabled={busy} onClick={() => void save([])}>Определять автоматически</button>}
+      <button className="ghost-button small" type="button" disabled={busy} onClick={onClose}>Отмена</button>
+    </div>
   </div>;
 }
 

@@ -1,4 +1,6 @@
 import type {
+  CallProgress,
+  EmployeeProgress,
   AdminCapabilitiesResponse,
   AdminCompanyLifecycleResponse,
   AdminCompanyResponse,
@@ -2662,6 +2664,14 @@ export const api = {
   // "me" is the viewer's own profile.
   getAnalyticsProfile(userId: string, filters: AnalyticsFilters) {
     return request<AnalyticsProfile>(`/analytics/employees/${encodeURIComponent(userId)}${queryString(filters)}`);
+  },
+
+  getEmployeeProgress(userId: string, filters: AnalyticsFilters) {
+    return request<EmployeeProgress>(`/analytics/employees/${encodeURIComponent(userId)}/progress${queryString(filters)}`);
+  },
+
+  getCallProgress(callId: string) {
+    return request<CallProgress>(`/calls/${encodeURIComponent(callId)}/progress`);
   },
 
   getAnalyticsCriterionCalls(criterionKey: string, filters: AnalyticsFilters & { status?: string; sort?: "occurred_at" | "score"; limit?: number; offset?: number }) {

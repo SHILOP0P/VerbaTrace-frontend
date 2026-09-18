@@ -2031,6 +2031,32 @@ export interface AnalyticsProfile {
   criteria: Array<{ criterion_key: string; title: string; instruction: AnalyticsInstructionRef; own_avg: number | null; own_n: number; reference_avg: number | null; delta: AnalyticsDelta; sample: AnalyticsSample }>;
   worth_listening: AnalyticsWorthListening[];
 }
+export type ProgressVerdict = "fixed" | "repeated" | "new" | "holding" | "first_time";
+export interface CallProgressCriterion {
+  criterion_key: string; title: string; verdict: ProgressVerdict;
+  current: { score: number; item_id: string };
+  previous: { call_uuid: string; occurred_at: string; score: number; item_id: string; can_open: boolean } | null;
+  repeat_streak: number;
+}
+export interface CallGrowthObservation { area_uuid: string; title: string; verdict: "repeated" | "improved" | "not_applicable"; note: string; item_ids: string[] }
+export interface CallProgress {
+  available: boolean;
+  unavailable_reason: "shared_call" | "internal_call" | "no_fixed_scorecard" | "no_analysis" | null;
+  employee: { user_uuid: string; full_name: string } | null;
+  counts: { fixed: number; repeated: number; new: number; holding: number; first_time: number };
+  criteria: CallProgressCriterion[];
+  growth_areas: CallGrowthObservation[];
+}
+export interface EmployeeGrowthArea {
+  area_uuid: string; title: string; description: string; status: "open" | "resolved" | "dismissed";
+  occurrences: number; clean_streak: number; returned: boolean;
+  observations: Array<{ call_uuid: string; occurred_at: string; verdict: "new" | "repeated" | "improved" | "not_applicable"; note: string; item_ids: string[]; can_open: boolean }>;
+}
+export interface EmployeeProgress {
+  open: Array<{ criterion_key: string; title: string; last_score: number; repeat_streak: number; first_failed_at: string; last_call_uuid: string }>;
+  closed_in_period: Array<{ criterion_key: string; title: string; closed_at: string }>;
+  growth_areas: EmployeeGrowthArea[];
+}
 export interface AnalyticsCriterionCall {
   call_uuid: string; title: string; occurred_at: string; employees: Array<{ user_uuid: string; full_name: string }>;
   status: string; score: number | null; score_source: "ai" | "human"; item_id: string; evidence_start_seconds: number | null;

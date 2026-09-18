@@ -4,6 +4,7 @@ import { ApiError, api } from "../../api";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
 import { SelectControl } from "../../shared/ui/primitives";
+import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
 import type {
   AnalyticsCapabilities, AnalyticsCriteriaResponse, AnalyticsCriterionCallsResponse, AnalyticsCriterionRow, AnalyticsDepartmentRow,
   AnalyticsDepartmentsResponse, AnalyticsEmployeeRow, AnalyticsEmployeesResponse, AnalyticsFilters, AnalyticsMatrixResponse,
@@ -334,10 +335,7 @@ function ProfileView({ userId, filters, onOpenCall, onNavigate }: { userId: stri
         ]}
         rows={profile.criteria} rowKey={(row) => row.criterion_key} emptyText="Оценённых критериев за период нет." />
     </section>
-    <section className="analytics-block">
-      <h2>Работа над ошибками</h2>
-      <p className="analytics-muted">Здесь появится, какие ошибки прошлых звонков исправлены, какие повторились и какие новые.</p>
-    </section>
+    <EmployeeWorkOnMistakes userId={userId} filters={filters} onOpenCall={(callId) => onOpenCall(callId)} />
     <section className="analytics-block">
       <h2>Стоит послушать</h2>
       <WorthListening items={profile.worth_listening} onOpenCall={onOpenCall} />

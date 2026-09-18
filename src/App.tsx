@@ -479,6 +479,11 @@ function App() {
       window.dispatchEvent(new PopStateEvent("popstate"));
       return;
     }
+    if ((notification.type === "scorecard_failed" || notification.type === "scorecard_review_needed") && notification.entity_uuid) {
+      window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(notification.entity_uuid)}?tab=criteria`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     if (notification.type === "invitation") navigate("settingsInvitations");
     else if (notification.entity_type === "report") navigate("reports");
     else if (notification.entity_type === "instruction") navigate("settingsInstructions");

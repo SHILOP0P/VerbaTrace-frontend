@@ -199,6 +199,7 @@ function localizedUtcOffset(timeZone: string) {
 function walletReason(reason: string, sandbox: boolean) {
   if (!sandbox && reason === "transcription") return "Транскрибация звонка";
   if (!sandbox && reason === "analysis") return "Анализ звонка";
+  if (!sandbox && reason === "scorecard_compile") return "Подготовка критериев";
   if (!sandbox && reason === "deep_analysis") return "Глубокий анализ звонка";
   if (!sandbox && reason === "assistant_generation") return "Ответ помощника по звонкам";
   if (!sandbox && reason === "sandbox wallet add") return "Тестовое пополнение основного кошелька";

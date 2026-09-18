@@ -881,6 +881,65 @@ export interface AnalysisInstructionVersion {
   published_at: string;
 }
 
+export type ScorecardStatus = "not_compiled" | "queued" | "compiling" | "ready" | "failed";
+export type CriterionChangeKind = "new" | "unchanged" | "reworded";
+export type ScorecardEditableField = "title" | "weight" | "is_critical" | "enabled";
+
+export interface ScorecardCriterionRef {
+  criterion_key: string;
+  title: string;
+}
+
+export interface ScorecardCriterion {
+  criterion_key: string;
+  position: number;
+  title: string;
+  requirement: string;
+  source_excerpt: string;
+  applicability: string;
+  depth: string;
+  required_question: boolean;
+  cross_cutting: boolean;
+  weight: number;
+  is_critical: boolean;
+  enabled: boolean;
+  edited_fields: ScorecardEditableField[];
+  change_kind: CriterionChangeKind;
+  warnings: string[];
+  same_as: ScorecardCriterionRef | null;
+}
+
+export interface InstructionScorecard {
+  scorecard_uuid: string | null;
+  instruction_uuid: string;
+  instruction_title: string;
+  instruction_version_uuid: string;
+  instruction_version: number;
+  revision: number;
+  status: ScorecardStatus;
+  origin: "compiled" | "copied" | "edited" | "";
+  is_current: boolean;
+  awaiting_confirmation: boolean;
+  confirm_required: boolean;
+  lock_version: number;
+  compile_after: string | null;
+  enabled_count: number;
+  estimated_requests_per_call: number;
+  criteria: ScorecardCriterion[];
+  removed_criteria: ScorecardCriterionRef[];
+  error: { code: string; message: string } | null;
+  confirmed_at: string | null;
+  created_at: string | null;
+}
+
+export interface ScorecardCriterionEdit {
+  criterion_key: string;
+  title?: string;
+  weight?: number;
+  is_critical?: boolean;
+  enabled?: boolean;
+}
+
 export interface SubscriptionUsageResponse {
   subscription: Subscription;
   period_start: string;
@@ -1814,7 +1873,10 @@ export interface AnalysisV3Item {
   explanation: string; strengths: string[]; gaps: AnalysisV3Gap[];
   improvement_kind: "grounded_answer" | "advice" | "clarification_needed" | "not_needed";
   improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[];
+  // Set on requirement cards scored by an instruction's scorecard.
+  criterion_key?: string; scorecard_uuid?: string; is_critical?: boolean;
 }
+export type AnalysisScorecardMode = "fixed" | "partial" | "adhoc" | "none";
 export interface AnalysisV3Recommendation {
   id: string; title: string; action: string; reason: string; expected_result: string; item_ids: string[];
   affects_score: boolean; importance: number; impact: number | null; repetition: number;
@@ -1827,6 +1889,7 @@ export interface AnalysisV3Result {
   coverage: { status: "complete" | "partial"; actual_question_count: number; analyzed_actual_question_count: number; required_question_count: number; complete_without_separate_question: number; limitations: string[]; };
   overall_score: number | null; overall_score_label: string; items: AnalysisV3Item[];
   recommendations: AnalysisV3Recommendation[]; priority_recommendation_ids: string[];
+  scorecard_mode?: AnalysisScorecardMode;
 }
 
 export interface AssistantCapabilities { search_enabled:boolean; chat_enabled:boolean; aggregate_enabled:boolean; export_enabled:boolean; company_uuid:string; role:string; department_uuids:string[]; reason_code?:string }

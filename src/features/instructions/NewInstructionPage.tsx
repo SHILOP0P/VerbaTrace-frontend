@@ -57,7 +57,8 @@ export function NewInstructionPage({ session, companies, departments, department
       const instructionFile = mode === "editor" ? new File([markdown], `${safeName}.md`, { type: "text/markdown;charset=utf-8" }) : file!;
       const created = await api.createInstruction({ title: title.trim(), file: instructionFile, scope, companyUuid: scope !== "personal" ? companyId : undefined, departmentUuid: scope === "department" ? departmentId : undefined });
       onCreated(created);
-      window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(created.id)}`);
+      // The criteria tab starts compiling the new instruction at once.
+      window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(created.id)}?tab=criteria`);
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось создать инструкцию.");

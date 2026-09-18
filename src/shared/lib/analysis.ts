@@ -276,7 +276,8 @@ export function analysisV3Result(analysis?: AnalysisResponse): AnalysisV3Result 
       status:(stringValue(raw.status) as AnalysisV3Result["items"][number]["status"]) ?? "not_assessed",
       weight:finiteNumber(raw.weight) ?? 1, score:finiteNumber(raw.score), explanation:stringValue(raw.explanation) ?? "", strengths:stringList(raw.strengths), gaps,
       improvement_kind:(stringValue(raw.improvement_kind) as AnalysisV3Result["items"][number]["improvement_kind"]) ?? "not_needed",
-      improvement:stringValue(raw.improvement) ?? null, evidence:evidenceList(raw.evidence), instruction_sources:stringList(raw.instruction_sources)
+      improvement:stringValue(raw.improvement) ?? null, evidence:evidenceList(raw.evidence), instruction_sources:stringList(raw.instruction_sources),
+      criterion_key:stringValue(raw.criterion_key), scorecard_uuid:stringValue(raw.scorecard_uuid), is_critical:raw.is_critical === true
     }];
   }).sort((a,b)=>a.order-b.order);
   const coverage = recordField(record,"coverage");
@@ -289,7 +290,8 @@ export function analysisV3Result(analysis?: AnalysisResponse): AnalysisV3Result 
     schema_version:3, prompt_version:stringValue(record.prompt_version) ?? "", conversation_types:stringList(record.conversation_types), purpose:stringValue(record.purpose) ?? null,
     summary:stringValue(record.summary) ?? "", outcome:stringValue(record.outcome) ?? null, strengths:stringList(record.strengths), work_on:stringList(record.work_on),
     coverage:{status:coverage?.status === "complete" ? "complete" : "partial", actual_question_count:integerValue(coverage?.actual_question_count) ?? 0, analyzed_actual_question_count:integerValue(coverage?.analyzed_actual_question_count) ?? 0, required_question_count:integerValue(coverage?.required_question_count) ?? 0, complete_without_separate_question:integerValue(coverage?.complete_without_separate_question) ?? 0, limitations:stringList(coverage?.limitations)},
-    overall_score:finiteNumber(record.overall_score), overall_score_label:stringValue(record.overall_score_label) ?? "", items, recommendations, priority_recommendation_ids:stringList(record.priority_recommendation_ids)
+    overall_score:finiteNumber(record.overall_score), overall_score_label:stringValue(record.overall_score_label) ?? "", items, recommendations, priority_recommendation_ids:stringList(record.priority_recommendation_ids),
+    scorecard_mode:(["fixed","partial","adhoc","none"].includes(stringValue(record.scorecard_mode) ?? "") ? stringValue(record.scorecard_mode) as AnalysisV3Result["scorecard_mode"] : undefined)
   };
 }
 

@@ -81,6 +81,8 @@ import type {
   ReportResponse,
   ReportStatus,
   ReportsResponse,
+  InstructionScorecard,
+  ScorecardCriterionEdit,
   SupportAccessJournalEntry,
   SearchResponse,
   Subscription,
@@ -273,6 +275,13 @@ const apiErrorMessages: Record<string, string> = {
   quality_review_active_appeal_exists:
     "Этот анализ уже находится на пересмотре",
   quality_review_failed: "Не удалось сохранить изменения анализа",
+  scorecard_not_found: "Критерии этой версии не найдены",
+  scorecard_not_ready: "Критерии ещё готовятся",
+  scorecard_version_conflict: "Карту изменили в другом окне",
+  scorecard_invalid: "Такое изменение критериев недопустимо",
+  scorecard_limit: "Включено слишком много критериев: не больше 40",
+  scorecard_recompile_limited:
+    "Критерии только что пересобирались. Повторить можно через минуту",
 };
 
 type ApiPayload = Record<string, unknown>;
@@ -2806,6 +2815,72 @@ export const api = {
   getInstructionVersionFile(id: string, versionId: string) {
     return requestBlob(
       `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/file`,
+    );
+  },
+
+  getInstructionScorecard(id: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard`,
+    );
+  },
+
+  getInstructionVersionScorecard(id: string, versionId: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/scorecard`,
+    );
+  },
+
+  // Starts the compile of the latest version at once instead of after the
+  // quiet period; does nothing when the version already has a scorecard.
+  ensureInstructionScorecard(id: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/ensure`,
+      { method: "POST" },
+    );
+  },
+
+  editInstructionScorecard(
+    id: string,
+    input: {
+      lock_version: number;
+      criteria?: ScorecardCriterionEdit[];
+      confirm_required?: boolean;
+    },
+  ) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard`,
+      { method: "PATCH", body: JSON.stringify(input) },
+    );
+  },
+
+  recompileInstructionScorecard(id: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/recompile`,
+      { method: "POST" },
+    );
+  },
+
+  confirmInstructionScorecard(
+    id: string,
+    input: { scorecard_uuid: string; lock_version: number },
+  ) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/confirm`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  },
+
+  linkScorecardCriterion(id: string, criterionKey: string, canonicalKey: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/criteria/${encodeURIComponent(criterionKey)}/same-as`,
+      { method: "POST", body: JSON.stringify({ canonical_key: canonicalKey }) },
+    );
+  },
+
+  splitScorecardCriterion(id: string, criterionKey: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/criteria/${encodeURIComponent(criterionKey)}/split`,
+      { method: "POST" },
     );
   },
 

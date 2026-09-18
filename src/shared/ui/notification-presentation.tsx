@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleAlert,
   FileCheck2,
+  ListChecks,
   RefreshCw,
 	Send,
 	ShieldAlert,
@@ -21,6 +22,8 @@ export function notificationPresentation(notification: NotificationResponse) {
 	if (type === "support_access_decided") return { tone: "info" as const, label: "Доступ поддержки", icon: ShieldAlert };
 	if (type === "action_external_sync_requested") return { tone: "warning" as const, label: "Согласование Bitrix24", icon: Send };
 	if (type === "action_external_sync_decided") return { tone: "success" as const, label: "Отправка в Bitrix24", icon: Send };
+  if (type === "scorecard_failed") return { tone: "danger" as const, label: "Критерии не готовы", icon: CircleAlert };
+  if (type === "scorecard_review_needed") return { tone: "warning" as const, label: "Проверьте критерии", icon: ListChecks };
   if (type === "invitation") return { tone: "invitation" as const, label: "Приглашение", icon: UserPlus };
   if (type === "action_completed" || type === "report_ready") return { tone: "success" as const, label: type === "report_ready" ? "Отчёт готов" : "Выполнено", icon: type === "report_ready" ? FileCheck2 : CheckCircle2 };
   if (type === "action_cancelled" || type === "processing_failed") return { tone: "danger" as const, label: type === "processing_failed" ? "Ошибка обработки" : "Отменено", icon: type === "processing_failed" ? CircleAlert : XCircle };

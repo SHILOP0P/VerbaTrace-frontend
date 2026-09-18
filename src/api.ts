@@ -83,6 +83,8 @@ import type {
   ReportsResponse,
   InstructionScorecard,
   ScorecardCriterionEdit,
+  CallSubject,
+  CallSubjectCandidate,
   SupportAccessJournalEntry,
   SearchResponse,
   Subscription,
@@ -275,6 +277,9 @@ const apiErrorMessages: Record<string, string> = {
   quality_review_active_appeal_exists:
     "Этот анализ уже находится на пересмотре",
   quality_review_failed: "Не удалось сохранить изменения анализа",
+  call_edit_forbidden: "Вы можете только просматривать этот звонок",
+  invalid_call_subjects: "Сотрудниками звонка могут быть только активные участники его компании",
+  call_subjects_locked: "У личного звонка один сотрудник — тот, кто его загрузил",
   scorecard_not_found: "Критерии этой версии не найдены",
   scorecard_not_ready: "Критерии ещё готовятся",
   scorecard_version_conflict: "Карту изменили в другом окне",
@@ -2815,6 +2820,21 @@ export const api = {
   getInstructionVersionFile(id: string, versionId: string) {
     return requestBlob(
       `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/file`,
+    );
+  },
+
+  // Employees of the call's company who may be marked as its speakers; only
+  // those who may change the call get the list.
+  listCallSubjectCandidates(callId: string) {
+    return request<{ items: CallSubjectCandidate[] }>(
+      `/calls/${encodeURIComponent(callId)}/subject-candidates`,
+    );
+  },
+
+  setCallSubjects(callId: string, input: { user_uuids: string[]; primary_user_uuid?: string }) {
+    return request<{ subjects: CallSubject[]; is_shared: boolean; is_internal: boolean; subjects_changed_manually: boolean }>(
+      `/calls/${encodeURIComponent(callId)}/subjects`,
+      { method: "PUT", body: JSON.stringify(input) },
     );
   },
 

@@ -356,6 +356,28 @@ export interface UpdatePreferencesRequest {
   date_range?: PreferencesDateRange;
 }
 
+export interface CallAccess {
+  can_edit: boolean;
+  via: "uploader" | "management" | "subject";
+}
+
+export interface CallSubject {
+  user_uuid: string;
+  full_name: string;
+  source: "uploader" | "speaker_match" | "manual";
+  is_primary: boolean;
+  grants_access: boolean;
+  speaker_key: string | null;
+  talk_share: number | null;
+  match_signals: string[];
+}
+
+export interface CallSubjectCandidate {
+  user_uuid: string;
+  full_name: string;
+  username: string;
+}
+
 export interface CallResponse {
   transcription_only?: boolean;
   id: string;
@@ -397,6 +419,12 @@ export interface CallResponse {
   ingest_error_code?: string | null;
   has_analysis?: boolean;
   has_actions?: boolean;
+  // Only on a single call: how the viewer reaches it and whom it counts for.
+  access?: CallAccess;
+  subjects?: CallSubject[];
+  is_shared?: boolean;
+  is_internal?: boolean;
+  subjects_changed_manually?: boolean;
   created_at: string;
   privacy?: CallPrivacy;
 }

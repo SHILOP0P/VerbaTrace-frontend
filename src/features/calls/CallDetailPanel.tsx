@@ -12,6 +12,7 @@ import {
   PhoneCall,
   RotateCcw,
   Trash2,
+  Users,
   WandSparkles
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -353,6 +354,8 @@ export function CallDetailPanel({
   const transcriptionState = transcriptionCardState(call, transcription);
   const analysisState = analysisCardState(call, analysis);
   const transcriptionOnly = Boolean(call.transcription_only && !analysis && call.status !== "analyzed");
+  // A marked employee reads the call; the server says so and the page follows.
+  const canEditCall = call.access?.can_edit !== false;
 
   function openEvidence(target: MediaSeekTarget) {
     const words = localTranscription?.words ?? [];
@@ -477,7 +480,7 @@ export function CallDetailPanel({
             <CloudUpload size={16} />
             Загрузить звонок
           </button>
-          {!call.is_test && (onAssignToFolder || (activeFolder && onRemoveFromFolder)) && (
+          {!call.is_test && canEditCall && (onAssignToFolder || (activeFolder && onRemoveFromFolder)) && (
             <div className="call-folder-action-menu" ref={folderMenuRef}>
               {activeFolder && onRemoveFromFolder ? (
                 <button
@@ -535,7 +538,7 @@ export function CallDetailPanel({
               )}
             </div>
           )}
-          {onDeleteCall && !call.is_test && !transcriptionOnly && (
+          {onDeleteCall && canEditCall && !call.is_test && !transcriptionOnly && (
             <button className="ghost-button small call-analysis-button" type="button" onClick={() => void runAnalysis()} disabled={analysisBusy}>
               <WandSparkles size={16} />
               {analysisBusy ? "Анализирую…" : "Сделать анализ"}
@@ -543,13 +546,13 @@ export function CallDetailPanel({
           )}
           {/* While the queue still owns the call, stopping it is the way out;
               deleting is refused until then and would only produce an error. */}
-          {onDeleteCall && processingInFlight && (
+          {onDeleteCall && canEditCall && processingInFlight && (
             <button className="ghost-button small danger-button" type="button" onClick={() => void cancelProcessing()} disabled={cancelling}>
               <Ban size={16} />
               {cancelling ? "Отменяю…" : "Отменить обработку"}
             </button>
           )}
-          {onDeleteCall && !processingInFlight && (
+          {onDeleteCall && canEditCall && !processingInFlight && (
             <button className="ghost-button small danger-button" onClick={() => setDeleteConfirmOpen(true)} disabled={deleting}>
               <Trash2 size={16} />
               {deleting ? "Удаляю..." : "Удалить"}
@@ -567,7 +570,7 @@ export function CallDetailPanel({
         <div className="call-waiting-notice" role="note">
           <strong>Обработка отменена</strong>
           <span>Запись на месте: её можно прослушать и скачать в плеере ниже, обработать заново или удалить в корзину.</span>
-          {onDeleteCall && !call.is_test && (
+          {onDeleteCall && canEditCall && !call.is_test && (
             <div className="call-waiting-actions">
               <button className="primary-button small" type="button" disabled={restarting !== null} onClick={() => void restartProcessing("analyze")}>
                 <RotateCcw size={16} />
@@ -596,6 +599,7 @@ export function CallDetailPanel({
             {formatDate(call.created_at)} · {formatDuration(call.duration_seconds)} ·{" "}
             {contextLabel(call, companies, departments)}
           </small>
+          <CallSubjectMarks call={call} />
           {!call.is_test && score.score !== null && (
             <span className="call-score-chip">Оценка {formatScore(score.percent)} / 100</span>
           )}
@@ -609,7 +613,8 @@ export function CallDetailPanel({
       />
       {!call.is_test && <StatusTimeline transcriptionOnly={transcriptionOnly} current={call.status} statuses={timelineStatuses} analysisProgress={analysisProgress(analysis)} analysisStatus={analysis?.status} />}
       {(showReports || transcriptionOnly) && !call.is_test && <ReportExportPanel call={call} analysis={analysis} transcription={localTranscription} />}
-      {transcriptionOnly && <div className="transcription-analysis-entry"><div><strong>Нужен анализ разговора?</strong><p>Запустите его по готовой транскрипции, когда понадобится.</p></div><button className="primary-button" disabled={analysisBusy || localTranscription?.status !== "transcribed"} onClick={() => void runAnalysis()}><WandSparkles size={18} />{analysisBusy ? "Запускаю…" : "Анализировать"}</button>{analysisRunError && <div className="form-error">{analysisRunError}</div>}</div>}
+      {transcriptionOnly && canEditCall && <TranscriptionOnlySteps call={call} ready={localTranscription?.status === "transcribed"} busy={analysisBusy} onEditRoles={onOpenTranscriptionEditor ? () => onOpenTranscriptionEditor(call.id) : undefined} onAnalyze={() => void runAnalysis()} />}
+      {transcriptionOnly && canEditCall && !isCompanyCall(call) && <div className="transcription-analysis-entry"><div><strong>Нужен анализ разговора?</strong><p>Запустите его по готовой транскрипции, когда понадобится.</p></div><button className="primary-button" disabled={analysisBusy || localTranscription?.status !== "transcribed"} onClick={() => void runAnalysis()}><WandSparkles size={18} />{analysisBusy ? "Запускаю…" : "Анализировать"}</button>{analysisRunError && <div className="form-error">{analysisRunError}</div>}</div>}
       <div className={`detail-grid${call.is_test || transcriptionOnly ? " is-test-call" : ""}`}>
         <InfoCard
           title="Расшифровка"
@@ -623,7 +628,7 @@ export function CallDetailPanel({
           actionVariant="analysis"
           expanded={showFullTranscript}
         >
-          {localTranscription?.editable && !call.is_test && (
+          {localTranscription?.editable && canEditCall && !call.is_test && (
             <div className="transcript-history-actions">
               <div className="transcript-history-toolbar">
                 {onOpenTranscriptionEditor && !call.is_test && <button type="button" className="primary-button small" onClick={() => onOpenTranscriptionEditor(call.id)}>Исправить транскрипцию</button>}
@@ -860,4 +865,37 @@ function analysisCardState(
   }
 
   return { label: "Ожидает", tone: "warn" };
+}
+
+function isCompanyCall(call: CallResponse) {
+  return Boolean(call.company_uuid);
+}
+
+// Whom the call counts for, whether it is shared or internal, and who can open
+// it. A marked employee learns why they see a call they did not upload.
+function CallSubjectMarks({ call }: { call: CallResponse }) {
+  const subjects = call.subjects ?? [];
+  if (!isCompanyCall(call) || (subjects.length === 0 && !call.access)) return null;
+  const marked = subjects.filter((subject) => subject.grants_access).map((subject) => subject.full_name).filter(Boolean);
+  const names = subjects.map((subject) => subject.is_primary && subjects.length > 1 ? `${subject.full_name} (основной)` : subject.full_name).filter(Boolean);
+  return <div className="call-subject-marks">
+    {names.length > 0 && <span className="call-subject-names"><Users size={14} />{names.join(", ")}</span>}
+    {call.is_shared && <span className="call-subject-chip" title="В разговоре несколько сотрудников компании: оценка засчитывается каждому">Совместный</span>}
+    {call.is_internal && <span className="call-subject-chip" title="Все участники — сотрудники компании. По умолчанию такой звонок не входит в аналитику">Внутренний</span>}
+    {call.subjects_changed_manually && <span className="call-subject-chip is-muted" title="Состав сотрудников звонка меняли вручную">Состав менялся вручную</span>}
+    {call.access && <span className="call-access-line">{call.access.via === "subject"
+      ? "Вас отметили в звонке: вы видите его, а менять могут загрузивший и руководство."
+      : `Доступен загрузившему и руководству${marked.length ? `, а также отмеченным: ${marked.join(", ")}` : ""}.`}</span>}
+  </div>;
+}
+
+// The path for a non-typical conversation: transcribe only, fix who is who, then
+// analyse. Marking an employee also shares the call with them.
+function TranscriptionOnlySteps({ call, ready, busy, onEditRoles, onAnalyze }: { call: CallResponse; ready: boolean; busy: boolean; onEditRoles?: () => void; onAnalyze: () => void }) {
+  if (!isCompanyCall(call)) return null;
+  return <ol className="transcription-only-steps" aria-label="Как проанализировать звонок">
+    <li><span>1</span><div><strong>Проверьте имена и роли участников</strong><small>Кто клиент, кто партнёр, кто из вашей команды.</small></div>{onEditRoles && <button className="ghost-button small" type="button" disabled={!ready} onClick={onEditRoles}>Открыть роли</button>}</li>
+    <li><span>2</span><div><strong>Отметьте сотрудников компании</strong><small>Они получат доступ к звонку на чтение, а оценка попадёт в их показатели.</small></div>{onEditRoles && <button className="ghost-button small" type="button" disabled={!ready} onClick={onEditRoles}>Отметить</button>}</li>
+    <li><span>3</span><div><strong>Запустите анализ</strong><small>По готовой расшифровке и с правильными ролями.</small></div><button className="primary-button small" type="button" disabled={busy || !ready} onClick={onAnalyze}><WandSparkles size={16} />{busy ? "Запускаю…" : "Анализировать"}</button></li>
+  </ol>;
 }

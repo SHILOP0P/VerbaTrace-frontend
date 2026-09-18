@@ -9480,3 +9480,21 @@ html[data-theme="light"] .app-shell .chip.is-role-admin {
 .analysis-critical-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; color: var(--app-danger, #c2412d); font-size: 11px; font-weight: 800; vertical-align: 2px; background: color-mix(in srgb,var(--app-danger, #c2412d) 10%,transparent); border: 1px solid color-mix(in srgb,var(--app-danger, #c2412d) 30%,var(--app-border)); border-radius: 999px; white-space: nowrap; }
 .analysis-criterion-link { display: inline-flex; align-items: center; gap: 6px; padding: 0; color: var(--app-accent-strong); font: inherit; font-weight: 700; background: transparent; border: 0; cursor: pointer; }
 .analysis-criterion-link:hover, .analysis-criterion-link:focus-visible { text-decoration: underline; text-underline-offset: 3px; outline: none; }
+
+/* Whom a call counts for and who can open it. */
+.call-subject-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 6px; }
+.call-subject-names { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: var(--app-text); font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.call-subject-names svg { flex: 0 0 auto; color: var(--app-muted); }
+.call-subject-chip { padding: 2px 8px; color: var(--app-accent-strong); font-size: 12px; font-weight: 800; background: var(--app-active); border: 1px solid color-mix(in srgb,var(--app-accent) 30%,var(--app-border)); border-radius: 999px; white-space: nowrap; }
+.call-subject-chip.is-muted { color: var(--app-muted); background: var(--app-panel-soft); border-color: var(--app-border); }
+.call-access-line { flex-basis: 100%; color: var(--app-muted); font-size: 12px; line-height: 1.45; }
+.speaker-access-warning { margin: -2px 0 0; padding: 7px 10px; color: var(--app-text); font-size: 12px; line-height: 1.45; background: color-mix(in srgb,var(--app-warning, #c46c00) 10%,transparent); border: 1px solid color-mix(in srgb,var(--app-warning, #c46c00) 30%,var(--app-border)); border-radius: 9px; }
+.transcription-only-steps { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.transcription-only-steps li { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; background: var(--app-glass); border: 1px solid var(--app-border); border-radius: 14px; }
+.transcription-only-steps li > span { display: grid; place-items: center; width: 30px; height: 30px; color: var(--app-accent-strong); font-weight: 800; background: var(--app-active); border-radius: 999px; }
+.transcription-only-steps li > div { display: grid; gap: 2px; min-width: 0; }
+.transcription-only-steps small { color: var(--app-muted); line-height: 1.4; }
+@media (max-width: 640px) {
+  .transcription-only-steps li { grid-template-columns: 30px minmax(0,1fr); }
+  .transcription-only-steps li > button { grid-column: 2; justify-self: start; }
+}

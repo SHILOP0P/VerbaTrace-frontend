@@ -120,10 +120,10 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
 
   return <div className="date-time-picker" ref={rootRef}>
     <input className="date-time-picker-value" id={id} value={value} readOnly tabIndex={-1} aria-hidden="true" />
-    <button className={`date-time-trigger${dateOnly ? " date-time-trigger-date-only" : ""}`} ref={triggerRef} type="button" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-required={required} onClick={() => setOpen((current) => !current)}>
+    <button className={`date-time-trigger${dateOnly ? " date-time-trigger-date-only" : ""}${selected ? "" : " is-empty"}`} ref={triggerRef} type="button" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-required={required} onClick={() => setOpen((current) => !current)}>
       {dateOnly ? <><span>{selected ? triggerFormat.format(selected) : compact ? "Дата" : "Выберите дату"}</span><CalendarDays size={18}/></> : <><CalendarDays size={18}/><span>{selected ? VALUE_FORMAT.format(selected) : "Выберите дату"}</span><i/><Clock3 size={17}/><span>{selected ? `${pad(selected.getHours())}:${pad(selected.getMinutes())}` : "--:--"}</span></>}
     </button>
-    {open ? createPortal(<div className={`date-time-popover${dateOnly ? " date-time-popover-date-only" : ""}`} ref={popoverRef} style={popoverPosition} role="dialog" aria-label={dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения"} onWheel={scrollOwningDialog}>
+    {open ? createPortal(<div className={`date-time-popover vt-portal${dateOnly ? " date-time-popover-date-only" : ""}`} ref={popoverRef} style={popoverPosition} role="dialog" aria-label={dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения"} onWheel={scrollOwningDialog}>
       <div className="date-time-month">
         <button type="button" aria-label="Предыдущий месяц" onClick={() => setView(addMonths(view, -1))}><ChevronLeft size={18}/></button>
         <strong aria-live="polite">{MONTH_FORMAT.format(view)}</strong>

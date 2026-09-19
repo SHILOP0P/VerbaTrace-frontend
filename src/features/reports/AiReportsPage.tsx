@@ -181,7 +181,7 @@ export function AiReportsPage({
         onDownloadReport={downloadReport}
         onDeleteReport={deleteReport}
       />
-      <CustomScrollbar targetRef={reportsPageScrollRef} inset={15} />
+      <CustomScrollbar targetRef={reportsPageScrollRef} alignToViewport />
     </section>
   );
 }

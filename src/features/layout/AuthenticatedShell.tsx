@@ -38,7 +38,7 @@ import { useDismissibleLayer } from "../../shared/ui/dismissible-layer";
 import { readWorkspaceCompanyId, storeWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { creditForecast } from "../../shared/lib/credits";
 import { pluralizeRu } from "../../shared/lib/plans";
-import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
+import { CustomScrollbar, PageScrollbar } from "../../shared/ui/custom-scrollbar";
 import { notificationPresentation } from "../../shared/ui/notification-presentation";
 import { ToolButton } from "../assistant/AssistantControls";
 import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
@@ -85,6 +85,7 @@ export function AuthenticatedShell({
   onLogout: () => void;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const workspaceRef = useRef<HTMLElement>(null);
   const [teamOpen, setTeamOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [assistantOpen,setAssistantOpen]=useState(false);
@@ -725,7 +726,8 @@ export function AuthenticatedShell({
             </button>
           </div>
         </aside>
-        <main className="workspace" data-mobile-transition={mobileTransitionDirection ?? undefined}>{children}</main>
+        <main ref={workspaceRef} className="workspace" data-mobile-transition={mobileTransitionDirection ?? undefined}>{children}</main>
+        <PageScrollbar containerRef={workspaceRef} page={activePage} />
       </div>
       {/* The sheet and the bar are one layer: the button that opens the sheet sits
           in the bar, and a tap on it while the sheet is open has to close it

@@ -1,5 +1,30 @@
-import { PointerEvent, RefObject, useEffect, useRef, useState } from "react";
+import { PointerEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+
+// Pages that scroll as a whole and slide under the floating header. Pages
+// that already draw their own thumb carry .custom-scroll-target and are left
+// to it.
+const pageScrollerSelector = ":scope > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout):not(.custom-scroll-target)";
+
+/**
+ * The thumb of the page in the workspace, the full height of the screen at its
+ * right edge, so every page scrolls with the same bar. It finds the page
+ * by itself: pages mount after the shell and change with navigation.
+ */
+export function PageScrollbar({ containerRef, page }: { containerRef: RefObject<HTMLElement | null>; page: string }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const find = () => setTarget(container.querySelector<HTMLElement>(pageScrollerSelector));
+    find();
+    const observer = new MutationObserver(find);
+    observer.observe(container, { childList: true });
+    return () => observer.disconnect();
+  }, [containerRef, page]);
+  const targetRef = useMemo(() => ({ current: target }), [target]);
+  return target ? <CustomScrollbar targetRef={targetRef} alignToViewport /> : null;
+}
 
 type ThumbMetrics = {
   visible: boolean;
@@ -105,7 +130,9 @@ export function CustomScrollbar({
       const rect = target.getBoundingClientRect();
       // A target nested in a scrolling page is only partly visible; keep the
       // fixed thumb inside the part that its clipping ancestors still show.
-      const [visibleTop, visibleBottom] = visibleRange(target, rect);
+      // A page scroller's thumb runs the full height of the screen at its right
+      // edge, clear of the floating header, which ends short of that edge.
+      const [visibleTop, visibleBottom] = alignToViewport ? [0, window.innerHeight] : visibleRange(target, rect);
       const trackHeight = Math.max(0, visibleBottom - visibleTop - inset * 2);
       if (maxScroll <= 1 || trackHeight < 56) return hide(thumb);
 
@@ -215,7 +242,8 @@ export function CustomScrollbar({
     <div
       ref={thumbRef}
       aria-hidden="true"
-      className={`custom-scroll-thumb${local ? " is-local" : ""} ${className}`.trim()}
+      // vt-portal: a thumb in <body> still reads the theme's scrollbar colours.
+      className={`custom-scroll-thumb vt-portal${local ? " is-local" : ""} ${className}`.trim()}
       onPointerDown={startDrag}
       onPointerMove={drag}
       onPointerUp={stopDrag}

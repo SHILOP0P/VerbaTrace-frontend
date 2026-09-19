@@ -243,6 +243,11 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const speedLongPressRef = useRef(false);
   const animationFrameRef = useRef<number | null>(null);
   const activeWordRef = useRef(-1);
+  const playerRef = useRef<HTMLDivElement | null>(null);
+  // While the pointer drags the playhead, the tracks follow it through one CSS
+  // variable, and the recording itself is sought at most once a frame.
+  const scrubFrameRef = useRef<number | null>(null);
+  const scrubTimeRef = useRef(0);
   const [audioUrl, setAudioUrl] = useState("");
   const [audioError, setAudioError] = useState("");
   const [loadingAudio, setLoadingAudio] = useState(false);
@@ -306,10 +311,10 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
     };
   }, [call.duration_seconds, source]);
 
-  // The waveform is only the fallback track before a transcript exists; with
-  // speaker turns there is no reason to decode the whole recording.
+  // The waveform is the seek track; the speaker lane, when there is one, sits
+  // under it and tells whose voice fills each stretch.
   useEffect(() => {
-    if (!audioBlob || hasLane) return;
+    if (!audioBlob) return;
     let cancelled = false;
     setLoadingWaveform(true);
     buildWaveform(audioBlob, waveformBars)
@@ -317,7 +322,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
       .catch(() => { if (!cancelled) setWaveform([]); })
       .finally(() => { if (!cancelled) setLoadingWaveform(false); });
     return () => { cancelled = true; };
-  }, [audioBlob, hasLane]);
+  }, [audioBlob]);
 
   useEffect(() => {
     const element = waveformRef.current;
@@ -428,16 +433,50 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
     seek(String(nextTime));
   }
 
-  function seekFromPointer(clientX: number) {
+  function pointerTime(clientX: number) {
     const rect = waveformRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return;
-    seekByRatio((clientX - rect.left) / rect.width);
+    if (!rect || rect.width <= 0) return null;
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * effectiveDuration;
+  }
+
+  // The drag moves the playhead on the page at once; the audio element and
+  // the React state catch up once a frame, and the transcript learns the new
+  // word only when the pointer is released.
+  function scrubTo(clientX: number, final: boolean) {
+    const nextTime = pointerTime(clientX);
+    if (nextTime === null) return;
+    playerRef.current?.style.setProperty("--audio-progress", `${effectiveDuration > 0 ? (nextTime / effectiveDuration) * 100 : 0}%`);
+    scrubTimeRef.current = nextTime;
+    if (final) {
+      if (scrubFrameRef.current !== null) cancelAnimationFrame(scrubFrameRef.current);
+      scrubFrameRef.current = null;
+      seek(String(nextTime));
+      return;
+    }
+    if (scrubFrameRef.current !== null) return;
+    scrubFrameRef.current = requestAnimationFrame(() => {
+      scrubFrameRef.current = null;
+      const audio = audioRef.current;
+      if (audio) audio.currentTime = scrubTimeRef.current;
+      setCurrentTime(scrubTimeRef.current);
+    });
   }
 
   function handleWaveformPointer(event: React.PointerEvent<HTMLDivElement>) {
     if (!audioUrl || loadingAudio || audioError || effectiveDuration <= 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    seekFromPointer(event.clientX);
+    scrubTo(event.clientX, false);
+  }
+
+  function handleWaveformDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.buttons !== 1 || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    scrubTo(event.clientX, false);
+  }
+
+  function handleWaveformRelease(event: React.PointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    scrubTo(event.clientX, true);
   }
 
   function handleWaveformKey(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -527,14 +566,54 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const progressPercent = effectiveDuration > 0 ? Math.min(100, Math.max(0, (currentTime / effectiveDuration) * 100)) : 0;
   const waveformReady = waveform.length > 0;
   const displayedWaveform = useMemo(() => resampleWaveform(waveformReady ? waveform : fallbackWaveform, visibleWaveformBars), [waveform, waveformReady, visibleWaveformBars]);
-  const showAudioSkeleton = loadingAudio || (!hasLane && loadingWaveform && !waveformReady);
+  const showAudioSkeleton = loadingAudio || (loadingWaveform && !waveformReady);
   const currentTimeLabel = formatDuration(Math.round(currentTime));
   const audioDisabled = !audioUrl || loadingAudio || Boolean(audioError);
-  const timelinePercent = (seconds: number) => `${effectiveDuration > 0 ? Math.min(100, Math.max(0, (seconds / effectiveDuration) * 100)) : 0}%`;
-  const legendSpeakers = speakers?.length ? speakers : speakerKeys.map((key) => ({ key, name: `Спикер ${key}`, share: null }));
+  // The bars and the speaker turns are drawn once per recording, not on every
+  // tick of the playhead: what has been played is a second, clipped copy of
+  // the bars and a shade over the rest of the lane, both driven by the
+  // --audio-progress variable.
+  const waveLayers = useMemo(() => {
+    const bars = displayedWaveform.map((peak, index) => (
+      <span style={{ "--bar-height": `${Math.max(8, peak * 100)}%` } as React.CSSProperties} key={`${index}-${peak.toFixed(3)}`} />
+    ));
+    return <>
+      <div className="audio-wave-layer">{bars}</div>
+      <div className="audio-wave-layer is-played" aria-hidden="true">{bars}</div>
+    </>;
+  }, [displayedWaveform]);
+  const laneTrack = useMemo(() => {
+    const percent = (seconds: number) => `${effectiveDuration > 0 ? Math.min(100, Math.max(0, (seconds / effectiveDuration) * 100)) : 0}%`;
+    return (
+      <span className="audio-lane-track">
+        {runs.map((run, index) => (
+          <span
+            key={`${run.speaker}-${run.start}-${index}`}
+            className="audio-lane-run"
+            style={{ left: percent(run.start), width: percent(run.end - run.start), "--run-color": speakerColor(run.speaker, speakerKeys) } as React.CSSProperties}
+          />
+        ))}
+      </span>
+    );
+  }, [effectiveDuration, runs, speakerKeys]);
+  // A call without speech statistics still has its turns: each speaker's
+  // share of the talking comes from their summed turn lengths.
+  const turnShare = (key: string) => {
+    let total = 0;
+    let own = 0;
+    for (const run of runs) {
+      const length = Math.max(0, run.end - run.start);
+      total += length;
+      if (run.speaker === key) own += length;
+    }
+    return total > 0 ? own / total : null;
+  };
+  const legendSpeakers = (speakers?.length ? speakers : speakerKeys.map((key) => ({ key, name: `Спикер ${key}`, share: null })))
+    .map((speaker) => ({ ...speaker, share: speaker.share ?? turnShare(speaker.key) }));
 
   return (
     <div
+      ref={playerRef}
       className={`dashboard-audio-player custom-audio-player${hasLane ? " has-lane" : ""} ${showAudioSkeleton ? "audio-loading-state" : ""} ${audioError ? "audio-error-state" : ""}`}
       style={{ "--audio-progress": `${progressPercent}%` } as React.CSSProperties}
     >
@@ -551,7 +630,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
         <div className="audio-player-track-row">
           <div
             ref={waveformRef}
-            className={hasLane ? "audio-conversation-lane" : `audio-waveform ${waveformReady ? "ready" : "empty"}`}
+            className={`audio-waveform ${waveformReady ? "ready" : "empty"}`}
             role="slider"
             tabIndex={audioUrl && !audioError ? 0 : -1}
             aria-label="Позиция аудиозаписи"
@@ -561,39 +640,26 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
             aria-valuetext={`${formatDuration(Math.round(currentTime))} из ${formatDuration(Math.round(effectiveDuration))}`}
             onKeyDown={handleWaveformKey}
             onPointerDown={handleWaveformPointer}
-            onPointerMove={(event) => {
-              if (event.buttons === 1) handleWaveformPointer(event);
-            }}
+            onPointerMove={handleWaveformDrag}
+            onPointerUp={handleWaveformRelease}
+            onPointerCancel={handleWaveformRelease}
           >
-            {hasLane ? (
-              <>
-                <span className="audio-lane-track" aria-hidden="true">
-                  {runs.map((run, index) => (
-                    <span
-                      key={`${run.speaker}-${run.start}-${index}`}
-                      className={`audio-lane-run${run.start < currentTime ? " is-played" : ""}`}
-                      style={{
-                        left: timelinePercent(run.start),
-                        width: timelinePercent(run.end - run.start),
-                        "--run-color": speakerColor(run.speaker, speakerKeys)
-                      } as React.CSSProperties}
-                    />
-                  ))}
-                </span>
-                <span className="audio-lane-knob" aria-hidden="true" style={{ left: `${progressPercent}%` }} />
-              </>
-            ) : displayedWaveform.map((peak, index) => {
-              const barProgress = displayedWaveform.length > 1 ? index / (displayedWaveform.length - 1) : 0;
-              const active = barProgress * 100 <= progressPercent;
-              return (
-                <span
-                  className={active ? "active" : ""}
-                  style={{ "--bar-height": `${Math.max(8, peak * 100)}%` } as React.CSSProperties}
-                  key={`${index}-${peak.toFixed(3)}`}
-                />
-              );
-            })}
+            {waveLayers}
           </div>
+          {hasLane && (
+            // Same time axis as the waveform above; a press seeks like it does.
+            <div
+              className="audio-conversation-lane"
+              aria-hidden="true"
+              onPointerDown={handleWaveformPointer}
+              onPointerMove={handleWaveformDrag}
+              onPointerUp={handleWaveformRelease}
+              onPointerCancel={handleWaveformRelease}
+            >
+              {laneTrack}
+              <span className="audio-lane-playhead" />
+            </div>
+          )}
           <div className="audio-player-meta-row">
             <div className="audio-time-range">
               <span className="audio-time">
@@ -602,16 +668,6 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
               <span className="audio-time-separator" aria-hidden="true">/</span>
               <span className="audio-time total">{formatDuration(Math.round(effectiveDuration))}</span>
             </div>
-            {hasLane && (
-              <ul className="audio-lane-legend" aria-label="Кто говорит">
-                {legendSpeakers.map((speaker) => (
-                  <li key={speaker.key} style={{ "--run-color": speakerColor(speaker.key, speakerKeys) } as React.CSSProperties}>
-                    <i />{speaker.name}{speaker.share !== null && <b>{Math.round(speaker.share * 100)}%</b>}
-                  </li>
-                ))}
-                {longestMonologue && <li className="audio-lane-note">самый длинный монолог {formatDuration(Math.round(longestMonologue.seconds))}, {longestMonologue.name}</li>}
-              </ul>
-            )}
             <div className="audio-player-actions">
               <div
                 className={`audio-speed-control ${speedMenuOpen ? "open" : ""} ${audioDisabled ? "disabled" : ""}`}
@@ -661,6 +717,20 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
               </button>
             </div>
           </div>
+          {/* Who speaks gets its own line under the time and the controls: in
+              one row with them the last speaker was cut off at the edge. */}
+          {hasLane && (
+            <div className="audio-lane-summary">
+              <ul className="audio-lane-legend" aria-label="Кто говорит">
+                {legendSpeakers.map((speaker) => (
+                  <li key={speaker.key} style={{ "--run-color": speakerColor(speaker.key, speakerKeys) } as React.CSSProperties}>
+                    <i />{speaker.name}{speaker.share !== null && <b>{Math.round(speaker.share * 100)}%</b>}
+                  </li>
+                ))}
+              </ul>
+              {longestMonologue && <p className="audio-lane-note">Самый длинный монолог — {formatDuration(Math.round(longestMonologue.seconds))}, {longestMonologue.name}</p>}
+            </div>
+          )}
         </div>
         <audio
           ref={audioRef}

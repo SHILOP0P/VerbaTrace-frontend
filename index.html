@@ -9,6 +9,37 @@
     />
     <link rel="icon" type="image/svg+xml" href="/assets/verbatrace-mark.svg" />
     <title>VerbaTrace</title>
+    <!-- The theme and the canvas are set before the first paint: without this a
+         reload showed the old background of the other theme until React ran.
+         The key and the rule mirror src/app/runtime.tsx (THEME_KEY). -->
+    <script>
+      (function () {
+        var theme = "light";
+        try {
+          var stored = localStorage.getItem("verbatrace.theme.v1");
+          theme = stored === "light" || stored === "dark"
+            ? stored
+            : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        } catch (error) {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <style>
+      html {
+        background:
+          radial-gradient(60% 50% at 90% -10%, rgba(255, 150, 100, 0.08), transparent 70%) fixed,
+          linear-gradient(180deg, #faf6f2 0%, #f4efea 70%) fixed;
+        background-color: #f4efea;
+      }
+
+      html[data-theme="dark"] {
+        background:
+          radial-gradient(60% 50% at 90% -10%, rgba(255, 110, 60, 0.07), transparent 70%) fixed,
+          linear-gradient(180deg, #171210 0%, #110e0b 58%, #0d0a08 100%) fixed;
+        background-color: #110e0b;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

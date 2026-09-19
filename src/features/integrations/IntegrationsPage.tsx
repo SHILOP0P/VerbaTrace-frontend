@@ -471,8 +471,8 @@ export function IntegrationsPage({
           )}
           {keyLimitMode === "temporary" && (
             <div className="integration-key-limit-period">
-              <label>Начало периода<input type="datetime-local" value={keyLimitStartsAt} onChange={(e) => setKeyLimitStartsAt(e.target.value)} /></label>
-              <label>Окончание периода<input type="datetime-local" value={keyLimitEndsAt} onChange={(e) => setKeyLimitEndsAt(e.target.value)} /></label>
+              <label>Начало периода<DateTimePicker placement="below" ariaLabel="Начало периода лимита" value={keyLimitStartsAt} onChange={setKeyLimitStartsAt} /></label>
+              <label>Окончание периода<DateTimePicker placement="below" ariaLabel="Окончание периода лимита" value={keyLimitEndsAt} onChange={setKeyLimitEndsAt} /></label>
             </div>
           )}
           <p className="integration-limit-note">Лимит фиксируется при выпуске ключа. Чтобы задать другой, отзовите ключ и выпустите новый.</p>

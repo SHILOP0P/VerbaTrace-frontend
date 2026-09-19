@@ -28,6 +28,9 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   --vt-accent-text: #ff7a55;
   --vt-accent-soft: rgba(255, 90, 47, 0.14);
   --vt-on-accent: #1d0c05;
+  /* A fill under white text: a step darker than the accent, for 4.5:1. */
+  --vt-accent-fill: #d4431a;
+  --vt-accent-fill-hover: #bd3a15;
   --vt-good: #5fbf7e;
   --vt-good-soft: rgba(95, 191, 126, 0.14);
   --vt-warn: #e3a24a;
@@ -39,6 +42,8 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   --vt-info-soft: rgba(126, 168, 218, 0.15);
   /* Marks (arcs, bars, dots, icons) may be as bright as the theme allows; on
      a dark page the text tones already are. */
+  --vt-scroll-thumb: rgba(255, 244, 235, 0.2);
+  --vt-scroll-thumb-hover: rgba(255, 244, 235, 0.38);
   --vt-good-mark: #5fbf7e;
   --vt-warn-mark: #e8a54b;
   --vt-bad-mark: #ec6b5d;
@@ -75,6 +80,8 @@ html[data-theme="light"] :is(.app-shell, .vt-portal) {
   --vt-accent-text: #b3380f;
   --vt-accent-soft: rgba(255, 90, 47, 0.12);
   --vt-on-accent: #1d0c05;
+  --vt-accent-fill: #d4431a;
+  --vt-accent-fill-hover: #bd3a15;
   /* Text tones keep 4.5:1 on their own soft tint, as saturated as that
      allows; marks carry the bright colour. Using the text shade for an arc or
      a bar is what made the light theme look brown. */
@@ -87,6 +94,8 @@ html[data-theme="light"] :is(.app-shell, .vt-portal) {
   --vt-bad-soft: rgba(229, 72, 77, 0.11);
   --vt-info: #2563c4;
   --vt-info-soft: rgba(59, 130, 246, 0.11);
+  --vt-scroll-thumb: rgba(84, 56, 38, 0.24);
+  --vt-scroll-thumb-hover: rgba(84, 56, 38, 0.42);
   --vt-good-mark: #2e9f63;
   --vt-warn-mark: #e68c0a;
   --vt-bad-mark: #e5484d;
@@ -136,13 +145,23 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   font-variant-numeric: tabular-nums;
 }
 
-/* The canvas is not flat black: a warm light falls from the top right, a faint
-   bounce warms the opposite corner, and a fine grain keeps the dark gradient
-   from banding into steps. Both layers are fixed, so the light stays in place
-   while a page scrolls, and they replace the photo layers of the old theme. */
+/* The canvas is not flat black. Three layers, all tied to the viewport so a
+   scrolling page does not drag them along:
+   - the page's own background (html, in base.css and index.html): a warm
+     vertical gradient. The shell stays transparent: when the header's top
+     margin pushed the shell down, a strip of a second, slightly different
+     canvas showed above it with a visible edge;
+   - ::before: a soft light that drifts over the screen, easing to a stop at
+     each edge and turning back. Its horizontal, vertical and "breathing"
+     cycles have unrelated lengths, so the path does not visibly repeat; it
+     moves at 15–30 px a second, slow enough to stay in the background;
+   - ::after: a fine grain that keeps the gradients from banding into steps.
+   Only translate, transform, scale and opacity animate, so the compositor
+   moves the light without repainting the page. They replace the photo layers
+   of the old theme. */
 html[data-theme] .app-shell:not(.select-menu-portal-root) {
   color: var(--vt-text);
-  background: var(--vt-canvas);
+  background: transparent;
 }
 
 html[data-theme] .app-shell:not(.select-menu-portal-root)::before,
@@ -157,19 +176,54 @@ html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
   pointer-events: none;
 }
 
+/* The light is a circle whose centre starts at the viewport's top-left corner;
+   the animations carry that centre between 6% and 94% of the width and
+   height. The negative delays start it near the top right, where the static
+   version of the light used to be. */
 html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
-  background:
-    radial-gradient(52% 60% at 88% -12%, rgba(255, 112, 60, 0.24) 0%, rgba(255, 90, 47, 0.09) 40%, transparent 72%),
-    radial-gradient(28% 32% at 100% 0%, rgba(255, 176, 120, 0.1), transparent 70%),
-    radial-gradient(46% 55% at -8% 112%, rgba(255, 96, 50, 0.09), transparent 70%),
-    linear-gradient(180deg, #171210 0%, var(--vt-canvas) 58%, #0d0a08 100%);
+  inset: auto;
+  top: -40vmax;
+  left: -40vmax;
+  width: 80vmax;
+  height: 80vmax;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 112, 60, 0.22) 0%, rgba(255, 90, 47, 0.08) 45%, transparent 100%);
+  translate: 88vw 0;
+  transform: translateY(8vh);
+  animation:
+    vt-light-x 65s ease-in-out -59s infinite alternate,
+    vt-light-y 47s ease-in-out -3s infinite alternate,
+    vt-light-breathe 23s ease-in-out infinite alternate;
+  will-change: translate, transform;
 }
 
+/* On paper an orange glow reads as a stain; a paler apricot light reads as
+   warmth. */
 html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::before {
-  background:
-    radial-gradient(52% 60% at 88% -12%, rgba(255, 128, 72, 0.2) 0%, rgba(255, 150, 100, 0.07) 42%, transparent 72%),
-    radial-gradient(46% 55% at -8% 112%, rgba(255, 170, 120, 0.13), transparent 70%),
-    linear-gradient(180deg, #f9f5f1 0%, var(--vt-canvas) 70%);
+  background: radial-gradient(closest-side, rgba(255, 160, 110, 0.26) 0%, rgba(255, 196, 150, 0.1) 45%, transparent 100%);
+}
+
+@keyframes vt-light-x {
+  from { translate: 6vw 0; }
+  to { translate: 94vw 0; }
+}
+
+@keyframes vt-light-y {
+  from { transform: translateY(6vh); }
+  to { transform: translateY(94vh); }
+}
+
+@keyframes vt-light-breathe {
+  from { scale: 0.9; opacity: 0.8; }
+  to { scale: 1.1; opacity: 1; }
+}
+
+/* Asked for less motion: the light stays where it starts. The general rule
+   below covers the shell's descendants, not the shell's own layers. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
+    animation: none;
+  }
 }
 
 html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
@@ -182,8 +236,111 @@ html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::after {
   opacity: 0.035;
 }
 
+/* The body lets the page's canvas (base.css, index.html) show through; a colour
+   here painted the dark fallback in the light theme until the app mounted. */
 html[data-theme] body {
-  background: var(--vt-canvas, #110e0b);
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * Scrollbars: one look everywhere, native bars and the drawn CustomScrollbar
+ * thumbs alike — a 4px rounded thumb that widens to 6px under the pointer,
+ * no track, no arrows, no accent colour.
+ * ------------------------------------------------------------------------- */
+.custom-scroll-thumb,
+.app-shell .custom-scroll-thumb {
+  width: 4px;
+  background: var(--vt-scroll-thumb, rgba(160, 146, 134, 0.4));
+  box-shadow: none;
+}
+
+.custom-scroll-thumb:is(:hover, :active),
+.app-shell .custom-scroll-thumb:is(:hover, :active) {
+  width: 6px;
+  background: var(--vt-scroll-thumb-hover, rgba(160, 146, 134, 0.65));
+}
+
+/* Chromium draws that thumb through ::-webkit-scrollbar, which a standard
+   scrollbar-width or scrollbar-color switches off, so both are reset here.
+   The rules cover every element, not only the app: the landing, the auth
+   pages and anything portalled out of the shell otherwise kept the system
+   bar, whose track paints a grey strip behind the thumb. Bars hidden on
+   purpose (a drawn thumb, a chip strip, the phone layout) stay hidden
+   through display: none, which these rules never set. */
+@supports selector(::-webkit-scrollbar) {
+  html,
+  html * {
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+  }
+
+  html :is(.custom-scroll-target, .notifications-popover, .assistant-message-context)::-webkit-scrollbar,
+  html .app-shell .workspace > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout)::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  html::-webkit-scrollbar,
+  html *::-webkit-scrollbar {
+    width: 10px !important;
+    height: 10px !important;
+    background: transparent !important;
+  }
+
+  html::-webkit-scrollbar-thumb,
+  html *::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 3px solid transparent !important;
+    border-radius: 999px !important;
+    background: var(--vt-scroll-thumb, rgba(160, 146, 134, 0.4)) padding-box !important;
+  }
+
+  html::-webkit-scrollbar-thumb:is(:hover, :active),
+  html *::-webkit-scrollbar-thumb:is(:hover, :active) {
+    border-width: 2px !important;
+    background-color: var(--vt-scroll-thumb-hover, rgba(160, 146, 134, 0.65)) !important;
+  }
+
+  /* The track, the piece around the thumb and the corner between two bars all
+     paint their own surface by default; the bar shows only the page behind. */
+  html::-webkit-scrollbar-track,
+  html::-webkit-scrollbar-track-piece,
+  html::-webkit-scrollbar-corner,
+  html *::-webkit-scrollbar-track,
+  html *::-webkit-scrollbar-track-piece,
+  html *::-webkit-scrollbar-corner {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html::-webkit-scrollbar-button,
+  html *::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+/* Other engines have no thumb shape to set: the thin bar in the same colour. */
+@supports not selector(::-webkit-scrollbar) {
+  html,
+  html * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vt-scroll-thumb, rgba(160, 146, 134, 0.4)) transparent;
+  }
+}
+
+/* Pages that scroll as a whole slide under the floating header, and their own
+   bar ran behind it and flush against the cards. PageScrollbar draws their
+   thumb the full height of the screen at its right edge, clear of both. */
+html .app-shell .workspace > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout) {
+  scrollbar-gutter: auto;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html .app-shell .workspace > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout) {
+    scrollbar-width: none;
+  }
 }
 
 /* Page islands: a flat panel, no photo, no blur. */
@@ -1566,8 +1723,8 @@ html[data-theme] .app-shell button.sidebar-plan-card:hover {
 }
 
 /* ---------------------------------------------------------------------------
- * Call player: one conversation lane coloured by who speaks, the places the
- * analysis quotes above it, and the same places as a list below.
+ * Call player: the waveform to seek in, a thin lane under it coloured by who
+ * speaks, and each speaker's share of the talking in the legend.
  * ------------------------------------------------------------------------- */
 html[data-theme] .app-shell .dashboard-audio-player {
   border: 0;
@@ -1594,63 +1751,104 @@ html[data-theme] .app-shell .dashboard-audio-player .audio-play {
   gap: 6px;
 }
 
-/* Time on the left, controls on the right; the speakers take the middle and
-   wrap inside it, so a long legend never pushes the controls to a new line. */
+/* Time on the left, controls on the right, nothing between them; who speaks
+   has a line of its own under them. */
 .app-shell .dashboard-audio-player.has-lane .audio-player-meta-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "time legend actions";
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px 16px;
 }
 
-.app-shell .dashboard-audio-player.has-lane .audio-time-range { grid-area: time; }
-.app-shell .dashboard-audio-player.has-lane .audio-lane-legend { grid-area: legend; }
-.app-shell .dashboard-audio-player.has-lane .audio-player-actions { grid-area: actions; margin-left: 0; }
-
-@media (max-width: 760px) {
-  .app-shell .dashboard-audio-player.has-lane .audio-player-meta-row {
-    grid-template-columns: auto auto;
-    grid-template-areas: "time actions" "legend legend";
-    justify-content: space-between;
-  }
-
-  .app-shell .dashboard-audio-player.has-lane .audio-lane-legend {
-    justify-content: flex-start;
-  }
-
-  .app-shell .audio-lane-legend li {
-    white-space: normal;
-  }
-
-  .app-shell .audio-lane-legend .audio-lane-note {
-    flex-basis: 100%;
-  }
+.app-shell .dashboard-audio-player.has-lane .audio-player-actions {
+  margin-left: 0;
 }
 
+.app-shell .audio-lane-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vt-line);
+}
+
+/* The waveform is the seek track, drawn flat: played bars in the accent of
+   the play button, the rest in a quiet tone, no glow. */
+html[data-theme] .app-shell .dashboard-audio-player .audio-waveform {
+  --wave-played: var(--vt-accent);
+  --wave-rest: var(--vt-line-strong);
+  position: relative;
+  display: block;
+  height: 34px;
+}
+
+/* The bars are two identical layers; the played one in the accent is clipped
+   at --audio-progress, so moving the playhead repaints one clip, not every
+   bar. */
+.app-shell .audio-wave-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 5px);
+  justify-content: space-between;
+  align-items: center;
+  gap: 3px;
+}
+
+.app-shell .audio-wave-layer.is-played {
+  clip-path: inset(0 calc(100% - var(--audio-progress, 0%)) 0 0);
+  pointer-events: none;
+}
+
+html[data-theme] .app-shell .audio-wave-layer.is-played span {
+  opacity: 1;
+  background: var(--wave-played);
+  box-shadow: none;
+}
+
+/* Under it, on the same time axis, a thin lane of who is speaking. */
 .app-shell .audio-conversation-lane {
   position: relative;
-  height: 22px;
+  height: 8px;
   cursor: pointer;
-  outline: 0;
   touch-action: none;
-}
-
-.app-shell .audio-conversation-lane:focus-visible {
-  border-radius: 8px;
-  box-shadow: 0 0 0 2px var(--app-accent-line, rgba(255, 102, 55, 0.56));
 }
 
 .app-shell .audio-lane-track {
   position: absolute;
-  top: 5px;
-  right: 0;
-  left: 0;
-  height: 12px;
+  inset: 0;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--vt-track);
   animation: vt-spark-reveal 900ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* What is still ahead is shaded over the turns; the shade and the playhead
+   follow --audio-progress. */
+.app-shell .audio-lane-track::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--audio-progress, 0%);
+  content: "";
+  background: color-mix(in srgb, var(--vt-s2) 60%, transparent);
+  pointer-events: none;
+}
+
+.app-shell .audio-lane-playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--audio-progress, 0%);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--vt-text);
+  pointer-events: none;
 }
 
 .app-shell .audio-lane-run {
@@ -1659,31 +1857,13 @@ html[data-theme] .app-shell .dashboard-audio-player .audio-play {
   bottom: 0;
   min-width: 1px;
   background: var(--run-color);
-  opacity: 0.4;
 }
 
-.app-shell .audio-lane-run.is-played {
-  opacity: 1;
-}
-
-.app-shell .audio-lane-knob {
-  position: absolute;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  margin: -8px 0 0 -8px;
-  border-radius: 50%;
-  background: var(--vt-text);
-  box-shadow: 0 0 0 3px var(--vt-s2), 0 2px 8px rgba(0, 0, 0, 0.35);
-  pointer-events: none;
-}
-
+/* Each speaker is a small chip: colour, name, share of the talking. */
 .app-shell .audio-lane-legend {
   display: flex;
-  flex: 1 1 auto;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 16px;
+  gap: 9px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1693,8 +1873,11 @@ html[data-theme] .app-shell .dashboard-audio-player .audio-play {
 .app-shell .audio-lane-legend li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  padding: 4px 10px 4px 9px;
+  border-radius: 999px;
   color: var(--vt-text-2);
+  background: var(--vt-s1);
   font-size: 0.82rem;
   white-space: nowrap;
 }
@@ -1711,8 +1894,10 @@ html[data-theme] .app-shell .dashboard-audio-player .audio-play {
   font-weight: 650;
 }
 
-.app-shell .audio-lane-legend .audio-lane-note {
+.app-shell .audio-lane-note {
+  margin: 0;
   color: var(--vt-text-3);
+  font-size: 0.8rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -2524,7 +2709,12 @@ html[data-theme] .app-shell .instruction-item-actions .instruction-delete:hover:
   height: 18px;
   border-radius: 999px;
   background: var(--vt-track);
+  box-shadow: inset 0 0 0 1px var(--vt-line-mid);
   transition: background var(--vt-dur) ease;
+}
+
+.app-shell .instruction-switch.is-on .instruction-switch-track {
+  box-shadow: none;
 }
 
 .app-shell .instruction-switch-track i {
@@ -3112,20 +3302,263 @@ html[data-theme] .app-shell .analysis-speaker-filter button b {
 }
 
 /* ---------------------------------------------------------------------------
- * Primary buttons: a flat accent. The glow under them made every page look
- * like it had several main actions at once.
+ * Tablet header (761–1024): the date used to be lifted out of the search row
+ * and pinned to the centre of the brand row, outside the layout. The icon row
+ * grows to the left — the calls button alone adds 42px — and slid under the
+ * date. The date stays in its own row now, after the search, in the flow, so
+ * the two rows can never overlap whatever the icons count.
+ * ------------------------------------------------------------------------- */
+@media (min-width: 761px) and (max-width: 1024px) {
+  html[data-theme] .app-shell .app-header-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  html[data-theme] .app-shell .app-header-center > div.header-popover-wrap {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: none;
+    transform: none;
+  }
+
+  html[data-theme] .app-shell .app-header-center .global-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* The 260px cap squeezed the calendar icon to a 2px dot; beside a search
+     that gives way, the date takes the width its text needs. */
+  html[data-theme] .app-shell .app-header .date-range-control {
+    max-width: none;
+  }
+}
+
+/* The calendar icon keeps its size at every width. */
+html[data-theme] .app-shell .date-range-control > svg {
+  flex: none;
+}
+
+/* One-row header (1025 and wider): the middle column holds the search and the
+   date and has only the width the grid gives it. The search kept a fixed
+   width, so once the calls button joined the icons the date ran 14px past
+   the column into them at 1025. The search gives way now; the date never
+   shrinks and is never cut. */
+@media (min-width: 1025px) {
+  html[data-theme] .app-shell .app-header-center .global-search {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  html[data-theme] .app-shell .app-header-center > div.header-popover-wrap {
+    flex: none;
+  }
+}
+
+/* The order of losses in the one-row header, measured with the calls button
+   and a company switcher in place, so the search never drops below ~180px:
+   the name at the avatar goes below 1441 (it went below 1321), the switcher's
+   text below 1241 (below 1121), and below 1025 the header becomes two rows. */
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .app-shell .profile-block .header-profile-link strong {
+    display: none;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1240px) {
+  html[data-theme] .app-shell .app-header .team-switcher {
+    display: inline-flex;
+    gap: 6px;
+    padding: 0 8px 0 6px;
+  }
+
+  .app-shell .app-header .team-switcher-text {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Date pickers: one field wherever a date is chosen — filters, analytics,
+ * admin, actions, integrations. The trigger used to take the font of the label
+ * it sits in, so the same "Выберите дату" was bold and large in the calls
+ * filters and "Дата" oversized in analytics; it has its own size now, the empty
+ * state is quiet, and the calendar icon is neutral.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .date-time-trigger {
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: border-color var(--vt-dur-fast) ease, background var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .date-time-trigger:is(:hover, [aria-expanded="true"]) {
+  border-color: var(--vt-line-strong);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .date-time-trigger:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 2px;
+}
+
+html[data-theme] .app-shell .date-time-trigger > svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .date-time-trigger > i {
+  height: 18px;
+  background: var(--vt-line-mid);
+}
+
+html[data-theme] .app-shell .date-time-trigger.is-empty > span {
+  color: var(--vt-text-3);
+  font-weight: 400;
+}
+
+/* The calendar itself: the same surfaces as other popovers, the chosen day in
+   the fill of the main buttons, today marked by a ring, no gradients. */
+html[data-theme] .date-time-popover.vt-portal {
+  padding: 14px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 16px;
+  color: var(--vt-text);
+  background: var(--vt-s1);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-month strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+html[data-theme] .date-time-popover.vt-portal :is(.date-time-month button, .date-time-actions button) {
+  min-height: 36px;
+  border: 1px solid var(--vt-line-mid);
+  color: var(--vt-text-2);
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+html[data-theme] .date-time-popover.vt-portal :is(.date-time-month button, .date-time-actions button):hover:not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-weekdays {
+  color: var(--vt-text-3);
+  font-size: 0.75rem;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button {
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+  border-color: transparent;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button.is-outside {
+  color: var(--vt-text-3);
+  opacity: 0.6;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button.is-today {
+  border-color: var(--vt-line-strong);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button.is-selected,
+html[data-theme] .date-time-popover.vt-portal .date-time-actions .date-time-confirm {
+  border-color: transparent;
+  color: #fff;
+  background: var(--vt-accent-fill);
+  box-shadow: none;
+  opacity: 1;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-actions .date-time-confirm:hover:not(:disabled) {
+  background: var(--vt-accent-fill-hover);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-clock {
+  border-top-color: var(--vt-line);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-clock > svg {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-select-trigger {
+  border: 1px solid transparent;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-select-trigger:is(:hover, [aria-expanded="true"]) {
+  border-color: var(--vt-line-strong);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options-shell {
+  border: 1px solid var(--vt-line-mid);
+  background: var(--vt-s1);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options > button {
+  color: var(--vt-text);
+  font-weight: 500;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options > button:hover {
+  background: var(--vt-hover);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options > button.is-selected {
+  color: #fff;
+  background: var(--vt-accent-fill);
+}
+
+/* ---------------------------------------------------------------------------
+ * Primary buttons: a flat fill. The glow under them made every page look
+ * like it had several main actions at once, and white text on the bright
+ * accent read at 3.1:1; the fill is the accent a step darker.
  * ------------------------------------------------------------------------- */
 html[data-theme] .app-shell .primary-button {
   border: 0;
-  background: var(--vt-accent);
+  color: #fff;
+  background: var(--vt-accent-fill);
   box-shadow: none;
   text-shadow: none;
 }
 
 html[data-theme] .app-shell .primary-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--vt-accent) 88%, #000);
+  background: var(--vt-accent-fill-hover);
   box-shadow: none;
   transform: none;
+}
+
+/* The upload steps number the current one on the same fill. */
+html[data-theme] .app-shell .step-rail .step-item.active > span:first-child {
+  color: #fff;
+  background: var(--vt-accent-fill);
 }
 
 html[data-theme] .app-shell .primary-button:focus-visible {
@@ -3315,21 +3748,35 @@ html[data-theme] .app-shell .calls-sidebar :is(.call-folder-heading .icon-button
   background: var(--vt-hover);
 }
 
+/* Every folder and every call is its own outlined card with a few pixels of
+   air around it; as bare rows the column read as one long block of text. */
 html[data-theme] .app-shell .calls-sidebar .call-folder-tree {
   display: grid;
-  gap: 2px;
+  gap: 6px;
+}
+
+html[data-theme] .app-shell .calls-sidebar :is(.call-folder-project-head, .call-row) {
+  border: 1px solid var(--vt-line-mid);
+  background: color-mix(in srgb, var(--vt-s2) 55%, transparent);
+  transition: background var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .calls-sidebar :is(.call-folder-project-head, .call-row):hover {
+  border-color: var(--vt-line-strong);
+  background: var(--vt-s2);
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-folder-project-head {
   display: flex;
   align-items: center;
   gap: 2px;
-  border-radius: 10px;
-  transition: background var(--vt-dur-fast) ease;
+  padding-right: 4px;
+  border-radius: 12px;
 }
 
-html[data-theme] .app-shell .calls-sidebar .call-folder-project-head:hover {
-  background: var(--vt-hover);
+html[data-theme] .app-shell .calls-sidebar .call-list {
+  display: grid;
+  gap: 5px;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-folder-project-button {
@@ -3372,7 +3819,7 @@ html[data-theme] .app-shell .calls-sidebar .call-folder-project-button {
   background: var(--vt-s2);
 }
 
-html[data-theme] .app-shell .calls-sidebar .call-row-deleted {
+html[data-theme] .app-shell .calls-sidebar .call-row.call-row-deleted {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -3382,51 +3829,78 @@ html[data-theme] .app-shell .calls-sidebar .call-row-deleted .call-row-main smal
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-folder-project-button strong {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--vt-text);
   font-size: 0.92rem;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-folder-project-button small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
   color: var(--vt-text-3);
   font-size: 0.8rem;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-folder-child-list {
   display: grid;
-  gap: 2px;
-  margin: 2px 0 6px 15px;
+  gap: 5px;
+  margin: 6px 0 4px 15px;
   padding: 0 0 0 10px;
   border-left: 1px solid var(--vt-line-mid);
 }
 
-/* A call row: status icon, title, status and date; nothing boxed. */
+/* A call row: the time of the call on a tile, its status as a dot on that
+   tile, the title, then length and anything unusual. The rows are split by
+   day headings, and the open call is the one tinted row in the column —
+   active navigation is where the accent belongs. */
+.app-shell .call-day-heading {
+  margin: 12px 10px 4px;
+  color: var(--vt-text-3);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.app-shell :is(.call-folder-child-list, .call-list) > .call-day-heading:first-child {
+  margin-top: 4px;
+}
+
 html[data-theme] .app-shell .calls-sidebar .call-row {
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   min-height: 0;
-  padding: 9px 8px 9px 10px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
+  padding: 8px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--vt-s2) 55%, transparent);
   box-shadow: none;
   transform: none;
-  transition: background var(--vt-dur-fast) ease;
+  transition: background var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row::before {
+  content: none;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-row:hover {
-  background: var(--vt-hover);
+  border-color: var(--vt-line-strong);
+  background: var(--vt-s2);
   box-shadow: none;
   transform: none;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-row.selected {
-  background: var(--vt-s2);
-  box-shadow: inset 0 0 0 1px var(--vt-line-mid);
+  border-color: color-mix(in srgb, var(--vt-accent) 45%, transparent);
+  background: var(--vt-accent-soft);
+  box-shadow: none;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-row:focus-visible {
@@ -3434,20 +3908,380 @@ html[data-theme] .app-shell .calls-sidebar .call-row:focus-visible {
   outline-offset: -2px;
 }
 
-.app-shell .call-row-icon {
+/* Folders are square tiles in their own colour; a call is a round neutral
+   emblem, so the two never blend in the tree. */
+.app-shell .call-row-emblem {
+  position: relative;
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  color: var(--vt-text-3);
-  background: var(--vt-soft);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 50%;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  transition: background var(--vt-dur-fast) ease, color var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
 }
 
-.app-shell .call-row-icon.is-ok { color: var(--vt-good-mark); background: var(--vt-good-soft); }
-.app-shell .call-row-icon.is-warn { color: var(--vt-warn-mark); background: var(--vt-warn-soft); }
-.app-shell .call-row-icon.is-bad { color: var(--vt-bad-mark); background: var(--vt-bad-soft); }
-.app-shell .call-row-icon.is-test { color: var(--vt-info-mark); background: var(--vt-info-soft); }
+.app-shell .call-row-emblem i {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--vt-text-3);
+  box-shadow: 0 0 0 2px var(--vt-s1);
+}
+
+.app-shell .call-row-emblem.is-ok i { background: var(--vt-good-mark); }
+.app-shell .call-row-emblem.is-warn i { background: var(--vt-warn-mark); }
+.app-shell .call-row-emblem.is-bad i { background: var(--vt-bad-mark); }
+.app-shell .call-row-emblem.is-test i { background: var(--vt-info-mark); }
+
+html[data-theme] .app-shell .calls-sidebar .call-row.selected .call-row-emblem {
+  border-color: transparent;
+  color: var(--vt-accent-text);
+  background: color-mix(in srgb, var(--vt-accent) 16%, var(--vt-s1));
+}
+
+.app-shell .vt-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Folder dialog: an island with labelled fields, the folder previewed as the
+ * list will show it, colour swatches instead of gradient tiles, and the
+ * project's own checkboxes for instructions.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .call-folder-modal-layer {
+  background: rgba(10, 7, 5, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+html[data-theme="light"] .app-shell .call-folder-modal-layer {
+  background: rgba(60, 40, 28, 0.22);
+}
+
+html[data-theme] .app-shell .call-folder-modal {
+  gap: 18px;
+  width: min(480px, 100%);
+  padding: 22px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 16px;
+  color: var(--vt-text);
+  background: var(--vt-s1);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head strong {
+  color: var(--vt-text);
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head small {
+  color: var(--vt-text-3);
+  font-size: 0.86rem;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head .icon-button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  color: var(--vt-text-3);
+  background: transparent;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head .icon-button:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-form.modal-form {
+  display: grid;
+  gap: 16px;
+}
+
+/* Every field has its label above it, in the same quiet style. */
+html[data-theme] .app-shell .call-folder-modal :is(.call-folder-field > span, .call-folder-scope-field > span, .call-folder-scope-picker legend, .call-folder-instructions legend, .call-folder-color-picker-head > span:first-child) {
+  margin: 0;
+  padding: 0;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field > span small {
+  color: var(--vt-text-3);
+  font-size: inherit;
+  font-weight: 450;
+  opacity: 0.8;
+}
+
+html[data-theme] .app-shell .call-folder-modal :is(.call-folder-field, .call-folder-scope-field) {
+  display: grid;
+  gap: 6px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field input,
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-field .select-trigger {
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-size: 0.92rem;
+  font-weight: 450;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field input::placeholder {
+  color: var(--vt-text-3);
+  font-weight: 400;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field input:focus {
+  border-color: var(--vt-line-strong);
+  outline: none;
+}
+
+.app-shell .call-folder-scope-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  font-size: 0.86rem;
+}
+
+.app-shell .call-folder-scope-note svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-picker {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  gap: 8px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  box-shadow: none;
+  text-align: left;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button:hover {
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button.active {
+  border-color: var(--vt-line-strong);
+  color: var(--vt-text);
+  background: var(--vt-s3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button > svg {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button.active > svg {
+  color: var(--vt-text);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button strong {
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button small {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-color-picker {
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-color-picker-head {
+  justify-content: space-between;
+}
+
+.app-shell .call-folder-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 62%;
+  min-width: 0;
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.app-shell .call-folder-preview > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  aspect-ratio: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--folder-color);
+  box-shadow: none;
+  transition: transform var(--vt-dur-fast) ease, box-shadow var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button svg {
+  opacity: 0;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button:hover {
+  border: 0;
+  transform: scale(1.08);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button.active {
+  border: 0;
+  box-shadow: 0 0 0 2px var(--vt-s1), 0 0 0 4px var(--folder-color);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button.active svg {
+  opacity: 1;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 4px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instructions {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instructions > small {
+  color: var(--vt-text-3);
+  font-size: 0.82rem;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options {
+  gap: 2px;
+  max-height: 200px;
+  padding-right: 2px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label {
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label:hover {
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label.is-checked {
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label > span {
+  color: var(--vt-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* The project's checkbox, which this list had overridden with the native one. */
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options input[type="checkbox"] {
+  appearance: none;
+  width: 20px !important;
+  min-width: 20px;
+  max-width: 20px;
+  height: 20px;
+  border: 1px solid var(--vt-line-strong);
+  border-radius: 6px;
+  background: transparent;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options input[type="checkbox"]:checked {
+  border-color: var(--vt-accent);
+  background: var(--vt-accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fffaf5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.8' d='m3.25 8 3.05 3.05 6.45-6.45'/%3E%3C/svg%3E") center / 15px no-repeat;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Collapse the list: a real button, not a ghost of one. */
+html[data-theme] .app-shell .calls-sidebar .calls-list-collapse {
+  border: 1px solid var(--vt-line-mid);
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-list-collapse:hover {
+  color: var(--vt-text);
+  background: var(--vt-s3);
+}
 
 html[data-theme] .app-shell .calls-sidebar .call-row-main {
   display: grid;
@@ -3462,6 +4296,7 @@ html[data-theme] .app-shell .calls-sidebar .call-row-main > strong {
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1.3;
+  white-space: normal;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -3488,8 +4323,11 @@ html[data-theme] .app-shell .calls-sidebar .call-row-meta .status-chip::before {
 
 html[data-theme] .app-shell .calls-sidebar .call-row-meta small,
 html[data-theme] .app-shell .calls-sidebar .call-source-line {
+  overflow: visible;
   color: var(--vt-text-3);
   font-size: 0.78rem;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-row-actions {
@@ -3703,6 +4541,29 @@ html[data-theme] .app-shell :is(
 
 html[data-theme] .app-shell .device-card .device-icon {
   background: var(--vt-s3);
+}
+
+/* An emblem on a card that is itself the s2 surface needs the next shade up,
+   otherwise the tile disappears into the card it sits on. */
+html[data-theme] .app-shell .atmospheric-page :is(.glass, .glass-panel) > .page-emblem,
+html[data-theme] .app-shell .atmospheric-page .privacy-settings-heading.glass-panel > span:first-child,
+html[data-theme] .app-shell .atmospheric-page .settings-heading.glass-panel > .settings-heading-icon {
+  background: var(--vt-s3);
+}
+
+/* In the light theme a tile and the card under it are two shades of the same
+   paper (1.1:1), so every emblem keeps a hairline instead of relying on fill. */
+html[data-theme] .app-shell :is(
+  .page-emblem,
+  .privacy-settings-heading > span:first-child,
+  .company-create-icon,
+  .next-step .step-icon,
+  .settings-heading .settings-heading-icon,
+  .analysis-personalization-heading > span:first-child,
+  .monitoring-metric > span:first-child,
+  .device-card .device-icon
+) {
+  box-shadow: inset 0 0 0 1px var(--vt-line);
 }
 
 html[data-theme] .app-shell :is(.privacy-settings-heading > span:first-child, .company-create-icon, .next-step .step-icon) svg {
@@ -4128,6 +4989,8 @@ html[data-theme] .app-shell .quality-review-entry small {
 @media (max-width: 760px) {
   .app-shell :is(
     .audio-lane-legend li,
+    .audio-lane-note,
+    .call-day-heading,
     .analysis-item-title small,
     .criterion-detail-label,
     .criterion-detail-coverage,
@@ -4165,6 +5028,186 @@ html[data-theme] .app-shell .quality-review-entry small {
     .instructions-catalog-head span
   ) {
     font-size: var(--mobile-text-small, 14px);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Notifications: which events arrive and where. The native checkbox was the
+ * last unstyled control in the app — a white box that belonged to no theme —
+ * so the cell carries the same switch as an instruction's «Активна».
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .notification-matrix {
+  padding: 6px 12px 10px;
+  border-radius: 16px;
+}
+
+html[data-theme] .app-shell .notification-matrix-row {
+  grid-template-columns: minmax(0, 1fr) repeat(3, 148px);
+  gap: 8px 12px;
+  padding: 14px 10px;
+  border-top-color: var(--vt-line);
+  border-radius: 12px;
+}
+
+html[data-theme] .app-shell .notification-matrix-row:not(.is-head):hover {
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .notification-matrix-row.is-head {
+  padding-bottom: 10px;
+  color: var(--vt-text-3);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+html[data-theme] .app-shell .notification-matrix-row.is-head > span:not(:first-child) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .notification-matrix-row.is-head svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+/* «скоро» is a state of the channel, not a call to act: a quiet outline. */
+html[data-theme] .app-shell .notification-matrix-row.is-head em {
+  margin-left: 0;
+  padding: 2px 7px;
+  color: var(--vt-text-3);
+  background: transparent;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+}
+
+html[data-theme] .app-shell .notification-matrix-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+html[data-theme] .app-shell .notification-matrix-event > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .notification-matrix-emblem {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .notification-matrix-emblem svg {
+  width: 18px;
+  height: 18px;
+}
+
+html[data-theme] .app-shell .notification-matrix-event strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .notification-matrix-event small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+html[data-theme] .app-shell .notification-matrix-cell {
+  gap: 10px;
+  cursor: pointer;
+}
+
+html[data-theme] .app-shell .notification-matrix-cell.is-waiting {
+  cursor: not-allowed;
+}
+
+html[data-theme] .app-shell .notification-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--vt-track);
+  transition: background var(--vt-dur) ease;
+}
+
+html[data-theme] .app-shell .notification-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--vt-text-2);
+  transition: transform var(--vt-dur) var(--vt-ease), background var(--vt-dur) ease;
+}
+
+/* The off track is a faint tint that all but vanishes on light paper, so it
+   keeps an edge; the on track carries its own colour and needs none. */
+html[data-theme] .app-shell .notification-matrix-cell input:not(:checked) + .notification-switch {
+  box-shadow: inset 0 0 0 1px var(--vt-line-mid);
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:checked + .notification-switch {
+  background: var(--vt-good-mark);
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:checked + .notification-switch i {
+  background: #ffffff;
+  transform: translateX(14px);
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:disabled + .notification-switch {
+  opacity: 0.45;
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:focus-visible + .notification-switch {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 3px;
+}
+
+html[data-theme] .app-shell .notification-matrix-channel {
+  color: var(--vt-text-3);
+  font-size: 0.85rem;
+}
+
+/* Three channel columns plus a readable event text need the wide layout; from
+   the tablet width down the row stacks and every switch says which channel it
+   is, instead of the column headings breaking into fragments. */
+@media (max-width: 1240px) {
+  html[data-theme] .app-shell .notification-matrix-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-theme] .app-shell .notification-matrix-row.is-head {
+    display: none;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-row.is-head + .notification-matrix-row {
+    border-top: 0;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-event {
+    margin-bottom: 4px;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-cell {
+    justify-content: flex-start;
+    padding-left: 50px;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-channel {
+    display: inline;
   }
 }
 

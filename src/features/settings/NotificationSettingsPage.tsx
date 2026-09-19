@@ -1,14 +1,16 @@
-import { ArrowLeft, BellRing } from "lucide-react";
+import { ArrowLeft, Bell, BellRing, CalendarCheck, Mail, Send, TrendingDown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import type { NotificationSubscription } from "../../types";
 
-const kindLabels: Record<NotificationSubscription["kind"], { title: string; text: string }> = {
-  weekly_digest: { title: "Итоги недели", text: "В понедельник утром: звонки, средний балл, слабые критерии и работа над ошибками за прошлую неделю." },
-  critical_call_alert: { title: "Провальный звонок", text: "Пропущен критичный критерий или балл ниже порога компании." },
+const kindLabels: Record<NotificationSubscription["kind"], { title: string; text: string; icon: LucideIcon }> = {
+  weekly_digest: { title: "Итоги недели", text: "В понедельник утром: звонки, средний балл, слабые критерии и работа над ошибками за прошлую неделю.", icon: CalendarCheck },
+  critical_call_alert: { title: "Провальный звонок", text: "Пропущен критичный критерий или балл ниже порога компании.", icon: TrendingDown },
 };
 
 const channelLabels: Record<NotificationSubscription["channel"], string> = { in_app: "В приложении", email: "Почта", telegram: "Telegram" };
+const channelIcons: Record<NotificationSubscription["channel"], LucideIcon> = { in_app: Bell, email: Mail, telegram: Send };
 const channels: NotificationSubscription["channel"][] = ["in_app", "email", "telegram"];
 const kinds: NotificationSubscription["kind"][] = ["weekly_digest", "critical_call_alert"];
 
@@ -47,19 +49,30 @@ export function NotificationSettingsPage({ onBack }: { onBack: () => void }) {
     {items && <div className="notification-matrix glass-panel" role="table" aria-label="События и каналы">
       <div className="notification-matrix-row is-head" role="row">
         <span role="columnheader">Событие</span>
-        {channels.map((channel) => <span key={channel} role="columnheader">{channelLabels[channel]}{channel !== "in_app" ? <em>скоро</em> : null}</span>)}
-      </div>
-      {kinds.map((kind) => <div className="notification-matrix-row" role="row" key={kind}>
-        <span className="notification-matrix-event" role="rowheader"><strong>{kindLabels[kind].title}</strong><small>{kindLabels[kind].text}</small></span>
         {channels.map((channel) => {
-          const item = cell(kind, channel);
-          return <label key={channel} className="notification-matrix-cell" role="cell" data-channel={channelLabels[channel]}>
-            <input type="checkbox" checked={Boolean(item?.enabled)} disabled={!item?.available || busy === `${kind}/${channel}`}
-              aria-label={`${kindLabels[kind].title}: ${channelLabels[channel]}`} onChange={() => item && void toggle(item)} />
-            <span className="notification-matrix-channel">{channelLabels[channel]}{channel !== "in_app" ? " · скоро" : ""}</span>
-          </label>;
+          const ChannelIcon = channelIcons[channel];
+          return <span key={channel} role="columnheader"><ChannelIcon size={15} aria-hidden="true" />{channelLabels[channel]}{channel !== "in_app" ? <em>скоро</em> : null}</span>;
         })}
-      </div>)}
+      </div>
+      {kinds.map((kind) => {
+        const KindIcon = kindLabels[kind].icon;
+        return <div className="notification-matrix-row" role="row" key={kind}>
+          <span className="notification-matrix-event" role="rowheader">
+            <span className="page-emblem notification-matrix-emblem" aria-hidden="true"><KindIcon /></span>
+            <span><strong>{kindLabels[kind].title}</strong><small>{kindLabels[kind].text}</small></span>
+          </span>
+          {channels.map((channel) => {
+            const item = cell(kind, channel);
+            const waiting = !item?.available;
+            return <label key={channel} className={`notification-matrix-cell${waiting ? " is-waiting" : ""}`} role="cell" data-channel={channelLabels[channel]}>
+              <input type="checkbox" className="vt-sr-only" checked={Boolean(item?.enabled)} disabled={waiting || busy === `${kind}/${channel}`}
+                aria-label={`${kindLabels[kind].title}: ${channelLabels[channel]}`} onChange={() => item && void toggle(item)} />
+              <span className="notification-switch" aria-hidden="true"><i /></span>
+              <span className="notification-matrix-channel">{channelLabels[channel]}{channel !== "in_app" ? " · скоро" : ""}</span>
+            </label>;
+          })}
+        </div>;
+      })}
     </div>}
   </section>;
 }

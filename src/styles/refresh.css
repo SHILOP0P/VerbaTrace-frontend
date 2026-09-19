@@ -37,6 +37,12 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   --vt-bad-soft: rgba(232, 105, 91, 0.15);
   --vt-info: #7ea8da;
   --vt-info-soft: rgba(126, 168, 218, 0.15);
+  /* Marks (arcs, bars, dots, icons) may be as bright as the theme allows; on
+     a dark page the text tones already are. */
+  --vt-good-mark: #5fbf7e;
+  --vt-warn-mark: #e8a54b;
+  --vt-bad-mark: #ec6b5d;
+  --vt-info-mark: #7eaae0;
   /* Series colours: a metric keeps its colour, and none of them is the accent. */
   --vt-chart-blue: #6ea6e6;
   --vt-chart-violet: #a88bec;
@@ -49,39 +55,46 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
 }
 
 html[data-theme="light"] :is(.app-shell, .vt-portal) {
-  --vt-canvas: #f5eee7;
-  --vt-s1: #fffcf9;
-  --vt-s2: #f1e8df;
+  /* A clean warm paper rather than beige: the nested fill is barely tinted,
+     so tinted blocks and colour marks stay fresh on it. */
+  --vt-canvas: #f4efea;
+  --vt-s1: #fffdfb;
+  --vt-s2: #f6f1ec;
   --vt-s3: #ffffff;
-  --vt-soft: rgba(84, 56, 38, 0.05);
-  --vt-hover: rgba(84, 56, 38, 0.05);
-  --vt-line: rgba(84, 56, 38, 0.10);
-  --vt-line-mid: rgba(84, 56, 38, 0.14);
-  --vt-line-strong: rgba(84, 56, 38, 0.2);
+  --vt-soft: rgba(84, 56, 38, 0.045);
+  --vt-hover: rgba(84, 56, 38, 0.045);
+  --vt-line: rgba(84, 56, 38, 0.09);
+  --vt-line-mid: rgba(84, 56, 38, 0.13);
+  --vt-line-strong: rgba(84, 56, 38, 0.19);
   --vt-text: #1c1511;
-  --vt-text-2: #5f544c;
+  --vt-text-2: #5c524b;
   /* Dark enough for 4.5:1 on the nested fill, not only on white. */
-  --vt-text-3: #6b5f56;
-  --vt-track: rgba(84, 56, 38, 0.10);
+  --vt-text-3: #6b6058;
+  --vt-track: rgba(84, 56, 38, 0.08);
   --vt-accent: #ff5a2f;
   --vt-accent-text: #b3380f;
   --vt-accent-soft: rgba(255, 90, 47, 0.12);
   --vt-on-accent: #1d0c05;
-  /* Tones are text as often as they are marks, so each keeps 4.5:1 on its
-     own soft tint. */
-  --vt-good: #1c7040;
-  --vt-good-soft: rgba(35, 134, 78, 0.12);
-  --vt-warn: #975206;
-  --vt-warn-soft: rgba(176, 98, 10, 0.12);
-  --vt-warn-ring: rgba(176, 98, 10, 0.35);
-  --vt-bad: #b23a31;
-  --vt-bad-soft: rgba(196, 67, 58, 0.12);
-  --vt-info: #345d91;
-  --vt-info-soft: rgba(63, 111, 168, 0.12);
-  --vt-chart-blue: #24599a;
-  --vt-chart-violet: #5a3da8;
-  --vt-chart-green: #1c7040;
-  --vt-chart-teal: #146f68;
+  /* Text tones keep 4.5:1 on their own soft tint, as saturated as that
+     allows; marks carry the bright colour. Using the text shade for an arc or
+     a bar is what made the light theme look brown. */
+  --vt-good: #127a3f;
+  --vt-good-soft: rgba(46, 159, 99, 0.12);
+  --vt-warn: #a35600;
+  --vt-warn-soft: rgba(230, 140, 10, 0.13);
+  --vt-warn-ring: rgba(230, 140, 10, 0.4);
+  --vt-bad: #c2372d;
+  --vt-bad-soft: rgba(229, 72, 77, 0.11);
+  --vt-info: #2563c4;
+  --vt-info-soft: rgba(59, 130, 246, 0.11);
+  --vt-good-mark: #2e9f63;
+  --vt-warn-mark: #e68c0a;
+  --vt-bad-mark: #e5484d;
+  --vt-info-mark: #3b82f6;
+  --vt-chart-blue: #3b82f6;
+  --vt-chart-violet: #8b5cf6;
+  --vt-chart-green: #2e9f63;
+  --vt-chart-teal: #14a39a;
   --vt-shadow: 0 14px 30px rgba(84, 56, 38, 0.12);
   --vt-shadow-soft: 0 6px 18px rgba(84, 56, 38, 0.09);
   --vt-skeleton: rgba(84, 56, 38, 0.08);
@@ -123,24 +136,50 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   font-variant-numeric: tabular-nums;
 }
 
-/* One quiet canvas instead of the photo; the warm corner keeps the brand. */
+/* The canvas is not flat black: a warm light falls from the top right, a faint
+   bounce warms the opposite corner, and a fine grain keeps the dark gradient
+   from banding into steps. Both layers are fixed, so the light stays in place
+   while a page scrolls, and they replace the photo layers of the old theme. */
 html[data-theme] .app-shell:not(.select-menu-portal-root) {
   color: var(--vt-text);
-  background:
-    radial-gradient(1100px 620px at 88% -12%, rgba(255, 90, 47, 0.075), transparent 62%),
-    var(--vt-canvas);
-}
-
-html[data-theme="light"] .app-shell:not(.select-menu-portal-root) {
-  background:
-    radial-gradient(1100px 620px at 88% -12%, rgba(255, 90, 47, 0.07), transparent 62%),
-    var(--vt-canvas);
+  background: var(--vt-canvas);
 }
 
 html[data-theme] .app-shell:not(.select-menu-portal-root)::before,
 html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
-  content: none;
-  background: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  content: "";
+  opacity: 1;
+  filter: none;
+  transform: none;
+  pointer-events: none;
+}
+
+html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
+  background:
+    radial-gradient(52% 60% at 88% -12%, rgba(255, 112, 60, 0.24) 0%, rgba(255, 90, 47, 0.09) 40%, transparent 72%),
+    radial-gradient(28% 32% at 100% 0%, rgba(255, 176, 120, 0.1), transparent 70%),
+    radial-gradient(46% 55% at -8% 112%, rgba(255, 96, 50, 0.09), transparent 70%),
+    linear-gradient(180deg, #171210 0%, var(--vt-canvas) 58%, #0d0a08 100%);
+}
+
+html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::before {
+  background:
+    radial-gradient(52% 60% at 88% -12%, rgba(255, 128, 72, 0.2) 0%, rgba(255, 150, 100, 0.07) 42%, transparent 72%),
+    radial-gradient(46% 55% at -8% 112%, rgba(255, 170, 120, 0.13), transparent 70%),
+    linear-gradient(180deg, #f9f5f1 0%, var(--vt-canvas) 70%);
+}
+
+html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  opacity: 0.05;
+}
+
+html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::after {
+  opacity: 0.035;
 }
 
 html[data-theme] body {
@@ -283,16 +322,18 @@ html[data-theme] .app-shell .app-header.app-header {
   transform-origin: left center;
 }
 
+/* A finished stage is a success, not a grey bar: done, running and failed
+   read as green, amber and red like everywhere else. */
 .app-shell .stage-rail-step.is-done .stage-rail-fill {
   width: 100%;
-  background: var(--vt-text-3);
+  background: color-mix(in srgb, var(--vt-good-mark) 75%, var(--vt-track));
   animation: vt-rail-fill 480ms var(--vt-ease) both;
   animation-delay: calc(var(--rail-index, 0) * 110ms);
 }
 
 .app-shell .stage-rail-step.is-active .stage-rail-fill {
   overflow: hidden;
-  background: var(--vt-warn);
+  background: var(--vt-warn-mark);
   transition: width var(--vt-dur-slow) var(--vt-ease);
 }
 
@@ -306,7 +347,7 @@ html[data-theme] .app-shell .app-header.app-header {
 }
 
 .app-shell .stage-rail-step.is-failed .stage-rail-fill {
-  background: var(--vt-bad);
+  background: var(--vt-bad-mark);
 }
 
 .app-shell .stage-rail-step.is-pending .stage-rail-line {
@@ -340,14 +381,14 @@ html[data-theme] .app-shell .app-header.app-header {
 }
 
 .app-shell .stage-rail-step.is-active .stage-rail-dot {
-  border: 2px solid var(--vt-warn);
+  border: 2px solid var(--vt-warn-mark);
   background: var(--vt-s1);
   animation: vt-rail-pulse 1.8s ease-out infinite;
 }
 
 .app-shell .stage-rail-step.is-failed .stage-rail-dot {
   border-color: transparent;
-  background: var(--vt-bad);
+  background: var(--vt-bad-mark);
 }
 
 .app-shell .stage-rail-label {
@@ -397,7 +438,7 @@ html[data-theme] .app-shell .app-header.app-header {
   height: 22px;
   place-items: center;
   border-radius: 50%;
-  color: var(--vt-good);
+  color: var(--vt-good-mark);
   background: var(--vt-good-soft);
 }
 
@@ -432,14 +473,15 @@ html[data-theme] .app-shell .app-header.app-header {
   gap: 4px;
 }
 
+/* All stages done: the same green as the open rail, the final one full. */
 .app-shell .stage-rail-summary-line > span {
   height: 2px;
   border-radius: 2px;
-  background: var(--vt-text-3);
+  background: color-mix(in srgb, var(--vt-good-mark) 75%, var(--vt-track));
 }
 
 .app-shell .stage-rail-summary-line > span:last-child {
-  background: var(--vt-good);
+  background: var(--vt-good-mark);
 }
 
 .app-shell .stage-rail-failure {
@@ -458,7 +500,7 @@ html[data-theme] .app-shell .app-header.app-header {
   height: 30px;
   place-items: center;
   border-radius: 9px;
-  color: var(--vt-bad);
+  color: var(--vt-bad-mark);
   background: var(--vt-s1);
 }
 
@@ -586,9 +628,9 @@ html[data-theme] .app-shell .app-header.app-header {
   animation: app-shimmer 1.4s ease-in-out infinite;
 }
 
-.app-shell .score-gauge.tone-good .score-gauge-value { stroke: var(--vt-good); }
-.app-shell .score-gauge.tone-warning .score-gauge-value { stroke: var(--vt-warn); }
-.app-shell .score-gauge.tone-danger .score-gauge-value { stroke: var(--vt-bad); }
+.app-shell .score-gauge.tone-good .score-gauge-value { stroke: var(--vt-good-mark); }
+.app-shell .score-gauge.tone-warning .score-gauge-value { stroke: var(--vt-warn-mark); }
+.app-shell .score-gauge.tone-danger .score-gauge-value { stroke: var(--vt-bad-mark); }
 
 .app-shell .score-gauge-tick {
   stroke: var(--vt-line-strong);
@@ -705,17 +747,17 @@ html[data-theme] .app-shell .analysis-distribution {
   border-radius: 2px;
 }
 
-.app-shell .analysis-distribution-legend .good::before { background: var(--vt-good); }
-.app-shell .analysis-distribution-legend .warning::before { background: var(--vt-warn); }
-.app-shell .analysis-distribution-legend .danger::before { background: var(--vt-bad); }
+.app-shell .analysis-distribution-legend .good::before { background: var(--vt-good-mark); }
+.app-shell .analysis-distribution-legend .warning::before { background: var(--vt-warn-mark); }
+.app-shell .analysis-distribution-legend .danger::before { background: var(--vt-bad-mark); }
 
 .app-shell .analysis-insight {
   border: 0;
 }
 
 /* Large tinted areas stay faint; the icon and heading carry the tone. */
-.app-shell .analysis-insight.good { background: color-mix(in srgb, var(--vt-good) 7%, var(--vt-s2)); }
-.app-shell .analysis-insight.warning { background: color-mix(in srgb, var(--vt-warn) 7%, var(--vt-s2)); }
+.app-shell .analysis-insight.good { background: color-mix(in srgb, var(--vt-good-mark) 7%, var(--vt-s2)); }
+.app-shell .analysis-insight.warning { background: color-mix(in srgb, var(--vt-warn-mark) 7%, var(--vt-s2)); }
 
 /* Advice: a numbered list divided by lines. The number is a place in the
    queue, not a score, so it stays neutral; the level carries the colour. */
@@ -794,9 +836,9 @@ html[data-theme] .app-shell .analysis-recommendation-head strong {
   background: var(--vt-text-3);
 }
 
-.app-shell .analysis-recommendation-priority.high::before { background: var(--vt-bad); }
-.app-shell .analysis-recommendation-priority.medium::before { background: var(--vt-warn); }
-.app-shell .analysis-recommendation-priority.low::before { background: var(--vt-info); }
+.app-shell .analysis-recommendation-priority.high::before { background: var(--vt-bad-mark); }
+.app-shell .analysis-recommendation-priority.medium::before { background: var(--vt-warn-mark); }
+.app-shell .analysis-recommendation-priority.low::before { background: var(--vt-info-mark); }
 
 html[data-theme] .app-shell p.analysis-recommendation-action {
   margin: 0;
@@ -877,9 +919,9 @@ html[data-theme] .app-shell .analysis-v3-item:hover {
   background: var(--vt-track);
 }
 
-.app-shell .analysis-score-pips.good i.is-filled { background: var(--vt-good); }
-.app-shell .analysis-score-pips.warning i.is-filled { background: var(--vt-warn); }
-.app-shell .analysis-score-pips.danger i.is-filled { background: var(--vt-bad); }
+.app-shell .analysis-score-pips.good i.is-filled { background: var(--vt-good-mark); }
+.app-shell .analysis-score-pips.warning i.is-filled { background: var(--vt-warn-mark); }
+.app-shell .analysis-score-pips.danger i.is-filled { background: var(--vt-bad-mark); }
 
 .app-shell .analysis-item-title strong {
   color: var(--vt-text);
@@ -940,14 +982,12 @@ html[data-theme] .app-shell .analysis-v3-item:hover {
 }
 
 /* An opened criterion, as on the approved reference: text on the left,
-   quotes on the right, labels instead of boxed sections. */
-.app-shell .analysis-v3-items {
-  container-type: inline-size;
-}
-
+   quotes on the right, labels instead of boxed sections. The quotes move
+   under the text by themselves once two 290px columns no longer fit, without
+   a container query. */
 html[data-theme] .app-shell .analysis-v3-item-body.criterion-detail {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
   align-items: start;
   gap: 18px 26px;
   padding: 16px 18px 18px;
@@ -999,9 +1039,9 @@ html[data-theme] .app-shell :is(.criterion-detail-section p, .criterion-detail-i
   --dot: var(--vt-text-3);
 }
 
-.app-shell .criterion-detail-list.good { --dot: var(--vt-good); }
-.app-shell .criterion-detail-list.warning { --dot: var(--vt-warn); }
-.app-shell .criterion-detail-list.danger { --dot: var(--vt-bad); }
+.app-shell .criterion-detail-list.good { --dot: var(--vt-good-mark); }
+.app-shell .criterion-detail-list.warning { --dot: var(--vt-warn-mark); }
+.app-shell .criterion-detail-list.danger { --dot: var(--vt-bad-mark); }
 
 html[data-theme] .app-shell .criterion-detail-list li {
   position: relative;
@@ -1087,20 +1127,15 @@ html[data-theme] .app-shell button.criterion-detail-basis:hover {
   text-decoration-color: currentColor;
 }
 
-@container (max-width: 640px) {
-  html[data-theme] .app-shell .analysis-v3-item-body.criterion-detail {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
 html[data-theme] .app-shell .analysis-detail-box {
   border: 0;
   background: var(--vt-s1);
 }
 
-html[data-theme] .app-shell .analysis-detail-box.good { background: color-mix(in srgb, var(--vt-good) 8%, var(--vt-s1)); }
-html[data-theme] .app-shell .analysis-detail-box.warning { background: color-mix(in srgb, var(--vt-warn) 8%, var(--vt-s1)); }
-html[data-theme] .app-shell .analysis-detail-box.reference { background: color-mix(in srgb, var(--vt-info) 8%, var(--vt-s1)); }
+html[data-theme] .app-shell .analysis-detail-box.good { background: color-mix(in srgb, var(--vt-good-mark) 8%, var(--vt-s1)); }
+html[data-theme] .app-shell .analysis-detail-box.warning { background: color-mix(in srgb, var(--vt-warn-mark) 8%, var(--vt-s1)); }
+html[data-theme] .app-shell .analysis-detail-box.reference { background: color-mix(in srgb, var(--vt-info-mark) 8%, var(--vt-s1)); }
 
 /* Quotes: the time is a button on the left, no accent stripe down the side. */
 html[data-theme] .app-shell :is(.evidence-link, .criterion-evidence blockquote, .evidence-quotes blockquote) {
@@ -1295,7 +1330,7 @@ html[data-theme] .app-shell .dashboard-kpi-card {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--vt-warn);
+  background: var(--vt-warn-mark);
   animation: vt-rail-pulse 1.8s ease-out infinite;
 }
 
@@ -1343,8 +1378,8 @@ html[data-theme] .app-shell .dashboard-kpi-card {
   opacity: 1;
 }
 
-.app-shell .mini-chart.success { --mini-chart-colour: var(--vt-good); }
-.app-shell .mini-chart.warning { --mini-chart-colour: var(--vt-warn); }
+.app-shell .mini-chart.success { --mini-chart-colour: var(--vt-good-mark); }
+.app-shell .mini-chart.warning { --mini-chart-colour: var(--vt-warn-mark); }
 
 .app-shell .mini-sparkline {
   animation: vt-spark-reveal 1100ms cubic-bezier(0.33, 1, 0.68, 1) both;
@@ -1507,12 +1542,14 @@ html[data-theme] .app-shell .sidebar-limit-card .sidebar-progress {
   background: var(--vt-track);
 }
 
+/* What is left of the credits is a resource, not a verdict: calm blue, amber
+   only when it runs low. */
 html[data-theme] .app-shell .sidebar-limit-card .sidebar-progress span {
-  background: var(--vt-text-2);
+  background: var(--vt-info-mark);
 }
 
 html[data-theme] .app-shell .sidebar-limit-card.is-low .sidebar-progress span {
-  background: var(--vt-warn);
+  background: var(--vt-warn-mark);
 }
 
 html[data-theme] .app-shell .sidebar-limit-card > small {
@@ -1754,9 +1791,9 @@ html[data-theme] .app-shell .mistakes-block {
   min-width: 4px;
 }
 
-.app-shell :is(.mistakes-bar, .mistakes-legend) .is-good { --tone: var(--vt-good); }
-.app-shell :is(.mistakes-bar, .mistakes-legend) .is-bad { --tone: var(--vt-bad); }
-.app-shell :is(.mistakes-bar, .mistakes-legend) .is-warn { --tone: var(--vt-warn); }
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-good { --tone: var(--vt-good-mark); }
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-bad { --tone: var(--vt-bad-mark); }
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-warn { --tone: var(--vt-warn-mark); }
 .app-shell :is(.mistakes-bar, .mistakes-legend) .is-hold { --tone: var(--vt-text-3); }
 
 .app-shell .mistakes-bar i {
@@ -2098,11 +2135,11 @@ html[data-theme] .app-shell .distribution-bar {
   background: var(--vt-track);
 }
 
-.app-shell .distribution-bar .is-met { background: var(--vt-good); }
-.app-shell .distribution-bar .is-mostly_met { background: color-mix(in srgb, var(--vt-good) 70%, var(--vt-warn)); }
-.app-shell .distribution-bar .is-partially_met { background: var(--vt-warn); }
-.app-shell .distribution-bar .is-minimally_met { background: color-mix(in srgb, var(--vt-warn) 45%, var(--vt-bad)); }
-.app-shell .distribution-bar .is-missed { background: var(--vt-bad); }
+.app-shell .distribution-bar .is-met { background: var(--vt-good-mark); }
+.app-shell .distribution-bar .is-mostly_met { background: color-mix(in srgb, var(--vt-good-mark) 70%, var(--vt-warn-mark)); }
+.app-shell .distribution-bar .is-partially_met { background: var(--vt-warn-mark); }
+.app-shell .distribution-bar .is-minimally_met { background: color-mix(in srgb, var(--vt-warn-mark) 45%, var(--vt-bad-mark)); }
+.app-shell .distribution-bar .is-missed { background: var(--vt-bad-mark); }
 
 .app-shell .delta-badge.is-up { color: var(--vt-good); }
 .app-shell .delta-badge.is-down { color: var(--vt-bad); }
@@ -2390,13 +2427,15 @@ html[data-theme] .app-shell .instructions-page-head .settings-heading {
   letter-spacing: 0.03em;
 }
 
-/* On the light page a lighter tile keeps the small label at 4.5:1. */
+/* On the light page the tile takes the bright colour and the small label a
+   deeper shade of it, so the label keeps 4.5:1. */
 html[data-theme="light"] .app-shell .instruction-item-format {
+  color: color-mix(in srgb, var(--format) 68%, #1c1511);
   background: color-mix(in srgb, var(--format) 12%, var(--vt-s1));
 }
 
 .app-shell .instruction-item-format.is-docx { --format: var(--vt-chart-blue); }
-.app-shell .instruction-item-format.is-pdf { --format: var(--vt-bad); }
+.app-shell .instruction-item-format.is-pdf { --format: var(--vt-bad-mark); }
 .app-shell .instruction-item-format.is-xlsx { --format: var(--vt-chart-green); }
 
 html[data-theme] .app-shell .instruction-item.is-off .instruction-item-format {
@@ -2504,7 +2543,7 @@ html[data-theme] .app-shell .instruction-item-actions .instruction-delete:hover:
 }
 
 .app-shell .instruction-switch.is-on .instruction-switch-track {
-  background: var(--vt-good);
+  background: var(--vt-good-mark);
 }
 
 .app-shell .instruction-switch.is-on .instruction-switch-track i {
@@ -2563,7 +2602,7 @@ html[data-theme] .app-shell .instruction-item-actions .instruction-delete:hover:
   padding: 16px 18px;
   border: 0;
   border-radius: var(--vt-radius-lg);
-  background: color-mix(in srgb, var(--vt-warn) 9%, var(--vt-s1));
+  background: color-mix(in srgb, var(--vt-warn-mark) 9%, var(--vt-s1));
 }
 
 .app-shell .instructions-help-card strong {
@@ -2579,7 +2618,7 @@ html[data-theme] .app-shell .instruction-item-actions .instruction-delete:hover:
 .app-shell .instructions-help-card strong svg {
   flex: 0 0 auto;
   margin-top: 1px;
-  color: var(--vt-warn);
+  color: var(--vt-warn-mark);
 }
 
 .app-shell .instructions-help-card ul {
@@ -2606,7 +2645,7 @@ html[data-theme] .app-shell .instruction-item-actions .instruction-delete:hover:
   height: 6px;
   border-radius: 50%;
   content: "";
-  background: var(--vt-warn);
+  background: var(--vt-warn-mark);
   opacity: 0.8;
 }
 
@@ -2859,29 +2898,25 @@ html[data-theme] .app-shell .workspace-options button small {
 }
 
 /* The wallet cards keep fixed minimum widths; the old rule chose the column
-   count by the window, so beside the sidebar four of them ran past the
-   panel and were cut. The panel's own width decides now. */
-.app-shell .credit-usage-panel {
-  container-type: inline-size;
+   count by the window, so beside the sidebar four of them ran past the panel
+   and were cut. As a wrapping row the cards keep their minimums and fill the
+   line they land on, whatever width the panel has. */
+html[data-theme] .app-shell .credit-limit-row {
+  display: flex;
+  flex-wrap: wrap;
 }
 
-@container (max-width: 1080px) {
-  .app-shell .credit-limit-row.has-sandbox {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+html[data-theme] .app-shell .credit-limit-row > * {
+  flex: 1 1 205px;
+  min-width: 0;
 }
 
-@container (max-width: 860px) {
-  .app-shell .credit-limit-row:not(.has-sandbox) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+html[data-theme] .app-shell .credit-limit-row > .credit-balance-summary {
+  flex-basis: 280px;
 }
 
-@container (max-width: 560px) {
-  .app-shell .credit-limit-row,
-  .app-shell .credit-limit-row.has-sandbox {
-    grid-template-columns: minmax(0, 1fr);
-  }
+html[data-theme] .app-shell .credit-limit-row > .credit-forecast {
+  flex-basis: 250px;
 }
 
 /* Credit history: rows are a fill, not a bordered box with a coloured stripe;
@@ -2897,28 +2932,28 @@ html[data-theme] .app-shell .credit-wallet-entry::before {
   content: none;
 }
 
-.app-shell .credit-wallet-entry.is-credit { --entry-accent: var(--vt-good); --entry-soft: var(--vt-good-soft); }
-.app-shell .credit-wallet-entry.is-debit { --entry-accent: var(--vt-bad); --entry-soft: var(--vt-bad-soft); }
-.app-shell .credit-wallet-entry.is-adjustment { --entry-accent: var(--vt-info); --entry-soft: var(--vt-info-soft); }
+.app-shell .credit-wallet-entry.is-credit { --entry-accent: var(--vt-good-mark); --entry-soft: var(--vt-good-soft); }
+.app-shell .credit-wallet-entry.is-debit { --entry-accent: var(--vt-bad-mark); --entry-soft: var(--vt-bad-soft); }
+.app-shell .credit-wallet-entry.is-adjustment { --entry-accent: var(--vt-info-mark); --entry-soft: var(--vt-info-soft); }
 
 /* Money going out and coming in read apart at a glance: a faint tint of the
    row, the amount in the same tone. */
 html[data-theme] .app-shell .credit-wallet-entry.is-debit {
-  background: color-mix(in srgb, var(--vt-bad) 7%, var(--vt-s2));
+  background: color-mix(in srgb, var(--vt-bad-mark) 7%, var(--vt-s2));
 }
 
 html[data-theme] .app-shell .credit-wallet-entry.is-credit {
-  background: color-mix(in srgb, var(--vt-good) 7%, var(--vt-s2));
+  background: color-mix(in srgb, var(--vt-good-mark) 7%, var(--vt-s2));
 }
 
 /* On the light page the tint starts from the panel, so the red amount keeps
    its contrast. */
 html[data-theme="light"] .app-shell .credit-wallet-entry.is-debit {
-  background: color-mix(in srgb, var(--vt-bad) 7%, var(--vt-s1));
+  background: color-mix(in srgb, var(--vt-bad-mark) 7%, var(--vt-s1));
 }
 
 html[data-theme="light"] .app-shell .credit-wallet-entry.is-credit {
-  background: color-mix(in srgb, var(--vt-good) 7%, var(--vt-s1));
+  background: color-mix(in srgb, var(--vt-good-mark) 7%, var(--vt-s1));
 }
 
 html[data-theme] .app-shell .credit-wallet-entry.is-debit strong {
@@ -3009,6 +3044,11 @@ html[data-theme="light"] .app-shell :is(.text-link, .settings-card-action, .mobi
 }
 
 html[data-theme="light"] .app-shell .tariff-feature-list li {
+  color: var(--vt-text-2);
+}
+
+/* The period switch of the credit activity faded its idle options to 72%. */
+html[data-theme] .app-shell .credit-activity-toolbar > div > button:not(.active) {
   color: var(--vt-text-2);
 }
 
@@ -3228,12 +3268,14 @@ html[data-theme] .app-shell .calls-sidebar .call-favorite-filter.checked {
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-favorite-filter.checked svg {
-  color: var(--vt-warn);
+  color: var(--vt-warn-mark);
 }
 
-html[data-theme] .app-shell .calls-sidebar .call-favorite-filter:has(input:focus-visible) {
+/* The checkbox is hidden; keyboard focus shows on the star beside it. */
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter-input:focus-visible + svg {
+  border-radius: 4px;
   outline: 2px solid var(--vt-accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-folder-panel > .call-folder-heading {
@@ -3402,10 +3444,10 @@ html[data-theme] .app-shell .calls-sidebar .call-row:focus-visible {
   background: var(--vt-soft);
 }
 
-.app-shell .call-row-icon.is-ok { color: var(--vt-good); background: var(--vt-good-soft); }
-.app-shell .call-row-icon.is-warn { color: var(--vt-warn); background: var(--vt-warn-soft); }
-.app-shell .call-row-icon.is-bad { color: var(--vt-bad); background: var(--vt-bad-soft); }
-.app-shell .call-row-icon.is-test { color: var(--vt-info); background: var(--vt-info-soft); }
+.app-shell .call-row-icon.is-ok { color: var(--vt-good-mark); background: var(--vt-good-soft); }
+.app-shell .call-row-icon.is-warn { color: var(--vt-warn-mark); background: var(--vt-warn-soft); }
+.app-shell .call-row-icon.is-bad { color: var(--vt-bad-mark); background: var(--vt-bad-soft); }
+.app-shell .call-row-icon.is-test { color: var(--vt-info-mark); background: var(--vt-info-soft); }
 
 html[data-theme] .app-shell .calls-sidebar .call-row-main {
   display: grid;
@@ -3469,7 +3511,7 @@ html[data-theme] .app-shell .calls-sidebar .call-row-actions {
 }
 
 html[data-theme] .app-shell .calls-sidebar .call-favorite-button.active {
-  color: var(--vt-warn);
+  color: var(--vt-warn-mark);
 }
 
 /* ---------------------------------------------------------------------------
@@ -3670,7 +3712,7 @@ html[data-theme] .app-shell :is(.privacy-settings-heading > span:first-child, .c
 
 /* Initials stand in for a missing photo; they are a name, not an action,
    so they sit on the neutral tile too. */
-html[data-theme] .app-shell :is(.admin-avatar, .avatar:not(:has(img))) {
+html[data-theme] .app-shell .admin-avatar {
   border: 0;
   color: var(--vt-text-2);
   background: var(--vt-s3);
@@ -3679,7 +3721,7 @@ html[data-theme] .app-shell :is(.admin-avatar, .avatar:not(:has(img))) {
 
 /* A done step is a fact, so it keeps the tone of success. */
 html[data-theme] .app-shell .next-step .step-icon.is-complete {
-  color: var(--vt-good);
+  color: var(--vt-good-mark);
   background: var(--vt-good-soft);
 }
 
@@ -3826,9 +3868,14 @@ html[data-theme] .app-shell .selected-call-score small {
   font-size: 0.78rem;
 }
 
-html[data-theme] .app-shell .selected-call-score.is-good strong { color: var(--vt-good); }
-html[data-theme] .app-shell .selected-call-score.is-warning strong { color: var(--vt-warn); }
-html[data-theme] .app-shell .selected-call-score.is-danger strong { color: var(--vt-bad); }
+html[data-theme] .app-shell .selected-call-score.is-good strong { color: var(--vt-good-mark); }
+html[data-theme] .app-shell .selected-call-score.is-warning strong { color: var(--vt-warn-mark); }
+html[data-theme] .app-shell .selected-call-score.is-danger strong { color: var(--vt-bad-mark); }
+
+/* A 30px number needs 3:1, which the bright amber and green miss on the light
+   fill; a step toward the text shade keeps them bright enough and readable. */
+html[data-theme="light"] .app-shell .selected-call-score.is-good strong { color: color-mix(in srgb, var(--vt-good-mark) 55%, var(--vt-good)); }
+html[data-theme="light"] .app-shell .selected-call-score.is-warning strong { color: color-mix(in srgb, var(--vt-warn-mark) 55%, var(--vt-warn)); }
 
 @media (max-width: 560px) {
   html[data-theme] .app-shell .selected-call-card {

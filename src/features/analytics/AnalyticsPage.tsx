@@ -1,15 +1,16 @@
-import { AlertTriangle, ArrowLeft, BarChart3, FileText, Headphones, ListChecks, Lock, RefreshCw, Settings2, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, BookOpenText, FileText, Headphones, ListChecks, Lock, RefreshCw, Settings2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSelect, ScoreValue, TrendChart, formatBucket, lastWeekPeriod, periodRange, scoreTone, type DataColumn, type PeriodValue } from "../../shared/ui/analytics-ui";
 import { HoverHint, InfoHint } from "../../shared/ui/hover-hint";
 import { SelectControl } from "../../shared/ui/primitives";
+import { ScoreGauge } from "../../shared/ui/score-gauge";
 import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
 import { SpeechComparison, formatSeconds as formatSpeechSeconds, formatShare, speechHints } from "../../shared/ui/speech";
 import { AnalyticsSettingsCard } from "./AnalyticsSettings";
 import type {
-  AnalyticsCapabilities, AnalyticsCriteriaResponse, AnalyticsCriterionCallsResponse, AnalyticsCriterionRow, AnalyticsDepartmentRow,
+  AnalyticsCapabilities, AnalyticsCriteriaResponse, AnalyticsDelta, AnalyticsSample, AnalyticsCriterionCallsResponse, AnalyticsCriterionRow, AnalyticsDepartmentRow,
   AnalyticsDepartmentsResponse, AnalyticsEmployeeRow, AnalyticsEmployeesResponse, AnalyticsFilters, AnalyticsMatrixResponse,
   AnalyticsProfile, AnalyticsSummary, AnalyticsTeamRow, AnalyticsWorthListening, AppPage, DepartmentResponse,
 } from "../../types";
@@ -218,11 +219,44 @@ function TeamView({ capabilities, filters, instructions, onNavigate, onOpenCall 
 function SummaryStrip({ summary, role }: { summary: AnalyticsSummary; role: AnalyticsCapabilities["role"] }) {
   return <div className="analytics-summary">
     <div><small>Звонков с анализом</small><strong>{summary.calls_analyzed}</strong><span>из {summary.calls_total}{summary.calls_internal_excluded ? ` · внутренних скрыто: ${summary.calls_internal_excluded}` : ""}</span></div>
-    <div><small>Средний балл</small><strong><ScoreValue value={summary.avg_score} sample={summary.sample} /></strong><span><DeltaBadge delta={summary.delta} /> к прошлому периоду</span></div>
+    <ScoreSummaryCard value={summary.avg_score} sample={summary.sample} delta={summary.delta} />
     {role === "department_leader" ? <div><small>Мой отдел / компания</small><strong>{summary.avg_score ?? "—"} / {summary.company_avg_score ?? "—"}</strong><span>средний балл</span></div> : null}
     <div><small>Критичных пропусков</small><strong className={summary.critical_missed ? "tone-danger" : ""}>{summary.critical_missed}</strong><span>критерии с отметкой «Критичный»</span></div>
     <div><small>Без постоянных критериев <InfoHint label="Без постоянных критериев" text="Их требования подобраны разово, поэтому их нет в разрезе по критериям" /></small><strong>{summary.calls_without_fixed_scorecard}</strong><span>не входят в разрез по критериям</span></div>
   </div>;
+}
+
+// The average on the same meter as the call score and the overview.
+function ScoreSummaryCard({ value, sample, delta }: { value: number | null; sample: AnalyticsSample; delta: AnalyticsDelta }) {
+  const shown = sample === "none" || sample === "low" ? null : value;
+  return <div className="analytics-score-card">
+    <ScoreGauge value={shown} size={84} caption="" />
+    <div>
+      <small>Средний балл</small>
+      <span><DeltaBadge delta={delta} /> к прошлому периоду</span>
+      {shown === null ? <span>балл появится от 5 оценок</span> : sample === "thin" ? <span>мало данных: меньше 20 оценок</span> : null}
+    </div>
+  </div>;
+}
+
+/** Criteria of one instruction under one heading, so its title is not repeated on every row. */
+function byInstruction<T extends { instruction: { uuid: string; title: string; deleted?: boolean } }>(rows: T[]) {
+  const groups = new Map<string, { title: string; deleted: boolean; rows: T[] }>();
+  for (const row of rows) {
+    const group = groups.get(row.instruction.uuid) ?? { title: row.instruction.title, deleted: Boolean(row.instruction.deleted), rows: [] };
+    group.rows.push(row);
+    groups.set(row.instruction.uuid, group);
+  }
+  return Array.from(groups.values());
+}
+
+function InstructionGroupTitle({ title, deleted }: { title: string; deleted: boolean }) {
+  return <p className="analytics-group-title"><BookOpenText size={14} />Инструкция «{title || "Без названия"}»{deleted ? <em>удалена</em> : null}</p>;
+}
+
+// A score over fewer than five marks is not shown; the row says so instead of a dash.
+function LowSample({ count }: { count: number }) {
+  return <HoverHint focusable={false} className="analytics-low-sample" label="Мало оценок" detail={["Средний балл появится от 5 оценок.", `Сейчас оценок: ${count}.`]}>мало оценок · {count} из 5</HoverHint>;
 }
 
 function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
@@ -251,14 +285,17 @@ function CriteriaTab({ filters, onOpen, onNavigate }: { filters: AnalyticsFilter
     text="Критерии появляются, когда звонки оцениваются по инструкции с готовой оценочной картой."
     action={<button className="primary-button" type="button" onClick={() => onNavigate("instructionCreate")}>Создать инструкцию</button>} />;
   const columns: DataColumn<AnalyticsCriterionRow>[] = [
-    { key: "title", label: "Критерий", priority: 0, render: (row) => <span className="analytics-name"><strong>{row.title}{row.is_critical ? <em className="analytics-critical">Критичный</em> : null}</strong><small>{row.instruction.title}{row.instruction.deleted ? " · инструкция удалена" : ""}</small></span>, sortValue: (row) => row.title },
-    { key: "avg", label: "Средний", priority: 1, width: 150, render: (row) => <span className="analytics-score-cell"><ScoreValue value={row.avg_score} sample={row.sample} /><DistributionBar distribution={row.distribution} /></span>, sortValue: (row) => row.avg_score },
-    { key: "delta", label: "Дельта", priority: 2, width: 76, align: "end", render: (row) => <DeltaBadge delta={row.delta} />, sortValue: (row) => row.delta.value },
+    { key: "title", label: "Критерий", priority: 0, render: (row) => <span className="analytics-name"><strong>{row.title}{row.is_critical ? <em className="analytics-critical">Критичный</em> : null}</strong></span>, sortValue: (row) => row.title },
+    { key: "avg", label: "Средний", priority: 1, width: 150, render: (row) => <span className="analytics-score-cell">{row.avg_score === null && (row.sample === "low" || row.sample === "none") && row.n_scored > 0 ? <LowSample count={row.n_scored} /> : <ScoreValue value={row.avg_score} sample={row.sample} />}<DistributionBar distribution={row.distribution} /></span>, sortValue: (row) => row.avg_score },
+    { key: "delta", label: "Дельта", priority: 2, width: 76, align: "end", render: (row) => row.delta.value === null ? null : <DeltaBadge delta={row.delta} />, sortValue: (row) => row.delta.value },
     { key: "pass", label: "Выполнено", priority: 3, width: 96, align: "end", render: (row) => row.pass_rate === null ? "—" : `${Math.round(row.pass_rate * 100)}%`, sortValue: (row) => row.pass_rate },
     { key: "n", label: "Оценок", priority: 4, width: 110, align: "end", render: (row) => <HoverHint focusable={false} label={`Оценено: ${row.n_scored}`} detail={`Не применимо: ${row.n_not_applicable}, не удалось оценить: ${row.n_unassessed}`}>{row.n_scored}{row.n_not_applicable || row.n_unassessed ? <small className="analytics-muted"> +{row.n_not_applicable + row.n_unassessed}</small> : null}</HoverHint>, sortValue: (row) => row.n_scored },
     { key: "trend", label: "Тренд", priority: 5, width: 96, render: (row) => <MiniTrend points={row.trend} /> },
   ];
-  return <DataTable columns={columns} rows={value.criteria} rowKey={(row) => row.criterion_key} onRowClick={(row) => onOpen(row.criterion_key)} />;
+  return <div className="analytics-groups">{byInstruction(value.criteria).map((group) => <section key={group.title + group.rows[0].criterion_key} className="analytics-group">
+    <InstructionGroupTitle title={group.title} deleted={group.deleted} />
+    <DataTable columns={columns} rows={group.rows} rowKey={(row) => row.criterion_key} onRowClick={(row) => onOpen(row.criterion_key)} />
+  </section>)}</div>;
 }
 
 function teamColumns<T extends AnalyticsEmployeeRow | AnalyticsDepartmentRow>(name: (row: T) => React.ReactNode, sortName: (row: T) => string): DataColumn<T>[] {
@@ -393,23 +430,26 @@ function ProfileView({ userId, filters, onOpenCall, onNavigate }: { userId: stri
       <div><h1>{profile.employee.full_name || "Сотрудник"}</h1><p>{solo ? "" : `${profile.employee.department?.name ?? "Без отдела"}${profile.employee.is_former_member ? " · бывший сотрудник" : ""} · `}{formatBucket(profile.period.from.slice(0, 10))} — {formatBucket(profile.period.to.slice(0, 10))}</p></div>
     </header>
     <div className="analytics-summary">
-      <div><small>Звонков</small><strong>{profile.totals.calls}</strong></div>
-      <div><small>Средний балл</small><strong><ScoreValue value={profile.totals.avg_score} sample={profile.totals.sample} /></strong><span><DeltaBadge delta={profile.totals.delta} /> к прошлому периоду</span></div>
+      <div><small>Звонков</small><strong>{profile.totals.calls}</strong><span>{profile.totals.critical_missed ? `критичных пропусков: ${profile.totals.critical_missed}` : "за выбранный период"}</span></div>
+      <ScoreSummaryCard value={profile.totals.avg_score} sample={profile.totals.sample} delta={profile.totals.delta} />
       <div><small>По критериям</small><strong>{profile.totals.avg_criteria_score ?? "—"}</strong><span>только критерии инструкций</span></div>
       {solo ? null : <div><small>{profile.reference.label || "Сравнение"}</small><strong>{profile.reference.hidden ? "—" : profile.reference.avg_score ?? "—"}</strong><span>{profile.reference.hidden ? "в отделе меньше трёх человек со звонками" : "средний балл"}</span></div>}
     </div>
     <div className="analytics-trend-card"><TrendChart points={profile.trend} reference={profile.reference.hidden ? undefined : profile.reference.trend} label="Свой балл" referenceLabel={profile.reference.label} /></div>
     <section className="analytics-block">
       <h2>{solo ? "Критерии" : `Критерии: свой балл и ${referenceName}`}</h2>
-      <DataTable
-        columns={[
-          { key: "title", label: "Критерий", priority: 0, render: (row) => <span className="analytics-name"><strong>{row.title}</strong><small>{row.instruction.title}</small></span>, sortValue: (row) => row.title },
-          { key: "own", label: "Свой", priority: 1, width: 110, render: (row) => <ScoreValue value={row.own_avg} sample={row.sample} />, sortValue: (row) => row.own_avg },
-          ...(solo ? [] : [{ key: "ref", label: profile.reference.label || "Сравнение", priority: 2, width: 90, align: "end" as const, render: (row: AnalyticsProfile["criteria"][number]) => row.reference_avg ?? "—", sortValue: (row: AnalyticsProfile["criteria"][number]) => row.reference_avg }]),
-          { key: "delta", label: "Дельта", priority: 3, width: 76, align: "end", render: (row) => <DeltaBadge delta={row.delta} />, sortValue: (row) => row.delta.value },
-          { key: "n", label: "Оценок", priority: 4, width: 80, align: "end", render: (row) => row.own_n, sortValue: (row) => row.own_n },
-        ]}
-        rows={profile.criteria} rowKey={(row) => row.criterion_key} emptyText="Оценённых критериев за период нет." />
+      {profile.criteria.length === 0 ? <p className="data-table-empty">Оценённых критериев за период нет.</p> : <div className="analytics-groups">{byInstruction(profile.criteria).map((group) => <section key={group.title + group.rows[0].criterion_key} className="analytics-group">
+        <InstructionGroupTitle title={group.title} deleted={group.deleted} />
+        <DataTable
+          columns={[
+            { key: "title", label: "Критерий", priority: 0, render: (row) => <span className="analytics-name"><strong>{row.title}</strong></span>, sortValue: (row) => row.title },
+            { key: "own", label: "Свой", priority: 1, width: 150, render: (row) => row.own_avg === null && (row.sample === "low" || row.sample === "none") && row.own_n > 0 ? <LowSample count={row.own_n} /> : <ScoreValue value={row.own_avg} sample={row.sample} />, sortValue: (row) => row.own_avg },
+            ...(solo ? [] : [{ key: "ref", label: profile.reference.label || "Сравнение", priority: 2, width: 90, align: "end" as const, render: (row: AnalyticsProfile["criteria"][number]) => row.reference_avg ?? "—", sortValue: (row: AnalyticsProfile["criteria"][number]) => row.reference_avg }]),
+            { key: "delta", label: "Дельта", priority: 3, width: 76, align: "end", render: (row) => row.delta.value === null ? null : <DeltaBadge delta={row.delta} />, sortValue: (row) => row.delta.value },
+            { key: "n", label: "Оценок", priority: 4, width: 80, align: "end", render: (row) => row.own_n, sortValue: (row) => row.own_n },
+          ]}
+          rows={group.rows} rowKey={(row) => row.criterion_key} />
+      </section>)}</div>}
     </section>
     <EmployeeWorkOnMistakes userId={userId} filters={filters} onOpenCall={(callId) => onOpenCall(callId)} />
     {profile.speech !== undefined && <section className="analytics-block">

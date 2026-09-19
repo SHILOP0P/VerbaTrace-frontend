@@ -559,8 +559,22 @@ export function stringList(value: unknown) {
 
 export function enumLabel(value: string | undefined, labels: Record<string, string>) {
   if (!value) return undefined;
-  return labels[value] ?? value;
+  // An unknown machine code (snake_case) is a key, not a word for a reader;
+  // the caller's fallback text reads better than "partially_answered".
+  return labels[value] ?? (/^[a-z0-9]+(?:[_-][a-z0-9]+)*$/.test(value) ? undefined : value);
 }
+
+/** Readable names of the legacy issue codes; codes without one are not shown. */
+export const issueCodeLabels: Record<string, string> = {
+  weak_next_step: "Слабый следующий шаг",
+  no_needs_discovery: "Потребность не выявлена",
+  low_confidence: "Низкая уверенность",
+  not_a_call: "Не звонок",
+  unclear_pricing: "Неясная цена",
+  price_risk: "Риск по цене",
+  "price-risk": "Риск по цене",
+  late_followup: "Поздний следующий контакт"
+};
 
 export function formatScore(value: number) {
   return Number.isInteger(value) ? value.toString() : value.toFixed(1).replace(".", ",");

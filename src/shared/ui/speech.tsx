@@ -32,7 +32,7 @@ function formatPause(ms: number | null | undefined) {
 }
 
 /** The «Речь» block of a call page: who spoke how much and how. */
-export function CallSpeechBlock({ speech }: { speech?: CallSpeech | null }) {
+export function CallSpeechBlock({ speech, hideShare = false }: { speech?: CallSpeech | null; /** The player already shows who spoke when and how much. */ hideShare?: boolean }) {
   if (!speech || speech.speakers.length === 0) return null;
   const keys = speech.speakers.map((speaker) => speaker.speaker_key);
   const name = (speaker: CallSpeech["speakers"][number]) => speaker.display_name || `Спикер ${speaker.speaker_key}`;
@@ -40,7 +40,7 @@ export function CallSpeechBlock({ speech }: { speech?: CallSpeech | null }) {
   return <section className="speech-block" aria-label="Речь">
     <header><span className="speech-title"><AudioLines size={17} />Речь</span><small>Наблюдения по таймингу слов, в оценку не входят</small></header>
     {/* Who held the floor, at a glance; the colours match the cards below. */}
-    <div className="speech-share">
+    {!hideShare && <div className="speech-share">
       <span className="speech-share-label">Доля речи в разговоре <InfoHint label="Доля речи" text={speechHints.talk_share} /></span>
       <div className="speech-share-bar" role="img" aria-label={speech.speakers.map((speaker) => `${name(speaker)}: ${formatShare(speaker.talk_share)}`).join(", ")}>
         {speech.speakers.map((speaker) => <HoverHint key={speaker.speaker_key} focusable={false} className="speech-share-segment" style={{ ...color(speaker), flexGrow: Math.max(speaker.talk_share, 0.01) }}
@@ -49,7 +49,7 @@ export function CallSpeechBlock({ speech }: { speech?: CallSpeech | null }) {
       <ul className="speech-share-legend">
         {speech.speakers.map((speaker) => <li key={speaker.speaker_key} style={color(speaker)}><i />{name(speaker)} <b>{formatShare(speaker.talk_share)}</b></li>)}
       </ul>
-    </div>
+    </div>}
     <ul className="speech-speakers">
       {speech.speakers.map((speaker) => <li key={speaker.speaker_key} className={speaker.is_subject ? "is-subject" : ""} style={color(speaker)}>
         <strong><i className="speech-speaker-dot" />{name(speaker)}{speaker.is_subject ? <em>сотрудник</em> : null}</strong>

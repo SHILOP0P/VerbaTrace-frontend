@@ -2,10 +2,22 @@ import { ArrowRight, CheckCircle2, ChevronDown, History, Repeat2, Sparkles, Tria
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import type { AnalyticsFilters, CallProgress, CallProgressCriterion, EmployeeGrowthArea, EmployeeProgress, ProgressVerdict } from "../../types";
+import { stripAnalysisRefs } from "../../shared/lib/analysis-refs";
 
 const dayFormat = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 function formatDate(value: string) {
   return dayFormat.format(new Date(value));
+}
+
+const shortDayFormat = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
+function formatShortDay(value: string) {
+  return shortDayFormat.format(new Date(value));
+}
+
+function callsWordRu(n: number) {
+  const tens = n % 100, ones = n % 10;
+  if (tens >= 11 && tens <= 14) return "звонков";
+  return ones === 1 ? "звонок" : ones >= 2 && ones <= 4 ? "звонка" : "звонков";
 }
 
 const verdictLabels: Record<ProgressVerdict, string> = {
@@ -66,20 +78,29 @@ export function CallWorkOnMistakes({ callId, analysisId, personal = false, onOpe
   }
   const { counts } = progress;
   const compared = counts.fixed + counts.repeated + counts.new + counts.holding;
-  return <section className="mistakes-block" aria-label="Работа над ошибками">
+  const previousDate = progress.criteria.find((row) => row.previous)?.previous?.occurred_at;
+  const segments: Array<[keyof typeof counts, string, string]> = [["fixed", "Исправлено", "good"], ["repeated", "Повторилось", "bad"], ["new", "Новых", "warn"], ["holding", "Держит", "hold"]];
+  return <section className={`mistakes-block${open ? " is-open" : ""}`} aria-label="Работа над ошибками">
     <button className="mistakes-head" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-      <span className="mistakes-title"><History size={17} />Работа над ошибками{progress.employee?.full_name ? <small>{progress.employee.full_name}</small> : null}</span>
-      <span className="mistakes-counts">
-        {progress.criteria.length === 0 ? <span>Зоны роста: {progress.growth_areas.length}</span>
-          : compared === 0 ? <span>Первый звонок с этими критериями — сравнивать пока не с чем</span> : <>
-            <span className="tone-good">Исправлено {counts.fixed}</span>
-            <span className="tone-danger">Повторилось {counts.repeated}</span>
-            <span className="tone-warning">Новых {counts.new}</span>
-            <span>Держит {counts.holding}</span>
-          </>}
+      <span className="mistakes-title">
+        <History size={17} />
+        <span>
+          <strong>Работа над ошибками</strong>
+          <small>{progress.employee?.full_name && !personal ? `${progress.employee.full_name} · ` : ""}{previousDate ? `по сравнению с ${personal ? "вашим прошлым звонком" : "прошлым звонком сотрудника"} · ${formatDate(previousDate)}` : "по сравнению с прошлыми звонками"}</small>
+        </span>
       </span>
       <ChevronDown className="mistakes-chevron" size={16} />
     </button>
+    {progress.criteria.length === 0 ? <p className="mistakes-summary-note">Зон роста: {progress.growth_areas.length}</p>
+      : compared === 0 ? <p className="mistakes-summary-note">Первый звонок с этими критериями — сравнивать пока не с чем.</p>
+        : <div className="mistakes-summary">
+          <div className="mistakes-bar" aria-hidden="true">
+            {segments.map(([key, , tone]) => counts[key] > 0 ? <i key={key} className={`is-${tone}`} style={{ flexGrow: counts[key] }} /> : null)}
+          </div>
+          <ul className="mistakes-legend">
+            {segments.map(([key, label, tone]) => <li key={key} className={`is-${tone}`}><i />{label} <b>{counts[key]}</b></li>)}
+          </ul>
+        </div>}
     {open && <div className="mistakes-body">
       {progress.criteria.length > 0 && <>
         <h4>По критериям инструкции</h4>
@@ -89,7 +110,7 @@ export function CallWorkOnMistakes({ callId, analysisId, personal = false, onOpe
         <h4>Зоны роста <em>сопоставлено автоматически, проверьте по цитатам</em></h4>
         <ul className="mistakes-list">{progress.growth_areas.map((area) => <li key={area.area_uuid} className={`mistakes-row verdict-${area.verdict}`}>
           <span className="mistakes-verdict">{growthVerdictLabels[area.verdict]}</span>
-          <div className="mistakes-main"><strong>{area.title}</strong>{area.note ? <small>{area.note}</small> : null}</div>
+          <div className="mistakes-main"><strong>{stripAnalysisRefs(area.title)}</strong>{area.note ? <small>{stripAnalysisRefs(area.note)}</small> : null}</div>
           {area.item_ids[0] && <div className="mistakes-links"><button className="text-link" type="button" onClick={() => onOpenItem(area.item_ids[0])}>Карточка</button></div>}
         </li>)}</ul>
       </>}
@@ -103,10 +124,10 @@ function CriterionRow({ row, onOpenItem }: { row: CallProgressCriterion; onOpenI
     <span className="mistakes-verdict"><Icon size={14} />{verdictLabels[row.verdict]}</span>
     <div className="mistakes-main">
       <strong>{row.title || "Критерий"}</strong>
-      <small>
-        Сейчас {row.current.score}
-        {row.previous ? ` · было ${row.previous.score} (${formatDate(row.previous.occurred_at)})` : ""}
-        {row.repeat_streak > 1 ? ` · подряд: ${row.repeat_streak}` : ""}
+      <small className="mistakes-change">
+        {row.previous ? <>{row.previous.score}<ArrowRight size={12} aria-label="стало" /></> : null}
+        <b className={`tone-${row.current.score >= 75 ? "good" : row.current.score >= 50 ? "warning" : "danger"}`}>{row.current.score}</b>
+        {row.repeat_streak > 1 ? <span className="mistakes-streak">{row.repeat_streak}-й звонок подряд</span> : null}
       </small>
     </div>
     <div className="mistakes-links">
@@ -120,6 +141,7 @@ function CriterionRow({ row, onOpenItem }: { row: CallProgressCriterion; onOpenI
 export function EmployeeWorkOnMistakes({ userId, filters, onOpenCall }: { userId: string; filters: AnalyticsFilters; onOpenCall: (callId: string) => void }) {
   const [progress, setProgress] = useState<EmployeeProgress>();
   const [error, setError] = useState("");
+  const [showAllOpen, setShowAllOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,30 +152,37 @@ export function EmployeeWorkOnMistakes({ userId, filters, onOpenCall }: { userId
   }, [userId, filters]);
 
   if (error) return null;
+  // With nothing closed the second column would stand almost empty beside a long
+  // list, so the note goes on top and the list takes the whole width.
+  const single = Boolean(progress && progress.closed_in_period.length === 0);
+  const openShown = progress && !showAllOpen ? progress.open.slice(0, 8) : progress?.open ?? [];
   return <section className="analytics-block mistakes-profile">
     <h2>Работа над ошибками</h2>
-    {!progress ? <div className="analytics-skeleton is-short" /> : <div className="mistakes-profile-grid">
+    {!progress ? <div className="analytics-skeleton is-short" /> : <div className={`mistakes-profile-grid${single ? " is-single" : ""}`}>
+      {single && <p className="mistakes-empty"><History size={16} />Закрытых за период нет. Ошибка закрывается после трёх звонков подряд с баллом от 75.</p>}
       <div>
-        <h3>Открытые ошибки</h3>
-        {progress.open.length === 0 ? <p className="analytics-muted">Нет критериев, которые проваливаются сейчас.</p> : <ul className="mistakes-list">
-          {progress.open.map((row) => <li key={row.criterion_key} className="mistakes-row is-plain verdict-repeated">
+        <h3>Открытые ошибки <b>{progress.open.length}</b></h3>
+        {progress.open.length === 0 ? <p className="mistakes-empty"><CheckCircle2 size={16} />Нет критериев, которые проваливаются сейчас.</p> : <ul className="mistakes-list">
+          {openShown.map((row) => <li key={row.criterion_key} className="mistakes-row is-open-mistake">
+            <span className={`mistakes-score tone-${row.last_score >= 75 ? "good" : row.last_score >= 50 ? "warning" : "danger"}`}>{row.last_score}</span>
             <div className="mistakes-main">
               <strong>{row.title || "Критерий"}</strong>
-              <small>Последний балл {row.last_score}{row.repeat_streak > 1 ? ` · подряд: ${row.repeat_streak}` : ""} · с {formatDate(row.first_failed_at)}</small>
+              <small>{row.repeat_streak > 1 ? `${row.repeat_streak} ${callsWordRu(row.repeat_streak)} подряд ниже 75 · ` : ""}с {formatShortDay(row.first_failed_at)}</small>
             </div>
-            {row.last_call_uuid && <div className="mistakes-links"><button className="text-link" type="button" onClick={() => onOpenCall(row.last_call_uuid)}>Звонок</button></div>}
+            {row.last_call_uuid && <div className="mistakes-links"><button className="text-link" type="button" onClick={() => onOpenCall(row.last_call_uuid)}>Открыть звонок<ArrowRight size={13} /></button></div>}
           </li>)}
         </ul>}
+        {progress.open.length > 8 && <button className="text-link mistakes-more" type="button" onClick={() => setShowAllOpen((value) => !value)}>{showAllOpen ? "Свернуть" : `Показать все ${progress.open.length}`}</button>}
       </div>
-      <div>
-        <h3>Закрытые за период</h3>
-        {progress.closed_in_period.length === 0 ? <p className="analytics-muted">Ошибка считается закрытой после трёх звонков подряд с баллом от 75.</p> : <ul className="mistakes-list">
+      {!single && <div>
+        <h3>Закрытые за период <b>{progress.closed_in_period.length}</b></h3>
+        <ul className="mistakes-list">
           {progress.closed_in_period.map((row) => <li key={row.criterion_key} className="mistakes-row verdict-fixed">
             <span className="mistakes-verdict"><CheckCircle2 size={14} />Закрыто</span>
-            <div className="mistakes-main"><strong>{row.title || "Критерий"}</strong><small>{formatDate(row.closed_at)}</small></div>
+            <div className="mistakes-main"><strong>{row.title || "Критерий"}</strong><small>{formatShortDay(row.closed_at)}</small></div>
           </li>)}
-        </ul>}
-      </div>
+        </ul>
+      </div>}
     </div>}
     <GrowthAreas userId={userId} filters={filters} />
   </section>;
@@ -205,9 +234,9 @@ function GrowthAreaRow({ area, onChanged }: { area: EmployeeGrowthArea; onChange
   return <li className={`growth-area is-${area.status}`}>
     <div className="growth-area-head">
       <div className="mistakes-main">
-        <strong>{area.title}{area.returned && area.status === "open" ? <em className="growth-returned">вернулась</em> : null}</strong>
+        <strong>{stripAnalysisRefs(area.title)}{area.returned && area.status === "open" ? <em className="growth-returned">вернулась</em> : null}</strong>
         <small>{areaStatusLabels[area.status]} · встречалась {times(area.occurrences)}{area.clean_streak > 0 ? ` · справился подряд: ${area.clean_streak}` : ""}</small>
-        <small>{area.description}</small>
+        <small>{stripAnalysisRefs(area.description)}</small>
       </div>
       <div className="mistakes-links">
         {area.observations.length > 0 && <button className="text-link" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? "Свернуть" : `Звонки: ${area.observations.length}`}</button>}
@@ -229,7 +258,7 @@ function GrowthAreaRow({ area, onChanged }: { area: EmployeeGrowthArea; onChange
       <span className={`mistakes-verdict verdict-${observation.verdict}`}>{growthVerdictLabels[observation.verdict]}</span>
       <div className="mistakes-main">
         <small>{formatDate(observation.occurred_at)}{observation.call_uuid ? "" : " · звонок недоступен вам"}</small>
-        {observation.note ? <span>{observation.note}</span> : null}
+        {observation.note ? <span>{stripAnalysisRefs(observation.note)}</span> : null}
       </div>
       {observation.call_uuid && <button className="text-link" type="button" onClick={() => openCallItem(observation.call_uuid, observation.item_ids[0] ?? "")}>Карточка</button>}
     </li>)}</ul>}

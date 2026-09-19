@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AuthProvider } from "./features/auth/AuthProvider";
+// Self-hosted: the interface font must not depend on a third-party CDN.
+import "@fontsource-variable/inter/wght.css";
 import "./styles/index.css";
 
 // Auth cookies are bound to the host name, so "localhost" and "127.0.0.1" keep

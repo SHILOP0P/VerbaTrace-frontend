@@ -36,6 +36,8 @@ import { adminSidebarItem, AppTheme, isSettingsPage, sidebarItems, ThemeToggleEv
 import { Logo } from "../../shared/ui/primitives";
 import { useDismissibleLayer } from "../../shared/ui/dismissible-layer";
 import { readWorkspaceCompanyId, storeWorkspaceCompanyId } from "../../shared/lib/workspace-company";
+import { creditForecast } from "../../shared/lib/credits";
+import { pluralizeRu } from "../../shared/lib/plans";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { notificationPresentation } from "../../shared/ui/notification-presentation";
 import { ToolButton } from "../assistant/AssistantControls";
@@ -168,15 +170,8 @@ export function AuthenticatedShell({
 	const activeCredits = selectedCompany ? companyCredits[selectedCompany.id] ?? null : personalCredits;
 	const creditLimit = activeCredits?.allowance_credits ?? 0;
 	const creditRemainingPercent = Math.min(100, Math.max(0, Math.round(activeCredits?.allowance_remaining_percent ?? 0)));
-	const progress = Math.min(
-    100,
-    Math.max(
-      0,
-      Math.round(
-			activeCredits ? 100 - activeCredits.allowance_remaining_percent : 0
-      )
-    )
-  );
+	// The bar shows what is left, like the number above it.
+	const creditForecastLine = activeCredits && creditLimit > 0 ? sidebarCreditForecast(activeCredits) : null;
   const hasSearchResults = Boolean(
     searchResults &&
       (searchResults.calls.length > 0 ||
@@ -432,49 +427,25 @@ export function AuthenticatedShell({
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={teamOpen}
+                aria-label={`Рабочая область: ${teamLabel}`}
                 onClick={() => setTeamOpen((open) => !open)}
               >
-                <span>{teamLabel}</span>
-                <ChevronDown size={15} />
+                <WorkspaceBadge company={selectedCompany} />
+                <span className="team-switcher-text">
+                  <small>{selectedCompany ? "Компания" : "Рабочая область"}</small>
+                  <strong>{teamLabel}</strong>
+                </span>
+                <ChevronDown size={15} className="team-switcher-chevron" />
               </button>
               {teamOpen && (
-                <div className="header-popover team-popover" role="listbox">
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={!selectedCompany}
-                    className={!selectedCompany ? "active" : ""}
-                    onClick={() => {
-                      selectWorkspaceCompany("");
-                      setTeamOpen(false);
-                    }}
-                  >
-                    <span>
-                      <strong>Личный кабинет</strong>
-                      <small>{personalSubscription?.plan.name ?? "Личный тариф не активирован"}</small>
-                    </span>
-                  </button>
-                  {companies.map((company) => {
-                    const companySubscription = companySubscriptions[company.id];
-                    return (
-                      <button
-                        type="button"
-                        key={company.id}
-                        role="option"
-                        aria-selected={company.id === selectedCompany?.id}
-                        className={company.id === selectedCompany?.id ? "active" : ""}
-                        onClick={() => {
-                          selectWorkspaceCompany(company.id);
-                          setTeamOpen(false);
-                        }}
-                      >
-                        <span>
-                          <strong>{company.name}</strong>
-                          <small>{companySubscription?.plan.name ?? "Подписка не активна"}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
+                <div className="header-popover team-popover" role="listbox" aria-label="Рабочая область">
+                  <WorkspaceOptions
+                    companies={companies}
+                    selectedCompany={selectedCompany}
+                    personalPlan={personalSubscription?.plan.name}
+                    companyPlan={(company) => companySubscriptions[company.id]?.plan.name}
+                    onSelect={(companyId) => { selectWorkspaceCompany(companyId); setTeamOpen(false); }}
+                  />
                 </div>
               )}
             </div>
@@ -727,19 +698,21 @@ export function AuthenticatedShell({
             >
               <small className="sidebar-plan-badge">{subscription?.plan.name ?? "Подключите тариф"}</small>
             </button>
-            <div className="sidebar-limit-card">
-				<span>Кредиты</span>
-				<strong>
-					{usageLoading
-						? "Загрузка баланса"
-						: creditLimit > 0
-							? `${creditRemainingPercent}%`
-							: "Нет активных кредитов"}
-				</strong>
-				{creditLimit > 0 && !usageLoading && <small>осталось</small>}
-              <div className="sidebar-progress" aria-hidden="true">
-                <span style={{ width: `${progress}%` }} />
+            <div className={`sidebar-limit-card${creditLimit > 0 && !usageLoading && creditRemainingPercent <= 15 ? " is-low" : ""}`}>
+              <div className="sidebar-limit-head">
+                <span>Кредиты</span>
+                <strong>
+                  {usageLoading
+                    ? "Загрузка…"
+                    : creditLimit > 0
+                      ? `${creditRemainingPercent}%`
+                      : "Нет"}
+                </strong>
               </div>
+              <div className="sidebar-progress" aria-hidden="true">
+                <span style={{ width: `${usageLoading ? 0 : creditRemainingPercent}%` }} />
+              </div>
+              {!usageLoading && <small>{creditLimit > 0 ? creditForecastLine ?? "осталось" : "активных кредитов нет"}</small>}
             </div>
             <button
               className="sidebar-collapse"
@@ -783,6 +756,21 @@ export function AuthenticatedShell({
         </nav>
         {mobileMoreOpen && (
           <div className="mobile-more-sheet" role="menu" aria-label="Остальные разделы">
+            {/* On a phone the header has no room for the switcher, so the
+                workspace is chosen here, above the sections it changes. */}
+            {hasCompanies && (
+              <div className="mobile-workspace" role="group" aria-label="Рабочая область">
+                <span className="mobile-workspace-label">Рабочая область</span>
+                <WorkspaceOptions
+                  companies={companies}
+                  selectedCompany={selectedCompany}
+                  personalPlan={personalSubscription?.plan.name}
+                  companyPlan={(company) => companySubscriptions[company.id]?.plan.name}
+                  onSelect={(companyId) => { selectWorkspaceCompany(companyId); setMobileMoreOpen(false); }}
+                  compact
+                />
+              </div>
+            )}
             {mobileMoreItems.map((item) => (
               <button
                 key={item.page}
@@ -809,6 +797,48 @@ function formatNotificationTime(value:string){const date=new Date(value);if(Numb
 function isRecentNotification(value: string) {
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) && timestamp >= Date.now() - 24 * 60 * 60 * 1000;
+}
+
+// A company is recognised by its initials on a colour of its own; the personal
+// workspace by a person icon. The colour follows the name, so it is stable.
+function WorkspaceBadge({ company }: { company?: CompanyResponse }) {
+  if (!company) return <span className="workspace-badge is-personal" aria-hidden="true"><UserRound size={15} /></span>;
+  const letters = company.name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "К";
+  let hash = 0;
+  for (const char of company.name) hash = (hash * 31 + char.charCodeAt(0)) % 360;
+  return <span className="workspace-badge" aria-hidden="true" style={{ "--badge-hue": hash } as React.CSSProperties}>{letters}</span>;
+}
+
+function WorkspaceOptions({ companies, selectedCompany, personalPlan, companyPlan, onSelect, compact = false }: {
+  companies: CompanyResponse[];
+  selectedCompany?: CompanyResponse;
+  personalPlan?: string;
+  companyPlan: (company: CompanyResponse) => string | undefined;
+  onSelect: (companyId: string) => void;
+  compact?: boolean;
+}) {
+  return <div className={`workspace-options${compact ? " is-compact" : ""}`}>
+    <span className="workspace-options-label">Личное</span>
+    <button type="button" role="option" aria-selected={!selectedCompany} className={!selectedCompany ? "active" : ""} onClick={() => onSelect("")}>
+      <WorkspaceBadge />
+      <span><strong>Личный кабинет</strong><small>{personalPlan ?? "Личный тариф не активирован"}</small></span>
+      {!selectedCompany && <Check size={16} className="workspace-option-check" />}
+    </button>
+    <span className="workspace-options-label">{companies.length > 1 ? "Компании" : "Компания"}</span>
+    {companies.map((company) => <button type="button" key={company.id} role="option" aria-selected={company.id === selectedCompany?.id} className={company.id === selectedCompany?.id ? "active" : ""} onClick={() => onSelect(company.id)}>
+      <WorkspaceBadge company={company} />
+      <span><strong>{company.name}</strong><small>{companyPlan(company) ?? "Подписка не активна"}</small></span>
+      {company.id === selectedCompany?.id && <Check size={16} className="workspace-option-check" />}
+    </button>)}
+  </div>;
+}
+
+function sidebarCreditForecast(credits: CreditDashboardResponse) {
+  const forecast = creditForecast(credits);
+  if (!forecast.lastsUntilReset) return `хватит примерно на ${forecast.daysLeft} ${pluralizeRu(forecast.daysLeft, "день", "дня", "дней")}`;
+  const reset = new Date(credits.resets_at);
+  if (Number.isNaN(reset.getTime())) return "хватит до сброса";
+  return `хватит до сброса ${reset.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`;
 }
 
 function profileInitial(value: string) {

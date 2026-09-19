@@ -6,6 +6,8 @@ import type { CallResponse, MediaSeekTarget, TranscriptionWordResponse } from ".
 import { activeTranscriptWordIndex } from "../lib/transcript";
 import { formatDuration } from "../lib/formatters";
 import { isVideoCall, mediaDownloadName } from "../lib/media";
+import { speakerColor } from "../lib/speaker-colors";
+import { HoverHint } from "./hover-hint";
 
 const playbackRates = [0.75, 1, 1.25, 1.5, 2];
 const emptyTranscriptWords: TranscriptionWordResponse[] = [];
@@ -16,12 +18,54 @@ const fallbackWaveform = Array.from({ length: waveformBars }, (_, index) => {
   return Math.max(0.2, Math.min(0.9, 0.54 + wave));
 });
 
+/** A place in the recording where an analysis card found its quote. */
+export type PlayerMoment = {
+  id: string;
+  seconds: number;
+  tone: "good" | "warn" | "bad";
+  title: string;
+  status: string;
+  quote: string;
+  speakerKey?: string;
+};
+
+export type PlayerSpeaker = { key: string; name: string; share: number | null };
+
 type MediaPlayerProps = {
   call: CallResponse;
   seekTarget?: MediaSeekTarget | null;
   words?: TranscriptionWordResponse[];
   onActiveWordChange?: (index: number) => void;
+  /** Speakers in the order and with the names of the speech block. */
+  speakers?: PlayerSpeaker[];
+  moments?: PlayerMoment[];
+  onMomentOpen?: (id: string) => void;
+  longestMonologue?: { seconds: number; name: string } | null;
 };
+
+type SpeakerRun = { speaker: string; start: number; end: number };
+
+// Consecutive words of one speaker are one turn; a pause over 1.2 s ends it, so
+// the lane shows silences as gaps instead of smearing them into speech.
+function speakerRuns(words: TranscriptionWordResponse[]): SpeakerRun[] {
+  const runs: SpeakerRun[] = [];
+  for (const word of words) {
+    const speaker = word.speaker?.trim();
+    if (!speaker || !Number.isFinite(word.start_seconds) || !Number.isFinite(word.end_seconds)) continue;
+    const last = runs[runs.length - 1];
+    if (last && last.speaker === speaker && word.start_seconds - last.end <= 1.2) {
+      last.end = Math.max(last.end, word.end_seconds);
+    } else {
+      runs.push({ speaker, start: word.start_seconds, end: Math.max(word.start_seconds, word.end_seconds) });
+    }
+  }
+  return runs;
+}
+
+function momentClock(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
 
 type ResolvedMediaPlayerProps = MediaPlayerProps & {
   mediaVariant: "original" | "redacted";
@@ -207,7 +251,13 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
   );
 }
 
-export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords, onActiveWordChange, mediaVariant = "original", accessSession = "" }: MediaPlayerProps & Partial<ResolvedMediaPlayerProps>) {
+export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords, onActiveWordChange, speakers, moments, onMomentOpen, longestMonologue, mediaVariant = "original", accessSession = "" }: MediaPlayerProps & Partial<ResolvedMediaPlayerProps>) {
+  const runs = useMemo(() => speakerRuns(words), [words]);
+  const speakerKeys = useMemo(() => speakers?.length ? speakers.map((speaker) => speaker.key) : Array.from(new Set(runs.map((run) => run.speaker))), [runs, speakers]);
+  const hasLane = runs.length > 0;
+  const [momentFilter, setMomentFilter] = useState<"weak" | "all">("weak");
+  const [momentsExpanded, setMomentsExpanded] = useState(false);
+  const [activeMoment, setActiveMoment] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
   const speedControlRef = useRef<HTMLDivElement | null>(null);
@@ -258,20 +308,11 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
     setLoadingWaveform(false);
 
     getCallMediaBlob(call, mediaVariant, accessSession)
-      .then(async (blob) => {
+      .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setAudioBlob(blob);
         setAudioUrl(objectUrl);
-        setLoadingWaveform(true);
-        try {
-          const peaks = await buildWaveform(blob, waveformBars);
-          if (!cancelled) setWaveform(peaks);
-        } catch {
-          if (!cancelled) setWaveform([]);
-        } finally {
-          if (!cancelled) setLoadingWaveform(false);
-        }
       })
       .catch((error) => {
         if (!cancelled) setAudioError(error instanceof Error ? error.message : "Аудио недоступно");
@@ -286,6 +327,19 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [call.duration_seconds, source]);
+
+  // The waveform is only the fallback track before a transcript exists; with
+  // speaker turns there is no reason to decode the whole recording.
+  useEffect(() => {
+    if (!audioBlob || hasLane) return;
+    let cancelled = false;
+    setLoadingWaveform(true);
+    buildWaveform(audioBlob, waveformBars)
+      .then((peaks) => { if (!cancelled) setWaveform(peaks); })
+      .catch(() => { if (!cancelled) setWaveform([]); })
+      .finally(() => { if (!cancelled) setLoadingWaveform(false); });
+    return () => { cancelled = true; };
+  }, [audioBlob, hasLane]);
 
   useEffect(() => {
     const element = waveformRef.current;
@@ -495,13 +549,25 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const progressPercent = effectiveDuration > 0 ? Math.min(100, Math.max(0, (currentTime / effectiveDuration) * 100)) : 0;
   const waveformReady = waveform.length > 0;
   const displayedWaveform = useMemo(() => resampleWaveform(waveformReady ? waveform : fallbackWaveform, visibleWaveformBars), [waveform, waveformReady, visibleWaveformBars]);
-  const showAudioSkeleton = loadingAudio || (loadingWaveform && !waveformReady);
+  const showAudioSkeleton = loadingAudio || (!hasLane && loadingWaveform && !waveformReady);
   const currentTimeLabel = formatDuration(Math.round(currentTime));
   const audioDisabled = !audioUrl || loadingAudio || Boolean(audioError);
+  const timelinePercent = (seconds: number) => `${effectiveDuration > 0 ? Math.min(100, Math.max(0, (seconds / effectiveDuration) * 100)) : 0}%`;
+  const speakerName = (key: string) => speakers?.find((speaker) => speaker.key === key)?.name || `Спикер ${key}`;
+  const allMoments = moments ?? [];
+  const hasGoodMoments = allMoments.some((moment) => moment.tone === "good");
+  const visibleMoments = momentFilter === "all" ? allMoments : allMoments.filter((moment) => moment.tone !== "good");
+  const shownMoments = momentsExpanded ? visibleMoments : visibleMoments.slice(0, 5);
+  const legendSpeakers = speakers?.length ? speakers : speakerKeys.map((key) => ({ key, name: `Спикер ${key}`, share: null }));
+
+  function openMoment(moment: PlayerMoment) {
+    setActiveMoment(moment.id);
+    seek(String(moment.seconds));
+  }
 
   return (
     <div
-      className={`dashboard-audio-player custom-audio-player ${showAudioSkeleton ? "audio-loading-state" : ""} ${audioError ? "audio-error-state" : ""}`}
+      className={`dashboard-audio-player custom-audio-player${hasLane ? " has-lane" : ""} ${showAudioSkeleton ? "audio-loading-state" : ""} ${audioError ? "audio-error-state" : ""}`}
       style={{ "--audio-progress": `${progressPercent}%` } as React.CSSProperties}
     >
       <button
@@ -515,9 +581,25 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
       </button>
       <div className="audio-player-main">
         <div className="audio-player-track-row">
+          {hasLane && visibleMoments.length > 0 && (
+            <div className="audio-moment-pins" aria-label="Места цитат из разбора">
+              {visibleMoments.map((moment) => (
+                <button
+                  key={moment.id}
+                  type="button"
+                  className={`audio-moment-pin is-${moment.tone}${activeMoment === moment.id ? " is-active" : ""}`}
+                  style={{ left: timelinePercent(moment.seconds) }}
+                  aria-label={`${moment.title}, ${momentClock(moment.seconds)}`}
+                  onClick={() => openMoment(moment)}
+                >
+                  <HoverHint focusable={false} label={moment.title} detail={[`${moment.status} · ${momentClock(moment.seconds)}`, `«${moment.quote}»`]}><i /></HoverHint>
+                </button>
+              ))}
+            </div>
+          )}
           <div
             ref={waveformRef}
-            className={`audio-waveform ${waveformReady ? "ready" : "empty"}`}
+            className={hasLane ? "audio-conversation-lane" : `audio-waveform ${waveformReady ? "ready" : "empty"}`}
             role="slider"
             tabIndex={audioUrl && !audioError ? 0 : -1}
             aria-label="Позиция аудиозаписи"
@@ -531,7 +613,24 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
               if (event.buttons === 1) handleWaveformPointer(event);
             }}
           >
-            {displayedWaveform.map((peak, index) => {
+            {hasLane ? (
+              <>
+                <span className="audio-lane-track" aria-hidden="true">
+                  {runs.map((run, index) => (
+                    <span
+                      key={`${run.speaker}-${run.start}-${index}`}
+                      className={`audio-lane-run${run.start < currentTime ? " is-played" : ""}`}
+                      style={{
+                        left: timelinePercent(run.start),
+                        width: timelinePercent(run.end - run.start),
+                        "--run-color": speakerColor(run.speaker, speakerKeys)
+                      } as React.CSSProperties}
+                    />
+                  ))}
+                </span>
+                <span className="audio-lane-knob" aria-hidden="true" style={{ left: `${progressPercent}%` }} />
+              </>
+            ) : displayedWaveform.map((peak, index) => {
               const barProgress = displayedWaveform.length > 1 ? index / (displayedWaveform.length - 1) : 0;
               const active = barProgress * 100 <= progressPercent;
               return (
@@ -545,12 +644,22 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
           </div>
           <div className="audio-player-meta-row">
             <div className="audio-time-range">
-              <span className="audio-time" title={audioError || (loadingWaveform ? "Строю звуковую дорожку" : undefined)}>
+              <span className="audio-time">
                 {currentTimeLabel}
               </span>
               <span className="audio-time-separator" aria-hidden="true">/</span>
               <span className="audio-time total">{formatDuration(Math.round(effectiveDuration))}</span>
             </div>
+            {hasLane && (
+              <ul className="audio-lane-legend" aria-label="Кто говорит">
+                {legendSpeakers.map((speaker) => (
+                  <li key={speaker.key} style={{ "--run-color": speakerColor(speaker.key, speakerKeys) } as React.CSSProperties}>
+                    <i />{speaker.name}{speaker.share !== null && <b>{Math.round(speaker.share * 100)}%</b>}
+                  </li>
+                ))}
+                {longestMonologue && <li className="audio-lane-note">самый длинный монолог {formatDuration(Math.round(longestMonologue.seconds))}, {longestMonologue.name}</li>}
+              </ul>
+            )}
             <div className="audio-player-actions">
               <div
                 className={`audio-speed-control ${speedMenuOpen ? "open" : ""} ${audioDisabled ? "disabled" : ""}`}
@@ -616,6 +725,46 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
           onTimeUpdate={(event) => updateCurrentTime(event.currentTarget.currentTime)}
         />
       </div>
+      {hasLane && allMoments.length > 0 && (
+        <section className="audio-moments" aria-label="Моменты, которые стоит послушать">
+          <header>
+            <strong>Моменты, которые стоит послушать</strong>
+            <span className="audio-moments-count">{visibleMoments.length}</span>
+            {hasGoodMoments && (
+              <div className="audio-moments-filter" role="group" aria-label="Какие моменты показать">
+                <button type="button" className={momentFilter === "weak" ? "active" : ""} aria-pressed={momentFilter === "weak"} onClick={() => setMomentFilter("weak")}>Слабые и частичные</button>
+                <button type="button" className={momentFilter === "all" ? "active" : ""} aria-pressed={momentFilter === "all"} onClick={() => setMomentFilter("all")}>Все</button>
+              </div>
+            )}
+          </header>
+          {visibleMoments.length === 0 ? (
+            <p className="audio-moments-empty">Слабых и частичных мест нет: все найденные пункты выполнены.</p>
+          ) : (
+            <ul>
+              {shownMoments.map((moment) => (
+                <li key={moment.id} className={activeMoment === moment.id ? "is-active" : undefined}>
+                  <button type="button" className="audio-moment-time" aria-label={`Слушать с ${momentClock(moment.seconds)}`} onClick={() => openMoment(moment)}>
+                    <Play size={10} />{momentClock(moment.seconds)}
+                  </button>
+                  <span className={`audio-moment-status is-${moment.tone}`}><i />{moment.status}</span>
+                  <button type="button" className="audio-moment-text" onClick={() => onMomentOpen ? onMomentOpen(moment.id) : openMoment(moment)}>
+                    <strong>{moment.title}</strong>
+                    <span>«{moment.quote}»</span>
+                  </button>
+                  {moment.speakerKey ? (
+                    <span className="audio-moment-speaker" style={{ "--run-color": speakerColor(moment.speakerKey, speakerKeys) } as React.CSSProperties}><i />{speakerName(moment.speakerKey)}</span>
+                  ) : <span />}
+                </li>
+              ))}
+            </ul>
+          )}
+          {visibleMoments.length > 5 && (
+            <button type="button" className="text-link audio-moments-more" onClick={() => setMomentsExpanded((value) => !value)}>
+              {momentsExpanded ? "Свернуть" : `Показать все ${visibleMoments.length}`}
+            </button>
+          )}
+        </section>
+      )}
     </div>
   );
 }

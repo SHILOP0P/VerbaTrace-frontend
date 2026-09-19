@@ -38,10 +38,13 @@ import type {
 } from "../../types";
 import { ApiError, api } from "../../api";
 
-import { analysisProgress, analysisNextStep, analysisScore100, formatScore, isAnalysisDone } from "../../shared/lib/analysis";
+import { analysisProgress, analysisNextStep, analysisScore100, analysisV3Result, formatScore, isAnalysisDone } from "../../shared/lib/analysis";
+import { stripAnalysisRefs } from "../../shared/lib/analysis-refs";
 import { contextLabel, formatDate, formatDuration } from "../../shared/lib/formatters";
 import { AnalysisPreview } from "../../shared/ui/analysis";
-import { CallMediaPlayer } from "../../shared/ui/audio";
+import { CallMediaPlayer, type PlayerSpeaker } from "../../shared/ui/audio";
+import { isVideoCall } from "../../shared/lib/media";
+import { playerMoments } from "./player-moments";
 import { isCallBeingProcessed } from "../../shared/lib/call-status";
 import { InfoCard, StatusChip, StatusTimeline, TranscriptPreview } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
@@ -175,6 +178,14 @@ export function CallDetailPanel({
       }
     }));
   }
+  const speakerNameOf = (key: string) =>
+    call?.speech?.speakers.find((speaker) => speaker.speaker_key === key)?.display_name
+    || speakerAssignments.find((assignment) => assignment.speaker_key === key)?.display_name
+    || `Спикер ${key}`;
+  // The player lists speakers in the order and with the names of the speech block.
+  const playerSpeakers: PlayerSpeaker[] | undefined = call?.speech?.speakers.length
+    ? call.speech.speakers.map((speaker) => ({ key: speaker.speaker_key, name: speakerNameOf(speaker.speaker_key), share: speaker.talk_share }))
+    : speakerAssignments.length ? speakerAssignments.map((assignment) => ({ key: assignment.speaker_key, name: assignment.display_name || `Спикер ${assignment.speaker_key}`, share: null })) : undefined;
   const canEditAnalysis = !call?.is_test && reviewContext?.capabilities.can_edit_analysis === true;
   const canDisputeAnalysis = !call?.is_test && reviewContext?.capabilities.can_dispute_analysis === true;
 
@@ -635,8 +646,22 @@ export function CallDetailPanel({
         words={localTranscription?.words}
         seekTarget={seekTarget}
         onActiveWordChange={setActiveWordIndex}
+        speakers={playerSpeakers}
+        moments={call.is_test ? undefined : playerMoments(displayedAnalysis, speakerNameOf)}
+        onMomentOpen={openAnalysisItem}
+        longestMonologue={longestMonologue(call.speech, speakerNameOf)}
       />
-      {!call.is_test && <StatusTimeline transcriptionOnly={transcriptionOnly} current={call.status} statuses={timelineStatuses} analysisProgress={analysisProgress(analysis)} analysisStatus={analysis?.status} />}
+      {!call.is_test && <StatusTimeline
+        transcriptionOnly={transcriptionOnly}
+        current={call.status}
+        statuses={timelineStatuses}
+        analysisProgress={analysisProgress(analysis)}
+        analysisStatus={analysis?.status}
+        acceptedAt={call.created_at}
+        transcriptionSeconds={transcriptionDurationSeconds(localTranscription)}
+        onRetry={onDeleteCall && canEditCall ? () => void runAnalysis() : undefined}
+        retryBusy={analysisBusy}
+      />}
       {(showReports || transcriptionOnly) && !call.is_test && <ReportExportPanel call={call} analysis={analysis} transcription={localTranscription} />}
       {transcriptionOnly && canEditCall && <TranscriptionOnlySteps call={call} ready={localTranscription?.status === "transcribed"} busy={analysisBusy} onEditRoles={onOpenTranscriptionEditor ? () => onOpenTranscriptionEditor(call.id) : undefined} onAnalyze={() => void runAnalysis()} />}
       {transcriptionOnly && canEditCall && !isCompanyCall(call) && <div className="transcription-analysis-entry"><div><strong>Нужен анализ разговора?</strong><p>Запустите его по готовой транскрипции, когда понадобится.</p></div><button className="primary-button" disabled={analysisBusy || localTranscription?.status !== "transcribed"} onClick={() => void runAnalysis()}><WandSparkles size={18} />{analysisBusy ? "Запускаю…" : "Анализировать"}</button>{analysisRunError && <div className="form-error">{analysisRunError}</div>}</div>}
@@ -690,7 +715,7 @@ export function CallDetailPanel({
             onOverflowChange={setTranscriptExpandable}
           />
         </InfoCard>
-        {!call.is_test && <CallSpeechBlock speech={call.speech} />}
+        {!call.is_test && <CallSpeechBlock speech={call.speech} hideShare={!isVideoCall(call) && (localTranscription?.words?.length ?? 0) > 0} />}
         {!call.is_test && !transcriptionOnly && <div className="analysis-card-stack">
           {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="primary-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}>{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
           {qualityReviewError && <div className="form-error is-dismissible" role="alert">{qualityReviewError}</div>}
@@ -732,7 +757,7 @@ export function CallDetailPanel({
               {instructionsError ? <p className="applied-instructions-error" role="alert">{instructionsError}</p> : instructionsLoading ? <div className="applied-instructions-skeleton" aria-label="Загрузка инструкций" /> : appliedInstructions.length === 0 ? <p className="applied-instructions-empty">Для этого анализа инструкции не применялись.</p> : <div className="applied-instructions-list">{appliedInstructions.map((instruction) => <button type="button" key={instruction.version_id} onClick={() => { window.history.pushState({}, "", `/app/calls/${encodeURIComponent(call.id)}/analyses/${encodeURIComponent(analysis.id)}/instructions/${encodeURIComponent(instruction.version_id)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}><span><strong>{instruction.title}</strong><small>Версия {instruction.version} · {instructionScopeLabel(instruction.scope)}{instruction.instruction_deleted ? " · удалена из настроек" : ""}</small></span><ChevronRight size={17} aria-hidden="true" /></button>)}</div>}
             </section>
           )}
-          {analysis && isAnalysisDone(analysis) && reviewContext && <AnalysisComments callId={call.id} analysisId={analysis.id} comments={reviewContext.comments ?? []} canComment={reviewContext.capabilities.can_comment_analysis} onChange={(comments)=>setReviewContext((current)=>current?{...current,comments}:current)} />}
+          {analysis && isAnalysisDone(analysis) && reviewContext && <AnalysisComments callId={call.id} analysisId={analysis.id} comments={reviewContext.comments ?? []} canComment={reviewContext.capabilities.can_comment_analysis} onChange={(comments)=>setReviewContext((current)=>current?{...current,comments}:current)} criterionTitles={analysisCriterionTitles(displayedAnalysis)} />}
         </div>}
       </div>
       {analysis && isAnalysisDone(analysis) && <div className="next-step">
@@ -799,6 +824,34 @@ function linkedActionHeading(status: CallAction["status"]) {
 }
 
 function optionalNonNegativeNumber(value:string|null){if(value===null||value.trim()==="")return undefined;const parsed=Number(value);return Number.isFinite(parsed)&&parsed>=0?parsed:undefined}
+
+// A comment on a card is stored against the card's key; a person sees its title.
+function analysisCriterionTitles(analysis: AnalysisResponse | undefined): ReadonlyMap<string, string> {
+  const titles = new Map<string, string>();
+  for (const item of analysisV3Result(analysis)?.items ?? []) {
+    const title = stripAnalysisRefs(item.title);
+    titles.set(item.id, title);
+    if (item.criterion_key) titles.set(item.criterion_key, title);
+  }
+  return titles;
+}
+
+function longestMonologue(speech: CallResponse["speech"], nameOf: (key: string) => string) {
+  const longest = (speech?.speakers ?? []).reduce<NonNullable<CallResponse["speech"]>["speakers"][number] | null>(
+    (best, speaker) => (speaker.longest_monologue_seconds ?? 0) > (best?.longest_monologue_seconds ?? 0) ? speaker : best,
+    null
+  );
+  if (!longest?.longest_monologue_seconds) return null;
+  return { seconds: longest.longest_monologue_seconds, name: nameOf(longest.speaker_key) };
+}
+
+// Speech-to-text time is only known from the first transcript: an edit moves
+// updated_at, and a span of hours would then read as the processing time.
+function transcriptionDurationSeconds(transcription: TranscriptionResponse | undefined) {
+  if (!transcription || transcription.status !== "transcribed" || (transcription.revision ?? 1) > 1 || transcription.edited) return null;
+  const seconds = (Date.parse(transcription.updated_at) - Date.parse(transcription.created_at)) / 1000;
+  return Number.isFinite(seconds) && seconds >= 1 && seconds <= 3 * 60 * 60 ? seconds : null;
+}
 
 function transcriptionCardState(
   call: CallResponse,

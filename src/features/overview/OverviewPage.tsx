@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Star
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { api } from "../../api";
 import type {
   AnalyticsOverviewResponse,
@@ -24,9 +24,10 @@ import {
 } from "../../shared/lib/analysis";
 import { formatDuration } from "../../shared/lib/formatters";
 import { useReloadScrollRestoration } from "../../shared/lib/reload-scroll";
-import { useDrawProgress } from "../../shared/lib/use-draw-progress";
+import { pluralizeRu } from "../../shared/lib/plans";
 import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
-import { TrendChart } from "../../shared/ui/analytics-ui";
+import { DeltaBadge, TrendChart } from "../../shared/ui/analytics-ui";
+import { ScoreGauge } from "../../shared/ui/score-gauge";
 import { TextBlockSkeleton } from "../../shared/ui/loading";
 import { WorthListening, type OpenCallAt } from "../analytics/AnalyticsPage";
 import { sparklineCoordinates, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./sparkline-geometry";
@@ -36,6 +37,11 @@ import { sparklineCoordinates, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./spark
  * a company shows that company, the personal workspace shows only personal
  * calls, and a device where nothing was chosen yet sees everything it can reach.
  */
+function runningTasksNote(running: number) {
+  if (running === 0) return "сейчас ничего не выполняется";
+  return `${running} ${pluralizeRu(running, "задача выполняется", "задачи выполняются", "задач выполняется")}`;
+}
+
 function overviewFilters(workspaceCompanyId: string | null): Parameters<typeof api.getAnalyticsOverview>[0] {
   if (workspaceCompanyId === null) return {};
   return workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" };
@@ -72,10 +78,6 @@ export function OverviewPage({
   const analyticsScore = overviewScore(analyticsOverview);
   const chartSeries = buildOverviewChartSeries(analyticsOverview);
   const recentUploads = useMemo(() => buildRecentUploadChart(calls), [calls]);
-  const qualityDonutPercent = analyticsScore.score === null ? 0 : (analyticsScore.score / analyticsScore.scale) * 100;
-  const qualityDonutLabel = analyticsScore.score === null
-    ? "нет данных"
-    : `${formatScore(analyticsScore.score)} / ${analyticsScore.scale}`;
 
   // The aggregates read every visible analysis, so they are fetched when the
   // calls change, when the tab comes back and on request — never on a timer.
@@ -134,28 +136,26 @@ export function OverviewPage({
   return (
     <section className="dashboard-page app-page">
       <div className="dashboard-kpi-grid">
-        <MetricCard loading={!loaded} icon={<BarChart3 size={20} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
+        <MetricCard loading={!loaded} icon={<BarChart3 size={18} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
         <MetricCard
           loading={!loaded}
-          icon={<Phone size={20} />}
+          icon={<Phone size={18} />}
           title="Новые сегодня"
           value={metricCount(analyticsOverview?.calls_created_today)}
           points={recentUploads}
           note="за последние 24 часа"
         />
-        <MetricCard loading={!loaded} icon={<Activity size={20} />} title="Звонки в обработке" value={metricCount(analyticsOverview?.calls_processing)} note={`${processingMonitoring?.queue.running ?? 0} задач выполняется`} />
-        <MetricCard loading={!loaded} icon={<CheckCircle2 size={20} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} tone="success" points={chartSeries.analyzedCalls} note="готовый результат анализа" />
-        <MetricCard loading={!loaded} icon={<Clock3 size={20} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} />
         <MetricCard
           loading={!loaded}
-          icon={<Star size={20} />}
-          title="Средняя оценка"
-          value={analyticsScore.score === null ? "Нет данных" : `${formatScore(analyticsScore.score)} / ${analyticsScore.scale}`}
-          tone="success"
-          points={chartSeries.quality}
-          donutPercent={qualityDonutPercent}
-          donutLabel={qualityDonutLabel}
+          icon={<Activity size={18} />}
+          title="Звонки в обработке"
+          value={metricCount(analyticsOverview?.calls_processing)}
+          live={(analyticsOverview?.calls_processing ?? 0) > 0}
+          note={runningTasksNote(processingMonitoring?.queue.running ?? 0)}
         />
+        <MetricCard loading={!loaded} icon={<CheckCircle2 size={18} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} points={chartSeries.analyzedCalls} note="готовый результат анализа" />
+        <MetricCard loading={!loaded} icon={<Clock3 size={18} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} note="по звонкам в выбранной области" />
+        <ScoreKpiCard loading={!loaded} score={analyticsScore.score === null ? null : (analyticsScore.score / analyticsScore.scale) * 100} summary={teamSummary} />
       </div>
 
       <div className="overview-insights-head">
@@ -329,62 +329,81 @@ function MetricCard({
   icon,
   title,
   value,
-  tone = "accent",
+  tone = "neutral",
   points,
   note,
-  donutPercent,
-  donutLabel,
+  live = false,
   loading = false
 }: {
   icon: React.ReactNode;
   title: string;
-  value: string;
-  tone?: "accent" | "success" | "warning";
+  value: React.ReactNode;
+  tone?: "neutral" | "success" | "warning";
   points?: ChartPoint[];
   note?: string;
-  donutPercent?: number;
-  donutLabel?: string;
+  /** Something is running right now: a quiet amber pulse next to the number. */
+  live?: boolean;
   loading?: boolean;
 }) {
-  const hasDonut = typeof donutPercent === "number";
+  const hasChart = Boolean(points && points.length > 0);
 
   if (loading) {
     return (
-      <article className={`dashboard-kpi-card glass-panel ${tone} ${hasDonut ? "with-donut" : ""}`} aria-busy="true">
-        <div>
-          <span className="metric-icon">{icon}</span>
+      <article className={`dashboard-kpi-card glass-panel ${tone}`} aria-busy="true">
+        <div className="kpi-head">
           <span>{title}</span>
+          <span className="metric-icon">{icon}</span>
         </div>
-        {hasDonut ? (
-          <span className="skeleton-circle overview-donut-skeleton" />
-        ) : (
-          <>
-            <span className="skeleton-line overview-kpi-value-skeleton" />
-            <span className="skeleton-line overview-kpi-chart-skeleton" />
-          </>
-        )}
+        <span className="skeleton-line overview-kpi-value-skeleton" />
+        <span className="skeleton-line overview-kpi-chart-skeleton" />
       </article>
     );
   }
 
   return (
-    <article className={`dashboard-kpi-card glass-panel ${tone} ${hasDonut ? "with-donut" : ""}`}>
-      <div>
-        <span className="metric-icon">{icon}</span>
+    <article className={`dashboard-kpi-card glass-panel ${tone}${hasChart ? "" : " is-plain"}`}>
+      <div className="kpi-head">
         <span>{title}</span>
+        <span className="metric-icon">{icon}</span>
       </div>
-      {hasDonut ? (
-        <QualityDonut percent={donutPercent} label={donutLabel ?? value} />
-      ) : (
-        <>
-          <strong>{value}</strong>
-          {points && points.length > 0 ? (
-            <MiniSparkline points={points} tone={tone} />
+      <strong className="kpi-value">{value}{live && <i className="kpi-live" aria-hidden="true" />}</strong>
+      {note && <span className="kpi-note">{note}</span>}
+      {hasChart && <MiniSparkline points={points!} tone={tone} />}
+    </article>
+  );
+}
+
+// The average over everything visible, with the change over the analytics
+// period next to it. The period is named, because the two numbers cover
+// different spans and must not read as one.
+function ScoreKpiCard({ score, summary, loading }: { score: number | null; summary: AnalyticsSummary | null; loading: boolean }) {
+  const periodDays = summary ? Math.max(1, Math.round((Date.parse(summary.period.to) - Date.parse(summary.period.from)) / 86_400_000)) : null;
+  return (
+    <article className="dashboard-kpi-card glass-panel is-score" aria-busy={loading || undefined}>
+      <div className="kpi-head">
+        <span>Средняя оценка</span>
+        <span className="metric-icon"><Star size={18} /></span>
+      </div>
+      <div className="kpi-score-body">
+        <ScoreGauge value={loading ? null : score} size={112} loading={loading} />
+        {!loading && <div className="kpi-score-side">
+          {score === null ? (
+            <span className="kpi-note">Оценок пока нет: общий балл появится после первого анализа.</span>
+          ) : summary && periodDays ? (
+            summary.avg_score !== null && summary.sample !== "none" && summary.sample !== "low" ? (
+              <>
+                <span className="kpi-note">за {periodDays} {pluralizeRu(periodDays, "день", "дня", "дней")}</span>
+                <span className="kpi-score-period"><b>{formatScore(summary.avg_score)}</b><DeltaBadge delta={summary.delta} /></span>
+                <span className="kpi-note">к прошлым {periodDays} {pluralizeRu(periodDays, "дню", "дням", "дням")}</span>
+              </>
+            ) : (
+              <span className="kpi-note">Сравнение с прошлым периодом появится от 5 оценённых звонков за {periodDays} {pluralizeRu(periodDays, "день", "дня", "дней")}.</span>
+            )
           ) : (
-            <span className="dashboard-kpi-note">{note ?? "нет динамики"}</span>
+            <span className="kpi-note">по всем оценённым звонкам</span>
           )}
-        </>
-      )}
+        </div>}
+      </div>
     </article>
   );
 }
@@ -396,17 +415,29 @@ type ChartPoint = {
   detail?: string;
 };
 
-export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "accent" | "success" | "warning"; }) {
+export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "neutral" | "accent" | "success" | "warning"; }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const gradientId = useId();
   const prepared = points.length > 0 ? points : [{ label: "Нет данных", value: 0, display: "0" }];
   const animationKey = prepared.map((point) => `${point.label}:${point.value}:${point.display}`).join("|");
   const coordinates = sparklineCoordinates(prepared);
   const path = smoothPath(coordinates);
+  const first = coordinates[0];
+  const last = coordinates[coordinates.length - 1];
+  const area = coordinates.length > 1 ? `${path} L ${last.x} ${SPARKLINE_HEIGHT} L ${first.x} ${SPARKLINE_HEIGHT} Z` : "";
 
   return (
     <div className={`mini-chart ${tone}${coordinates.length === 1 ? " is-single-point" : ""}`}>
       <svg key={animationKey} className="mini-sparkline" viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="График значения">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" className="mini-sparkline-stop-top" />
+            <stop offset="1" className="mini-sparkline-stop-bottom" />
+          </linearGradient>
+        </defs>
+        {area && <path className="mini-sparkline-area" d={area} fill={`url(#${gradientId})`} />}
         <path
+          className="mini-sparkline-line"
           d={path}
           vectorEffect="non-scaling-stroke"
         />
@@ -421,7 +452,7 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "a
       </svg>
       {coordinates.map((point, index) => (
         <span
-          className={`chart-hit ${activeIndex === index ? "active" : ""} ${index <= 1 ? "edge-start" : ""} ${index >= coordinates.length - 2 ? "edge-end" : ""}`}
+          className={`chart-hit ${activeIndex === index ? "active" : ""} ${index <= 1 ? "edge-start" : ""} ${index >= coordinates.length - 2 ? "edge-end" : ""} ${index === coordinates.length - 1 ? "is-last" : ""}`}
           style={{
             left: `${point.left}%`,
             top: `${point.top}%`
@@ -441,36 +472,6 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "a
         </span>
       ))}
     </div>
-  );
-}
-
-function QualityDonut({ percent, label }: { percent: number; label: string; }) {
-  const [active, setActive] = useState(false);
-  const clamped = Math.max(0, Math.min(100, percent));
-  const drawProgress = useDrawProgress(`${clamped}:${label}`, 1600);
-  const drawnPercent = clamped * drawProgress;
-  const percentLabel = `${Math.round(clamped)}%`;
-  return (
-    <span
-      className={`quality-donut-wrap ${active ? "active" : ""}`}
-      style={{ "--quality-donut-percent": `${drawnPercent}%` } as React.CSSProperties}
-      tabIndex={0}
-      aria-label={`Заполнение диаграммы: ${percentLabel}`}
-      onBlur={() => setActive(false)}
-      onFocus={() => setActive(true)}
-      onMouseEnter={() => setActive(true)}
-      onMouseLeave={() => setActive(false)}
-    >
-      <span className="quality-donut" role="img" aria-label="Круговая диаграмма оценки качества">
-        <span className="quality-donut-core">
-          <span>{label}</span>
-        </span>
-      </span>
-      <span className="chart-tooltip donut-tooltip">
-        <strong>{percentLabel}</strong>
-        <span>заполнение диаграммы</span>
-      </span>
-    </span>
   );
 }
 

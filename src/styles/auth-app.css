@@ -5053,6 +5053,17 @@ html[data-theme="light"] .progress-ring::before {
   transition: width 140ms ease, background-color 140ms ease, opacity 140ms ease;
 }
 
+/* Nested in a scrolling page, the thumb sits next to its list and scrolls with
+   it; the layout rules of the list's parent must not place or size it. */
+.custom-scroll-thumb.is-local,
+.app-shell .custom-scroll-thumb.is-local {
+  position: absolute;
+  z-index: 3;
+  margin: 0;
+  grid-area: auto;
+  flex: none;
+}
+
 .custom-scroll-thumb:hover {
   width: 6px;
   background: color-mix(in srgb, var(--app-accent, #ff6b3d) 42%, var(--app-muted, #b8aaa1));

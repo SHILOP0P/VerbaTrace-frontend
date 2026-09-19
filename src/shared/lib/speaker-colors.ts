@@ -1,4 +1,5 @@
-const SPEAKER_COLORS = ["#ff7657", "#63a7ff", "#ad7cff", "#42bd96", "#e1b54f", "#ef6cae", "#57b8c8", "#9caf52"];
+// Orange comes last: the first speakers must not share the colour of actions.
+const SPEAKER_COLORS = ["#63a7ff", "#ad7cff", "#57b8c8", "#e1b54f", "#ef6cae", "#42bd96", "#9caf52", "#ff7657"];
 
 /**
  * The colour of a speaker among the speakers of a call. It depends on the keys

@@ -5,9 +5,12 @@ import type {
   TranscriptionSpeakerAssignment
 } from "../../types";
 import { createContext, useContext, useLayoutEffect, useRef, useState } from "react";
-import { BookOpen, CheckCircle2, ChevronDown, CircleHelp, Info, ListChecks, MessageSquareText, Quote, Sparkles, Target, TriangleAlert } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronDown, Info, ListChecks, MessageSquareText, Quote, Sparkles, Target, TriangleAlert } from "lucide-react";
 import { transcriptionSpeakerLabel } from "../lib/formatters";
 import { maskProfanity } from "../lib/display-text";
+import { stripAnalysisRefs } from "../lib/analysis-refs";
+import { pluralizeRu } from "../lib/plans";
+import { ScoreGauge } from "./score-gauge";
 
 import {
   analysisDetails,
@@ -26,6 +29,7 @@ import {
   enumLabel,
   formatScore,
   isAnalysisDone,
+  issueCodeLabels,
   lostReasonLabels,
   signalLevelLabels
 } from "../lib/analysis";
@@ -214,8 +218,14 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
     partial: scored.filter(item => item.score! >= 50 && item.score! < 75).length,
     weak: scored.filter(item => item.score! < 50).length
   };
-  const displayText = (value: string) => resolveAnalysisSpeakers(cleanAnalysisText(value), speakerAssignments);
+  // Card and recommendation numbers the model cites become their titles.
+  const refTitles = new Map<string, string>([
+    ...result.items.map((item): [string, string] => [item.id, stripAnalysisRefs(item.title)]),
+    ...result.recommendations.map((item): [string, string] => [item.id, stripAnalysisRefs(item.title)])
+  ]);
+  const displayText = (value: string) => resolveAnalysisSpeakers(stripAnalysisRefs(cleanAnalysisText(value), refTitles), speakerAssignments);
   const scoreTone = (score: number | null) => score === null ? "neutral" : score >= 75 ? "good" : score >= 50 ? "warning" : "danger";
+  const cardStatusLabels: Record<string, string> = { met: "выполнено", mostly_met: "в основном", partially_met: "частично", minimally_met: "минимально", missed: "пропущено", not_applicable: "не применимо", unclear: "мало данных", conflict: "конфликт требований", not_assessed: "не оценено" };
   useLayoutEffect(() => {
     const filter = filterRef.current;
     if (!filter) return;
@@ -234,18 +244,16 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
     {inProgress && result.progress && <AnalysisProgressView progress={result.progress} failed={analysis.status === "failed" || analysis.status === "stale"} />}
     {!inProgress && <AnalysisSection title="Итог разговора">
       <div className="analysis-outcome-card"><Sparkles size={20}/><div><p>{displayText(result.summary) || "Итог не указан."}</p>{result.outcome && <p><b>Результат:</b> {displayText(result.outcome)}</p>}</div></div>
-      <div className="analysis-metrics-grid">
-        <div className="analysis-metric-card">
-          <div className="analysis-metric-heading"><span>Общая оценка</span><strong>{result.overall_score === null ? "—" : formatScore(result.overall_score)}<small>/100</small></strong></div>
-          <div className={`analysis-linear-score ${scoreTone(result.overall_score)}`}><i style={{width:`${Math.max(0, Math.min(100, result.overall_score ?? 0))}%`}} /></div>
-          <small>{result.overall_score_label}</small>
-        </div>
-        <div className="analysis-metric-card">
-          <div className="analysis-metric-heading"><span>Распределение ответов</span><strong>{scored.length}</strong></div>
+      <div className="analysis-score-summary">
+        <ScoreGauge value={result.overall_score} size={150} />
+        <div className="analysis-score-summary-body">
+          <span className="analysis-score-summary-title">Общая оценка</span>
+          {result.overall_score === null && <small className="analysis-score-summary-note">{displayText(result.overall_score_label) || "Разобрана только часть критериев — общий балл не считается."}</small>}
+          <span className="analysis-score-summary-count">{scored.length} {pluralizeRu(scored.length, "оценённый пункт", "оценённых пункта", "оценённых пунктов")}</span>
           <div className="analysis-distribution" aria-label="Распределение оценок">
             {scored.length > 0 && <><i className="good" style={{width:`${distribution.strong/scored.length*100}%`}}/><i className="warning" style={{width:`${distribution.partial/scored.length*100}%`}}/><i className="danger" style={{width:`${distribution.weak/scored.length*100}%`}}/></>}
           </div>
-          <div className="analysis-distribution-legend"><span className="good">Сильные {distribution.strong}</span><span className="warning">Частичные {distribution.partial}</span><span className="danger">Слабые {distribution.weak}</span></div>
+          <div className="analysis-distribution-legend"><span className="good">Сильные <b>{distribution.strong}</b></span><span className="warning">Частичные <b>{distribution.partial}</b></span><span className="danger">Слабые <b>{distribution.weak}</b></span></div>
         </div>
       </div>
       {(result.strengths.length > 0 || result.work_on.length > 0) && <div className="analysis-insight-grid">
@@ -261,7 +269,17 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
       {result.items.some(item => item.kind === "requirement") && (result.scorecard_mode === "adhoc" || result.scorecard_mode === "partial") && <p className="analysis-scorecard-note"><Info size={16}/>{result.scorecard_mode === "adhoc" ? "Критерии для этого звонка подобраны разово и не попадут в аналитику." : "Часть требований подобрана разово: они не попадут в аналитику."}</p>}
       {speakers.length > 1 && <div ref={filterRef} className="analysis-speaker-filter" role="group" aria-label="Фильтр вопросов по спикеру"><i className="analysis-filter-indicator" aria-hidden="true"/><button className={speakerFilter === "all" ? "active" : ""} onClick={()=>setSpeakerFilter("all")}>Все <b>{result.items.filter(item=>item.kind==="question").length}</b></button>{speakers.map(speaker=><button key={speaker} className={speakerFilter === speaker ? "active" : ""} onClick={()=>setSpeakerFilter(speaker)}>{transcriptionSpeakerLabel(speaker, speakerAssignments)} <b>{result.items.filter(item=>item.kind==="question" && itemSpeaker(item)===speaker).length}</b></button>)}</div>}
       <div className="analysis-v3-items">{visibleItems.map(item=><details id={`analysis-item-${item.id}`} className={`analysis-v3-item ${item.processing_status === "pending" ? "is-pending" : "is-ready"}`} key={item.id}>
-        <summary><span className="analysis-item-icon"><CircleHelp size={19}/></span><span className="analysis-item-title"><strong>{displayText(item.title)}{item.is_critical && <span className="analysis-critical-badge">Критичный</span>}</strong><small>{item.kind === "question" && itemSpeaker(item) ? transcriptionSpeakerLabel(itemSpeaker(item), speakerAssignments) : kindLabels[item.kind]}{item.fulfilled_earlier ? " · Ответ прозвучал ранее" : ""}</small></span><span className={`analysis-score-badge ${scoreTone(item.score)}`}>{item.processing_status === "pending" ? "Ожидает" : item.score === null ? statusLabels[item.status] ?? item.status : <><strong>{formatScore(item.score)}</strong><small>баллов</small></>}</span><ChevronDown className="analysis-item-chevron" size={18}/></summary>
+        <summary>
+          <ScorePips score={item.processing_status === "pending" ? null : item.score} tone={scoreTone(item.score)} />
+          <span className="analysis-item-title"><strong>{displayText(item.title)}</strong><small>{item.kind === "question" && itemSpeaker(item) ? transcriptionSpeakerLabel(itemSpeaker(item), speakerAssignments) : kindLabels[item.kind]}{item.fulfilled_earlier ? " · Ответ прозвучал ранее" : ""}</small></span>
+          {item.is_critical ? <span className="analysis-critical-badge">Критичный</span> : <span aria-hidden="true" />}
+          <span className={`analysis-item-score ${item.processing_status === "pending" ? "neutral" : scoreTone(item.score)}`}>
+            {item.processing_status === "pending"
+              ? <small>ожидает</small>
+              : <><strong>{item.score === null ? "—" : formatScore(item.score)}</strong><small>{cardStatusLabels[item.status] ?? statusLabels[item.status] ?? "не оценено"}</small></>}
+          </span>
+          <ChevronDown className="analysis-item-chevron" size={18}/>
+        </summary>
         <div className="analysis-v3-item-body">
           {item.kind === "question" && (item.question_parts?.length ?? 0) > 1 && <div className="analysis-detail-box neutral"><b>Части вопроса</b><AnalysisStringList items={item.question_parts!.map(displayText)} emptyLabel="" /></div>}
           {item.processing_status !== "pending" && item.kind === "question" && <div className="analysis-detail-box neutral"><b>Покрытие вопроса</b><p>{item.asked === true ? "Вопрос задан явно" : item.asked === false ? "Отдельный вопрос не задавался" : "Нельзя однозначно определить, задавался ли вопрос"}{item.information_status ? ` · Ответ ${informationLabels[item.information_status] ?? item.information_status}` : ""}{item.fulfilled_earlier ? " · Нужная информация прозвучала раньше и засчитана без штрафа" : ""}.</p></div>}
@@ -277,6 +295,15 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
       </details>)}</div>{visibleItems.length === 0 && <p className="analysis-empty">У выбранного спикера вопросы не найдены.</p>}
     </AnalysisSection>
   </div>;
+}
+
+// The five-step scale 0/25/50/75/100 as four divisions: the status reads at a
+// glance and the title, not a badge, stays the loudest thing in the row.
+function ScorePips({ score, tone }: { score: number | null; tone: string }) {
+  const filled = score === null ? 0 : Math.round(Math.max(0, Math.min(100, score)) / 25);
+  return <span className={`analysis-score-pips ${tone}`} aria-hidden="true">
+    {[0, 1, 2, 3].map((index) => <i key={index} className={index < filled ? "is-filled" : undefined} />)}
+  </span>;
 }
 
 // A card names its instruction by title. Analyses saved before titles were
@@ -361,7 +388,7 @@ function AnalysisV2View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
             {result.criteria_results.map((criterion, index) => (
               <div className="analysis-criterion" key={`${criterion.code}-${index}`}>
                 <div className="analysis-question-heading">
-                  <strong>{criterion.title || criterion.code || "Критерий"}</strong>
+                  <strong>{criterion.title || "Критерий"}</strong>
                   <span className={`analysis-status ${criterionStatusTone(criterion.status)}`}>
                     {enumLabel(criterion.status, criteriaStatusLabels)}
                   </span>
@@ -426,10 +453,10 @@ function AnalysisV2View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
         </AnalysisSection>
       )}
 
-      {result.issue_codes.length > 0 && (
-        <AnalysisSection title="Проблемные коды">
+      {result.issue_codes.some((code) => issueCodeLabels[code]) && (
+        <AnalysisSection title="Отмеченные проблемы">
           <div className="topic-list">
-            {result.issue_codes.map((code) => <span key={code}>{code}</span>)}
+            {result.issue_codes.filter((code) => issueCodeLabels[code]).map((code) => <span key={code}>{issueCodeLabels[code]}</span>)}
           </div>
         </AnalysisSection>
       )}

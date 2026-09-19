@@ -1,0 +1,5234 @@
+/*
+ * Visual foundation of the workspace. Loaded last on purpose: it re-points the
+ * older --app-* tokens at one surface scale for both themes, defines the
+ * tokens earlier rules referenced without ever declaring, and removes the photo
+ * layers behind the workspace. The landing page keeps its own background.
+ *
+ * Surface scale: canvas → panel (--vt-s1) → nested block (--vt-s2) → overlay
+ * (--vt-s3). Nested blocks separate by fill, not by another border.
+ */
+
+html[data-theme="dark"] :is(.app-shell, .vt-portal),
+html:not([data-theme]) :is(.app-shell, .vt-portal) {
+  --vt-canvas: #110e0b;
+  --vt-s1: #1a1612;
+  --vt-s2: #231e19;
+  --vt-s3: #2e2721;
+  --vt-soft: rgba(255, 244, 235, 0.05);
+  --vt-hover: rgba(255, 244, 235, 0.045);
+  --vt-line: rgba(255, 244, 235, 0.08);
+  --vt-line-mid: rgba(255, 244, 235, 0.11);
+  --vt-line-strong: rgba(255, 244, 235, 0.16);
+  --vt-text: #f7f0ea;
+  --vt-text-2: #c9bbaf;
+  /* 4.5:1 on the nested fill and on the tinted rows, not only on the panel. */
+  --vt-text-3: #a09286;
+  --vt-track: rgba(255, 244, 235, 0.09);
+  --vt-accent: #ff5a2f;
+  --vt-accent-text: #ff7a55;
+  --vt-accent-soft: rgba(255, 90, 47, 0.14);
+  --vt-on-accent: #1d0c05;
+  /* A fill under white text: a step darker than the accent, for 4.5:1. */
+  --vt-accent-fill: #d4431a;
+  --vt-accent-fill-hover: #bd3a15;
+  --vt-good: #5fbf7e;
+  --vt-good-soft: rgba(95, 191, 126, 0.14);
+  --vt-warn: #e3a24a;
+  --vt-warn-soft: rgba(227, 162, 74, 0.15);
+  --vt-warn-ring: rgba(227, 162, 74, 0.45);
+  --vt-bad: #e8695b;
+  --vt-bad-soft: rgba(232, 105, 91, 0.15);
+  --vt-info: #7ea8da;
+  --vt-info-soft: rgba(126, 168, 218, 0.15);
+  /* Marks (arcs, bars, dots, icons) may be as bright as the theme allows; on
+     a dark page the text tones already are. */
+  --vt-scroll-thumb: rgba(255, 244, 235, 0.2);
+  --vt-scroll-thumb-hover: rgba(255, 244, 235, 0.38);
+  --vt-good-mark: #5fbf7e;
+  --vt-warn-mark: #e8a54b;
+  --vt-bad-mark: #ec6b5d;
+  --vt-info-mark: #7eaae0;
+  /* Series colours: a metric keeps its colour, and none of them is the accent. */
+  --vt-chart-blue: #6ea6e6;
+  --vt-chart-violet: #a88bec;
+  --vt-chart-green: #5fbf7e;
+  --vt-chart-teal: #4db8ae;
+  --vt-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+  --vt-shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.26);
+  --vt-skeleton: rgba(255, 244, 235, 0.07);
+  --vt-skeleton-hi: rgba(255, 244, 235, 0.13);
+}
+
+html[data-theme="light"] :is(.app-shell, .vt-portal) {
+  /* A clean warm paper rather than beige: the nested fill is barely tinted,
+     so tinted blocks and colour marks stay fresh on it. */
+  --vt-canvas: #f4efea;
+  --vt-s1: #fffdfb;
+  --vt-s2: #f6f1ec;
+  --vt-s3: #ffffff;
+  --vt-soft: rgba(84, 56, 38, 0.045);
+  --vt-hover: rgba(84, 56, 38, 0.045);
+  --vt-line: rgba(84, 56, 38, 0.09);
+  --vt-line-mid: rgba(84, 56, 38, 0.13);
+  --vt-line-strong: rgba(84, 56, 38, 0.19);
+  --vt-text: #1c1511;
+  --vt-text-2: #5c524b;
+  /* Dark enough for 4.5:1 on the nested fill, not only on white. */
+  --vt-text-3: #6b6058;
+  --vt-track: rgba(84, 56, 38, 0.08);
+  --vt-accent: #ff5a2f;
+  --vt-accent-text: #b3380f;
+  --vt-accent-soft: rgba(255, 90, 47, 0.12);
+  --vt-on-accent: #1d0c05;
+  --vt-accent-fill: #d4431a;
+  --vt-accent-fill-hover: #bd3a15;
+  /* Text tones keep 4.5:1 on their own soft tint, as saturated as that
+     allows; marks carry the bright colour. Using the text shade for an arc or
+     a bar is what made the light theme look brown. */
+  --vt-good: #127a3f;
+  --vt-good-soft: rgba(46, 159, 99, 0.12);
+  --vt-warn: #a35600;
+  --vt-warn-soft: rgba(230, 140, 10, 0.13);
+  --vt-warn-ring: rgba(230, 140, 10, 0.4);
+  --vt-bad: #c2372d;
+  --vt-bad-soft: rgba(229, 72, 77, 0.11);
+  --vt-info: #2563c4;
+  --vt-info-soft: rgba(59, 130, 246, 0.11);
+  --vt-scroll-thumb: rgba(84, 56, 38, 0.24);
+  --vt-scroll-thumb-hover: rgba(84, 56, 38, 0.42);
+  --vt-good-mark: #2e9f63;
+  --vt-warn-mark: #e68c0a;
+  --vt-bad-mark: #e5484d;
+  --vt-info-mark: #3b82f6;
+  --vt-chart-blue: #3b82f6;
+  --vt-chart-violet: #8b5cf6;
+  --vt-chart-green: #2e9f63;
+  --vt-chart-teal: #14a39a;
+  --vt-shadow: 0 14px 30px rgba(84, 56, 38, 0.12);
+  --vt-shadow-soft: 0 6px 18px rgba(84, 56, 38, 0.09);
+  --vt-skeleton: rgba(84, 56, 38, 0.08);
+  --vt-skeleton-hi: rgba(84, 56, 38, 0.14);
+}
+
+/* Older tokens follow the scale, and the ones rules used without a definition
+   finally exist, so cards, rows and failed states get their fill and border. */
+html[data-theme] :is(.app-shell, .vt-portal),
+html:not([data-theme]) :is(.app-shell, .vt-portal) {
+  --vt-dur-fast: 120ms;
+  --vt-dur: 200ms;
+  --vt-dur-slow: 320ms;
+  --vt-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --vt-radius: 12px;
+  --vt-radius-lg: 16px;
+
+  --app-base: var(--vt-canvas);
+  --app-text: var(--vt-text);
+  --app-muted: var(--vt-text-2);
+  --app-glass: var(--vt-s1);
+  --app-glass-strong: var(--vt-s1);
+  --app-border: var(--vt-line-mid);
+  --app-success: var(--vt-good);
+  --app-warning: var(--vt-warn);
+  --app-danger: var(--vt-bad);
+  --app-panel: var(--vt-s1);
+  --app-panel-strong: var(--vt-s2);
+  --app-panel-soft: var(--vt-soft);
+  --app-panel-line: var(--vt-line-mid);
+  --app-panel-hover: var(--vt-hover);
+  --app-shadow: var(--vt-shadow);
+  --app-shadow-soft: var(--vt-shadow-soft);
+  --surface: var(--vt-s1);
+  --surface-raised: var(--vt-s1);
+  --border: var(--vt-line-mid);
+  --border-color: var(--vt-line-mid);
+  --text-muted: var(--vt-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The canvas is not flat black. Three layers, all tied to the viewport so a
+   scrolling page does not drag them along:
+   - the page's own background (html, in base.css and index.html): a warm
+     vertical gradient. The shell stays transparent: when the header's top
+     margin pushed the shell down, a strip of a second, slightly different
+     canvas showed above it with a visible edge;
+   - ::before: a soft light that drifts over the screen, easing to a stop at
+     each edge and turning back. Its horizontal, vertical and "breathing"
+     cycles have unrelated lengths, so the path does not visibly repeat; it
+     moves at 15–30 px a second, slow enough to stay in the background;
+   - ::after: a fine grain that keeps the gradients from banding into steps.
+   Only translate, transform, scale and opacity animate, so the compositor
+   moves the light without repainting the page. They replace the photo layers
+   of the old theme. */
+html[data-theme] .app-shell:not(.select-menu-portal-root) {
+  color: var(--vt-text);
+  background: transparent;
+}
+
+html[data-theme] .app-shell:not(.select-menu-portal-root)::before,
+html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  content: "";
+  opacity: 1;
+  filter: none;
+  transform: none;
+  pointer-events: none;
+}
+
+/* The light is a circle whose centre starts at the viewport's top-left corner;
+   the animations carry that centre between 6% and 94% of the width and
+   height. The negative delays start it near the top right, where the static
+   version of the light used to be. */
+html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
+  inset: auto;
+  top: -40vmax;
+  left: -40vmax;
+  width: 80vmax;
+  height: 80vmax;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 112, 60, 0.22) 0%, rgba(255, 90, 47, 0.08) 45%, transparent 100%);
+  translate: 88vw 0;
+  transform: translateY(8vh);
+  animation:
+    vt-light-x 65s ease-in-out -59s infinite alternate,
+    vt-light-y 47s ease-in-out -3s infinite alternate,
+    vt-light-breathe 23s ease-in-out infinite alternate;
+  will-change: translate, transform;
+}
+
+/* On paper an orange glow reads as a stain; a paler apricot light reads as
+   warmth. */
+html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::before {
+  background: radial-gradient(closest-side, rgba(255, 160, 110, 0.26) 0%, rgba(255, 196, 150, 0.1) 45%, transparent 100%);
+}
+
+@keyframes vt-light-x {
+  from { translate: 6vw 0; }
+  to { translate: 94vw 0; }
+}
+
+@keyframes vt-light-y {
+  from { transform: translateY(6vh); }
+  to { transform: translateY(94vh); }
+}
+
+@keyframes vt-light-breathe {
+  from { scale: 0.9; opacity: 0.8; }
+  to { scale: 1.1; opacity: 1; }
+}
+
+/* Asked for less motion: the light stays where it starts. The general rule
+   below covers the shell's descendants, not the shell's own layers. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
+    animation: none;
+  }
+}
+
+html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  opacity: 0.05;
+}
+
+html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::after {
+  opacity: 0.035;
+}
+
+/* The body lets the page's canvas (base.css, index.html) show through; a colour
+   here painted the dark fallback in the light theme until the app mounted. */
+html[data-theme] body {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * Scrollbars: one look everywhere, native bars and the drawn CustomScrollbar
+ * thumbs alike — a 4px rounded thumb that widens to 6px under the pointer,
+ * no track, no arrows, no accent colour.
+ * ------------------------------------------------------------------------- */
+.custom-scroll-thumb,
+.app-shell .custom-scroll-thumb {
+  width: 4px;
+  background: var(--vt-scroll-thumb, rgba(160, 146, 134, 0.4));
+  box-shadow: none;
+}
+
+.custom-scroll-thumb:is(:hover, :active),
+.app-shell .custom-scroll-thumb:is(:hover, :active) {
+  width: 6px;
+  background: var(--vt-scroll-thumb-hover, rgba(160, 146, 134, 0.65));
+}
+
+/* Chromium draws that thumb through ::-webkit-scrollbar, which a standard
+   scrollbar-width or scrollbar-color switches off, so both are reset here.
+   The rules cover every element, not only the app: the landing, the auth
+   pages and anything portalled out of the shell otherwise kept the system
+   bar, whose track paints a grey strip behind the thumb. Bars hidden on
+   purpose (a drawn thumb, a chip strip, the phone layout) stay hidden
+   through display: none, which these rules never set. */
+@supports selector(::-webkit-scrollbar) {
+  html,
+  html * {
+    scrollbar-width: auto !important;
+    scrollbar-color: auto !important;
+  }
+
+  html :is(.custom-scroll-target, .notifications-popover, .assistant-message-context)::-webkit-scrollbar,
+  html .app-shell .workspace > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout)::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  html::-webkit-scrollbar,
+  html *::-webkit-scrollbar {
+    width: 10px !important;
+    height: 10px !important;
+    background: transparent !important;
+  }
+
+  html::-webkit-scrollbar-thumb,
+  html *::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 3px solid transparent !important;
+    border-radius: 999px !important;
+    background: var(--vt-scroll-thumb, rgba(160, 146, 134, 0.4)) padding-box !important;
+  }
+
+  html::-webkit-scrollbar-thumb:is(:hover, :active),
+  html *::-webkit-scrollbar-thumb:is(:hover, :active) {
+    border-width: 2px !important;
+    background-color: var(--vt-scroll-thumb-hover, rgba(160, 146, 134, 0.65)) !important;
+  }
+
+  /* The track, the piece around the thumb and the corner between two bars all
+     paint their own surface by default; the bar shows only the page behind. */
+  html::-webkit-scrollbar-track,
+  html::-webkit-scrollbar-track-piece,
+  html::-webkit-scrollbar-corner,
+  html *::-webkit-scrollbar-track,
+  html *::-webkit-scrollbar-track-piece,
+  html *::-webkit-scrollbar-corner {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html::-webkit-scrollbar-button,
+  html *::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+/* Other engines have no thumb shape to set: the thin bar in the same colour. */
+@supports not selector(::-webkit-scrollbar) {
+  html,
+  html * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--vt-scroll-thumb, rgba(160, 146, 134, 0.4)) transparent;
+  }
+}
+
+/* Pages that scroll as a whole slide under the floating header, and their own
+   bar ran behind it and flush against the cards. PageScrollbar draws their
+   thumb the full height of the screen at its right edge, clear of both. */
+html .app-shell .workspace > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout) {
+  scrollbar-gutter: auto;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  html .app-shell .workspace > :is(.contacts-page, .reports-page, .companies-page, .settings-overview, .settings-subpage-layout) {
+    scrollbar-width: none;
+  }
+}
+
+/* Page islands: a flat panel, no photo, no blur. */
+html[data-theme] .app-shell .atmospheric-page.atmospheric-page,
+html[data-theme] .app-shell .admin-page.admin-page {
+  background: var(--vt-s1);
+  border-color: var(--vt-line);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme] .app-shell .atmospheric-page.atmospheric-page::before,
+html[data-theme] .app-shell .admin-page.admin-page::before {
+  content: none;
+  background: none;
+}
+
+/* Calls and analysis are two columns; the columns are the islands and the page
+   around them disappears into the canvas. */
+html[data-theme] .app-shell :is(.calls-layout, .analysis-layout).atmospheric-page.atmospheric-page {
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-theme] .app-shell :is(
+  .glass,
+  .glass-panel,
+  .calls-sidebar,
+  .call-overview,
+  .analysis-detail,
+  .report-panel
+) {
+  color: var(--vt-text);
+  background: var(--vt-s1);
+  border-color: var(--vt-line);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* A card inside a page island is a nested block: fill, no second border. */
+html[data-theme] .app-shell .atmospheric-page:not(.calls-layout):not(.analysis-layout) :is(.glass, .glass-panel) {
+  background: var(--vt-s2);
+  border-color: transparent;
+}
+
+/* Header and sidebar stay islands, on the same surface as the panels. */
+html[data-theme] .app-shell .app-header.app-header {
+  background: color-mix(in srgb, var(--vt-s1) 88%, transparent);
+  border-color: var(--vt-line);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Processing stages: a rail instead of five equal circles. Colour appears only
+ * where attention is needed: amber while a stage runs, red where it stopped.
+ * ------------------------------------------------------------------------- */
+.app-shell .stage-rail-wrap {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 20px;
+}
+
+.app-shell .stage-rail {
+  display: grid;
+  gap: 16px;
+  padding: 16px 20px 18px;
+  border: 1px solid var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+}
+
+.app-shell .stage-rail-wrap > .stage-rail,
+.app-shell .stage-rail.is-summary {
+  margin: 0;
+}
+
+.app-shell .stage-rail.is-summary {
+  gap: 12px;
+  margin: 18px 0 20px;
+  padding: 12px 16px 14px;
+}
+
+.app-shell .stage-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+}
+
+.app-shell .stage-rail-status {
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+}
+
+.app-shell .stage-rail-steps {
+  display: grid;
+  grid-template-columns: repeat(var(--rail-steps, 5), minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .stage-rail-step {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app-shell .stage-rail-track {
+  position: relative;
+  display: block;
+  height: 16px;
+  margin-bottom: 9px;
+}
+
+.app-shell .stage-rail-line {
+  position: absolute;
+  top: 7px;
+  left: 22px;
+  right: 6px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--vt-track);
+}
+
+.app-shell .stage-rail-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  transform-origin: left center;
+}
+
+/* A finished stage is a success, not a grey bar: done, running and failed
+   read as green, amber and red like everywhere else. */
+.app-shell .stage-rail-step.is-done .stage-rail-fill {
+  width: 100%;
+  background: color-mix(in srgb, var(--vt-good-mark) 75%, var(--vt-track));
+  animation: vt-rail-fill 480ms var(--vt-ease) both;
+  animation-delay: calc(var(--rail-index, 0) * 110ms);
+}
+
+.app-shell .stage-rail-step.is-active .stage-rail-fill {
+  overflow: hidden;
+  background: var(--vt-warn-mark);
+  transition: width var(--vt-dur-slow) var(--vt-ease);
+}
+
+.app-shell .stage-rail-step.is-active .stage-rail-fill::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  content: "";
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0));
+  animation: vt-rail-sheen 1.6s linear infinite;
+}
+
+.app-shell .stage-rail-step.is-failed .stage-rail-fill {
+  background: var(--vt-bad-mark);
+}
+
+.app-shell .stage-rail-step.is-pending .stage-rail-line {
+  background: repeating-linear-gradient(90deg, var(--vt-line-strong) 0 4px, transparent 4px 8px);
+}
+
+.app-shell .stage-rail-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  box-sizing: border-box;
+  border: 1.5px solid var(--vt-line-strong);
+  border-radius: 50%;
+  color: var(--vt-s1);
+  background: var(--vt-s2);
+}
+
+.app-shell .stage-rail-step.is-done .stage-rail-dot {
+  border-color: transparent;
+  background: var(--vt-text-2);
+}
+
+.app-shell .stage-rail-step.is-done .stage-rail-dot svg path {
+  stroke-dasharray: 24;
+  animation: vt-rail-draw 260ms ease-out both;
+  animation-delay: calc(var(--rail-index, 0) * 110ms + 160ms);
+}
+
+.app-shell .stage-rail-step.is-active .stage-rail-dot {
+  border: 2px solid var(--vt-warn-mark);
+  background: var(--vt-s1);
+  animation: vt-rail-pulse 1.8s ease-out infinite;
+}
+
+.app-shell .stage-rail-step.is-failed .stage-rail-dot {
+  border-color: transparent;
+  background: var(--vt-bad-mark);
+}
+
+.app-shell .stage-rail-label {
+  overflow: hidden;
+  padding-right: 12px;
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .stage-rail-step.is-pending .stage-rail-label {
+  color: var(--vt-text-2);
+}
+
+.app-shell .stage-rail-step.is-active .stage-rail-label,
+.app-shell .stage-rail-step.is-failed .stage-rail-label {
+  font-weight: 650;
+}
+
+.app-shell .stage-rail-meta {
+  padding-right: 12px;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+.app-shell .stage-rail-step.is-active .stage-rail-meta {
+  color: var(--vt-warn);
+}
+
+.app-shell .stage-rail-step.is-failed .stage-rail-meta {
+  color: var(--vt-bad);
+}
+
+.app-shell .stage-rail-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-shell .stage-rail-summary-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--vt-good-mark);
+  background: var(--vt-good-soft);
+}
+
+.app-shell .stage-rail-summary > strong {
+  flex: 0 0 auto;
+  color: var(--vt-text);
+  font-size: 0.92rem;
+}
+
+.app-shell .stage-rail-summary-facts {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vt-text-3);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .stage-rail-summary > button {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.app-shell .stage-rail-chevron {
+  transform: rotate(90deg);
+}
+
+.app-shell .stage-rail-summary-line {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* All stages done: the same green as the open rail, the final one full. */
+.app-shell .stage-rail-summary-line > span {
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--vt-good-mark) 75%, var(--vt-track));
+}
+
+.app-shell .stage-rail-summary-line > span:last-child {
+  background: var(--vt-good-mark);
+}
+
+.app-shell .stage-rail-failure {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--vt-radius);
+  background: var(--vt-bad-soft);
+}
+
+.app-shell .stage-rail-failure-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--vt-bad-mark);
+  background: var(--vt-s1);
+}
+
+.app-shell .stage-rail-failure-text {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-shell .stage-rail-failure-text strong {
+  color: var(--vt-text);
+  font-size: 0.92rem;
+}
+
+.app-shell .stage-rail-failure-text small {
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+}
+
+.app-shell .stage-rail-failure > button {
+  flex: 0 0 auto;
+}
+
+/* On a phone the rail turns vertical; every stage keeps its label and meta. */
+@media (max-width: 760px) {
+  .app-shell .stage-rail-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .stage-rail-step {
+    position: relative;
+    min-height: 54px;
+    padding-left: 30px;
+  }
+
+  .app-shell .stage-rail-track {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 16px;
+    height: auto;
+    margin: 0;
+  }
+
+  .app-shell .stage-rail-line {
+    top: 20px;
+    bottom: 4px;
+    left: 7px;
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+
+  .app-shell .stage-rail-step.is-active .stage-rail-fill {
+    width: 100% !important;
+    height: var(--rail-progress, 40%);
+  }
+
+  .app-shell .stage-rail-step.is-pending .stage-rail-line {
+    background: repeating-linear-gradient(180deg, var(--vt-line-strong) 0 4px, transparent 4px 8px);
+  }
+
+  .app-shell .stage-rail-label {
+    font-size: var(--mobile-text, 15px);
+    line-height: 16px;
+  }
+
+  .app-shell .stage-rail-meta {
+    padding-bottom: 14px;
+    font-size: var(--mobile-text-small, 14px);
+  }
+
+  .app-shell .stage-rail-summary {
+    flex-wrap: wrap;
+  }
+
+  .app-shell .stage-rail-summary-facts {
+    flex-basis: 100%;
+    order: 3;
+    white-space: normal;
+  }
+
+  .app-shell .stage-rail-failure {
+    flex-wrap: wrap;
+  }
+}
+
+@keyframes vt-rail-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes vt-rail-sheen { from { transform: translateX(-120%); } to { transform: translateX(260%); } }
+@keyframes vt-rail-draw { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes vt-rail-pulse {
+  0% { box-shadow: 0 0 0 0 var(--vt-warn-ring); }
+  70% { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+
+/* ---------------------------------------------------------------------------
+ * Score gauge: one model for a 0–100 score across the overview and the call.
+ * ------------------------------------------------------------------------- */
+.app-shell .score-gauge {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.app-shell .score-gauge svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.app-shell .score-gauge circle {
+  fill: none;
+  stroke-width: 13;
+  stroke-linecap: round;
+}
+
+.app-shell .score-gauge-track {
+  stroke: var(--vt-track);
+}
+
+.app-shell .score-gauge.is-loading .score-gauge-track {
+  stroke: var(--vt-skeleton-hi);
+  animation: app-shimmer 1.4s ease-in-out infinite;
+}
+
+.app-shell .score-gauge.tone-good .score-gauge-value { stroke: var(--vt-good-mark); }
+.app-shell .score-gauge.tone-warning .score-gauge-value { stroke: var(--vt-warn-mark); }
+.app-shell .score-gauge.tone-danger .score-gauge-value { stroke: var(--vt-bad-mark); }
+
+.app-shell .score-gauge-tick {
+  stroke: var(--vt-line-strong);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.app-shell .score-gauge-center {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.app-shell .score-gauge-center strong {
+  color: var(--vt-text);
+  font-size: calc(var(--gauge-size, 150px) * 0.24);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.app-shell .score-gauge-center small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+.app-shell .score-gauge.tone-none .score-gauge-center strong {
+  color: var(--vt-text-3);
+}
+
+.app-shell .score-gauge-skeleton {
+  display: block;
+  width: 56px;
+  height: 22px;
+  border-radius: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Call analysis: calmer tones, a score summary instead of two metric cards,
+ * criteria rows whose title outranks the score.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .analysis-v3 {
+  --analysis-good: var(--vt-good);
+  --analysis-warning: var(--vt-warn);
+  --analysis-danger: var(--vt-bad);
+  --analysis-info: var(--vt-info);
+}
+
+.app-shell .analysis-outcome-card {
+  border: 0;
+  background: var(--vt-s2);
+}
+
+.app-shell .analysis-score-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: var(--vt-s2);
+  --gauge-size: 150px;
+}
+
+.app-shell .analysis-score-summary-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app-shell .analysis-score-summary-title {
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.app-shell .analysis-score-summary-count {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.app-shell .analysis-score-summary-note {
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+html[data-theme] .app-shell .analysis-distribution {
+  gap: 2px;
+  background: var(--vt-track);
+}
+
+.app-shell .analysis-distribution-legend {
+  gap: 8px 16px;
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+}
+
+.app-shell .analysis-distribution-legend span {
+  color: var(--vt-text-2);
+}
+
+.app-shell .analysis-distribution-legend span b {
+  margin-left: 4px;
+  color: var(--vt-text);
+  font-weight: 650;
+}
+
+.app-shell .analysis-distribution-legend span::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.app-shell .analysis-distribution-legend .good::before { background: var(--vt-good-mark); }
+.app-shell .analysis-distribution-legend .warning::before { background: var(--vt-warn-mark); }
+.app-shell .analysis-distribution-legend .danger::before { background: var(--vt-bad-mark); }
+
+.app-shell .analysis-insight {
+  border: 0;
+}
+
+/* Large tinted areas stay faint; the icon and heading carry the tone. */
+.app-shell .analysis-insight.good { background: color-mix(in srgb, var(--vt-good-mark) 7%, var(--vt-s2)); }
+.app-shell .analysis-insight.warning { background: color-mix(in srgb, var(--vt-warn-mark) 7%, var(--vt-s2)); }
+
+/* Advice: a numbered list divided by lines. The number is a place in the
+   queue, not a score, so it stays neutral; the level carries the colour. */
+.app-shell .analysis-recommendations {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .analysis-recommendation {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px 0;
+  border-top: 1px solid var(--vt-line);
+}
+
+.app-shell .analysis-recommendation:first-child {
+  padding-top: 4px;
+  border-top: 0;
+}
+
+.app-shell .analysis-recommendation:last-child {
+  padding-bottom: 0;
+}
+
+.app-shell .analysis-recommendation-index {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.app-shell .analysis-recommendation-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-shell .analysis-recommendation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding-top: 3px;
+}
+
+html[data-theme] .app-shell .analysis-recommendation-head strong {
+  color: var(--vt-text);
+  font-size: 1rem;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.app-shell .analysis-recommendation-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.app-shell .analysis-recommendation-priority::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  content: "";
+  background: var(--vt-text-3);
+}
+
+.app-shell .analysis-recommendation-priority.high::before { background: var(--vt-bad-mark); }
+.app-shell .analysis-recommendation-priority.medium::before { background: var(--vt-warn-mark); }
+.app-shell .analysis-recommendation-priority.low::before { background: var(--vt-info-mark); }
+
+html[data-theme] .app-shell p.analysis-recommendation-action {
+  margin: 0;
+  color: var(--vt-text);
+  font-size: 0.94rem;
+  font-weight: 450;
+  line-height: 1.55;
+}
+
+html[data-theme] .app-shell .analysis-recommendation-note {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.app-shell .analysis-recommendation-note > span {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.75;
+}
+
+.app-shell .analysis-recommendation-note.is-effect > span {
+  color: var(--vt-good);
+}
+
+@media (max-width: 560px) {
+  html[data-theme] .app-shell .analysis-recommendation-note {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
+html[data-theme] .app-shell .analysis-v3-item {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--vt-s2);
+  box-shadow: none;
+  interpolate-size: allow-keywords;
+  transition: border-color var(--vt-dur) ease, background-color var(--vt-dur) ease;
+}
+
+html[data-theme] .app-shell .analysis-v3-item:hover {
+  border-color: var(--vt-line-strong);
+  box-shadow: none;
+}
+
+.app-shell .analysis-v3-item::details-content {
+  height: 0;
+  overflow: clip;
+  transition: height var(--vt-dur-slow) var(--vt-ease), content-visibility var(--vt-dur-slow) allow-discrete;
+}
+
+.app-shell .analysis-v3-item[open]::details-content {
+  height: auto;
+}
+
+.app-shell .analysis-v3-item > summary {
+  grid-template-columns: 44px minmax(0, 1fr) auto 104px 18px;
+  align-items: center;
+  column-gap: 14px;
+  padding: 13px 16px;
+}
+
+.app-shell .analysis-v3-item > summary > .analysis-score-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.app-shell .analysis-score-pips i {
+  width: 7px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--vt-track);
+}
+
+.app-shell .analysis-score-pips.good i.is-filled { background: var(--vt-good-mark); }
+.app-shell .analysis-score-pips.warning i.is-filled { background: var(--vt-warn-mark); }
+.app-shell .analysis-score-pips.danger i.is-filled { background: var(--vt-bad-mark); }
+
+.app-shell .analysis-item-title strong {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+  font-weight: 550;
+}
+
+.app-shell .analysis-item-title small {
+  width: auto;
+  padding: 0;
+  color: var(--vt-text-3);
+  background: none;
+  font-size: 0.8rem;
+  font-weight: 450;
+}
+
+.app-shell .analysis-v3-item .analysis-critical-badge {
+  margin-left: 0;
+  padding: 3px 9px;
+  border: 0;
+  color: var(--vt-bad);
+  background: var(--vt-bad-soft);
+  font-size: 0.75rem;
+  font-weight: 650;
+  vertical-align: middle;
+}
+
+.app-shell .analysis-item-score {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  min-width: 0;
+}
+
+.app-shell .analysis-item-score strong {
+  font-size: 1.1rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.app-shell .analysis-item-score small {
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .analysis-item-score.good strong { color: var(--vt-good); }
+.app-shell .analysis-item-score.warning strong { color: var(--vt-warn); }
+.app-shell .analysis-item-score.danger strong { color: var(--vt-bad); }
+.app-shell .analysis-item-score.neutral strong { color: var(--vt-text-3); }
+
+.app-shell .analysis-v3-item-body {
+  border-top: 1px solid var(--vt-line);
+  background: transparent;
+}
+
+/* An opened criterion, as on the approved reference: text on the left,
+   quotes on the right, labels instead of boxed sections. The quotes move
+   under the text by themselves once two 290px columns no longer fit, without
+   a container query. */
+html[data-theme] .app-shell .analysis-v3-item-body.criterion-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  align-items: start;
+  gap: 18px 26px;
+  padding: 16px 18px 18px;
+}
+
+.app-shell :is(.criterion-detail-main, .criterion-detail-side) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.app-shell .criterion-detail-side {
+  gap: 10px;
+}
+
+html[data-theme] .app-shell .criterion-detail-coverage {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.app-shell .criterion-detail-section {
+  display: grid;
+  gap: 5px;
+}
+
+.app-shell .criterion-detail-label {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+html[data-theme] .app-shell :is(.criterion-detail-section p, .criterion-detail-improvement p) {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.app-shell .criterion-detail-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  --dot: var(--vt-text-3);
+}
+
+.app-shell .criterion-detail-list.good { --dot: var(--vt-good-mark); }
+.app-shell .criterion-detail-list.warning { --dot: var(--vt-warn-mark); }
+.app-shell .criterion-detail-list.danger { --dot: var(--vt-bad-mark); }
+
+html[data-theme] .app-shell .criterion-detail-list li {
+  position: relative;
+  padding-left: 15px;
+  color: var(--vt-text-2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.app-shell .criterion-detail-list li::before {
+  position: absolute;
+  top: 0.6em;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  content: "";
+  background: var(--dot);
+}
+
+html[data-theme] .app-shell .criterion-detail-list small {
+  display: block;
+  margin-top: 2px;
+  color: var(--vt-text-3);
+  font-size: 0.83rem;
+}
+
+.app-shell .criterion-detail-improvement {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--vt-s3);
+}
+
+.app-shell .criterion-detail-improvement > span {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .criterion-detail-improvement p {
+  color: var(--vt-text);
+}
+
+.app-shell .criterion-detail-quotes {
+  display: grid;
+  gap: 10px;
+}
+
+html[data-theme] .app-shell .criterion-detail-empty {
+  margin: 0;
+  color: var(--vt-text-3);
+  font-size: 0.86rem;
+}
+
+html[data-theme] .app-shell .criterion-detail-basis {
+  margin: 4px 0 0;
+  color: var(--vt-text-3);
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+
+html[data-theme] .app-shell button.criterion-detail-basis {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  color: var(--vt-text-2);
+  background: none;
+  font: inherit;
+  font-size: 0.83rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--vt-line-strong);
+  text-underline-offset: 3px;
+}
+
+html[data-theme] .app-shell button.criterion-detail-basis:hover {
+  color: var(--vt-text);
+  text-decoration-color: currentColor;
+}
+
+
+html[data-theme] .app-shell .analysis-detail-box {
+  border: 0;
+  background: var(--vt-s1);
+}
+
+html[data-theme] .app-shell .analysis-detail-box.good { background: color-mix(in srgb, var(--vt-good-mark) 8%, var(--vt-s1)); }
+html[data-theme] .app-shell .analysis-detail-box.warning { background: color-mix(in srgb, var(--vt-warn-mark) 8%, var(--vt-s1)); }
+html[data-theme] .app-shell .analysis-detail-box.reference { background: color-mix(in srgb, var(--vt-info-mark) 8%, var(--vt-s1)); }
+
+/* Quotes: the time is a button on the left, no accent stripe down the side. */
+html[data-theme] .app-shell :is(.evidence-link, .criterion-evidence blockquote, .evidence-quotes blockquote) {
+  border: 0;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .evidence-link {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 8px 10px;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .evidence-link:is(:hover, :focus-visible) {
+  border: 0;
+  background: var(--vt-hover);
+  box-shadow: inset 0 0 0 1px var(--vt-line-strong);
+}
+
+html[data-theme] .app-shell .evidence-link time {
+  order: -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  color: var(--vt-text);
+  background: var(--vt-s1);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.app-shell .evidence-link time::before {
+  width: 7px;
+  height: 8px;
+  content: "";
+  background: var(--vt-text-2);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+html[data-theme] .app-shell .evidence-speaker {
+  color: var(--vt-text-3);
+}
+
+.app-shell .evidence-speaker.has-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-shell .evidence-speaker.has-color::before {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  content: "";
+  background: var(--speaker-color);
+}
+
+/* Beside the criterion text a quote needs no panel: the time is the button. */
+html[data-theme] .app-shell .criterion-detail-quotes :is(.evidence-link, blockquote) {
+  margin: 0;
+  padding: 4px 6px 4px 4px;
+  background: transparent;
+}
+
+html[data-theme] .app-shell .criterion-detail-quotes .evidence-link:is(:hover, :focus-visible) {
+  background: var(--vt-hover);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .criterion-detail-quotes .evidence-link time {
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .criterion-detail-quotes .evidence-link > span {
+  display: grid;
+  gap: 3px;
+  color: var(--vt-text-2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Player controls stay neutral; orange is for the play button only. */
+html[data-theme] .app-shell :is(.audio-speed-button, .audio-download-button) {
+  color: var(--vt-text-2);
+  border-color: var(--vt-line-strong);
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell :is(.audio-speed-button, .audio-download-button):hover:not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+@media (max-width: 760px) {
+  .app-shell .analysis-score-summary {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .app-shell .analysis-score-summary-body {
+    width: 100%;
+  }
+
+  /* The status word may wrap under the number; left on one line, «не
+     применимо» took the title's width on a phone. */
+  .app-shell .analysis-v3-item > summary {
+    grid-template-columns: 38px minmax(0, 1fr) minmax(0, 84px);
+    row-gap: 6px;
+  }
+
+  .app-shell .analysis-v3-item > summary .analysis-item-score small {
+    text-align: right;
+    white-space: normal;
+  }
+
+  .app-shell .analysis-v3-item > summary > .analysis-critical-badge {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .app-shell .analysis-v3-item > summary > .analysis-item-score {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .app-shell .analysis-v3-item > summary > span[aria-hidden="true"]:empty {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Overview KPI cards: grey icons, tabular numbers, a filled line with the last
+ * value marked. Orange stays for actions; the score card keeps its tone.
+ * ------------------------------------------------------------------------- */
+.app-shell .dashboard-kpi-grid {
+  gap: 14px;
+}
+
+html[data-theme] .app-shell .dashboard-kpi-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-height: 176px;
+  padding: 16px 18px 84px;
+  border-radius: var(--vt-radius-lg);
+}
+
+.app-shell .dashboard-kpi-card > .kpi-head {
+  justify-content: space-between;
+  color: var(--vt-text-2);
+  font-size: 0.86rem;
+}
+
+.app-shell .dashboard-kpi-card .metric-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--vt-text-3);
+}
+
+.app-shell .dashboard-kpi-card .kpi-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  color: var(--vt-text);
+  font-size: 2rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.app-shell .dashboard-kpi-card .kpi-note {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.app-shell .dashboard-kpi-card.is-plain {
+  padding-bottom: 18px;
+}
+
+.app-shell .kpi-live {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vt-warn-mark);
+  animation: vt-rail-pulse 1.8s ease-out infinite;
+}
+
+.app-shell .dashboard-kpi-card.is-score {
+  padding-bottom: 16px;
+}
+
+.app-shell .kpi-score-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 4px;
+  --gauge-size: 112px;
+}
+
+.app-shell .kpi-score-side {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.app-shell .kpi-score-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell .kpi-score-period b {
+  color: var(--vt-text);
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.app-shell .dashboard-kpi-card .overview-kpi-value-skeleton {
+  margin-top: 8px;
+}
+
+.app-shell .mini-chart {
+  --mini-chart-colour: var(--vt-text-2);
+  right: 18px;
+  bottom: 16px;
+  left: 18px;
+  height: 48px;
+  opacity: 1;
+}
+
+.app-shell .mini-chart.success { --mini-chart-colour: var(--vt-good-mark); }
+.app-shell .mini-chart.warning { --mini-chart-colour: var(--vt-warn-mark); }
+
+.app-shell .mini-sparkline {
+  animation: vt-spark-reveal 1100ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+.app-shell .mini-sparkline .mini-sparkline-line {
+  stroke: var(--mini-chart-colour);
+  stroke-width: 2;
+}
+
+.app-shell .mini-sparkline .mini-sparkline-area {
+  stroke: none;
+}
+
+.app-shell .mini-sparkline-stop-top {
+  stop-color: var(--mini-chart-colour);
+  stop-opacity: 0.26;
+}
+
+/* Each overview metric keeps one colour for its icon and its line, so the
+   cards tell apart at a glance; the score card keeps the gauge's tones. */
+.app-shell .dashboard-kpi-card.kpi-series-blue { --kpi-series: var(--vt-chart-blue); }
+.app-shell .dashboard-kpi-card.kpi-series-violet { --kpi-series: var(--vt-chart-violet); }
+.app-shell .dashboard-kpi-card.kpi-series-green { --kpi-series: var(--vt-chart-green); }
+.app-shell .dashboard-kpi-card.kpi-series-teal { --kpi-series: var(--vt-chart-teal); }
+
+.app-shell .dashboard-kpi-card[class*="kpi-series-"] .mini-chart {
+  --mini-chart-colour: var(--kpi-series);
+}
+
+.app-shell .dashboard-kpi-card[class*="kpi-series-"] .metric-icon {
+  color: var(--kpi-series);
+}
+
+.app-shell .mini-sparkline-stop-bottom {
+  stop-color: var(--mini-chart-colour);
+  stop-opacity: 0;
+}
+
+.app-shell .chart-hit.is-last::before {
+  width: 8px;
+  height: 8px;
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--vt-s1);
+  animation: vt-fade-in 240ms ease 1050ms both;
+}
+
+html[data-theme] .app-shell .chart-tooltip {
+  color: var(--vt-text);
+  background: var(--vt-s3);
+  border-color: var(--vt-line-strong);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .app-shell .chart-tooltip::after {
+  border-color: var(--vt-line-strong);
+}
+
+.app-shell .chart-tooltip span {
+  color: var(--vt-text-2);
+}
+
+@keyframes vt-spark-reveal {
+  from { clip-path: inset(-12px 100% -12px -12px); }
+  to { clip-path: inset(-12px -12px -12px -12px); }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Sidebar islands: hover is a quiet fill, the active page a stronger fill with
+ * an orange icon. No border, no bar: an active item must not look like a button.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .app-sidebar-menu,
+html[data-theme] .app-shell .app-sidebar-plan {
+  border-color: var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .app-sidebar-menu {
+  gap: 2px;
+  padding: 8px;
+}
+
+html[data-theme] .app-shell .app-sidebar-menu button {
+  min-height: 40px;
+  color: var(--vt-text-2);
+  border-color: transparent;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+html[data-theme] .app-shell .app-sidebar-menu button svg {
+  color: var(--vt-text-3);
+  transition: color var(--vt-dur) ease;
+}
+
+html[data-theme] .app-shell .app-sidebar-menu button:hover {
+  color: var(--vt-text);
+  border-color: transparent;
+  background: var(--vt-hover);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .app-sidebar-menu button:hover svg {
+  color: var(--vt-text-2);
+}
+
+html[data-theme] .app-shell .app-sidebar-menu button.active {
+  color: var(--vt-text);
+  border-color: transparent;
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .app-sidebar-menu button.active svg {
+  color: var(--vt-accent);
+}
+
+html[data-theme] .app-shell .sidebar-limit-card {
+  height: 86px;
+  max-height: 86px;
+  gap: 6px;
+  padding: 10px 12px;
+  border-color: transparent;
+  border-radius: 12px;
+  background: var(--vt-s2);
+}
+
+.app-shell .sidebar-limit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-shell .sidebar-limit-head > span {
+  color: var(--vt-text-2);
+  font-size: 0.78rem;
+}
+
+.app-shell .sidebar-limit-head > strong {
+  color: var(--vt-text);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+html[data-theme] .app-shell .sidebar-limit-card .sidebar-progress {
+  height: 5px;
+  margin: 0;
+  background: var(--vt-track);
+}
+
+/* What is left of the credits is a resource, not a verdict: calm blue, amber
+   only when it runs low. */
+html[data-theme] .app-shell .sidebar-limit-card .sidebar-progress span {
+  background: var(--vt-info-mark);
+}
+
+html[data-theme] .app-shell .sidebar-limit-card.is-low .sidebar-progress span {
+  background: var(--vt-warn-mark);
+}
+
+html[data-theme] .app-shell .sidebar-limit-card > small {
+  color: var(--vt-text-3);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+html[data-theme] .app-shell button.sidebar-plan-card,
+html[data-theme] .app-shell button.sidebar-plan-card:hover {
+  border-color: transparent;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Call player: the waveform to seek in, a thin lane under it coloured by who
+ * speaks, and each speaker's share of the talking in the legend.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .dashboard-audio-player {
+  border: 0;
+  border-radius: 14px;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .dashboard-audio-player .audio-play {
+  color: var(--vt-on-accent);
+  border: 0;
+  background: var(--vt-accent);
+  box-shadow: none;
+}
+
+.app-shell .dashboard-audio-player.has-lane {
+  align-items: start;
+  row-gap: 12px;
+  padding: 14px 16px;
+}
+
+.app-shell .dashboard-audio-player.has-lane .audio-player-track-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
+/* Time on the left, controls on the right, nothing between them; who speaks
+   has a line of its own under them. */
+.app-shell .dashboard-audio-player.has-lane .audio-player-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.app-shell .dashboard-audio-player.has-lane .audio-player-actions {
+  margin-left: 0;
+}
+
+.app-shell .audio-lane-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vt-line);
+}
+
+/* The waveform is the seek track, drawn flat: played bars in the accent of
+   the play button, the rest in a quiet tone, no glow. */
+html[data-theme] .app-shell .dashboard-audio-player .audio-waveform {
+  --wave-played: var(--vt-accent);
+  --wave-rest: var(--vt-line-strong);
+  position: relative;
+  display: block;
+  height: 34px;
+}
+
+/* The bars are two identical layers; the played one in the accent is clipped
+   at --audio-progress, so moving the playhead repaints one clip, not every
+   bar. */
+.app-shell .audio-wave-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 5px);
+  justify-content: space-between;
+  align-items: center;
+  gap: 3px;
+}
+
+.app-shell .audio-wave-layer.is-played {
+  clip-path: inset(0 calc(100% - var(--audio-progress, 0%)) 0 0);
+  pointer-events: none;
+}
+
+html[data-theme] .app-shell .audio-wave-layer.is-played span {
+  opacity: 1;
+  background: var(--wave-played);
+  box-shadow: none;
+}
+
+/* Under it, on the same time axis, a thin lane of who is speaking. */
+.app-shell .audio-conversation-lane {
+  position: relative;
+  height: 8px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.app-shell .audio-lane-track {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--vt-track);
+  animation: vt-spark-reveal 900ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* What is still ahead is shaded over the turns; the shade and the playhead
+   follow --audio-progress. */
+.app-shell .audio-lane-track::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--audio-progress, 0%);
+  content: "";
+  background: color-mix(in srgb, var(--vt-s2) 60%, transparent);
+  pointer-events: none;
+}
+
+.app-shell .audio-lane-playhead {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--audio-progress, 0%);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--vt-text);
+  pointer-events: none;
+}
+
+.app-shell .audio-lane-run {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 1px;
+  background: var(--run-color);
+}
+
+/* Each speaker is a small chip: colour, name, share of the talking. */
+.app-shell .audio-lane-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .audio-lane-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 9px;
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: var(--vt-s1);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.app-shell .audio-lane-legend li i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--run-color);
+}
+
+.app-shell .audio-lane-legend li b {
+  color: var(--vt-text);
+  font-weight: 650;
+}
+
+.app-shell .audio-lane-note {
+  margin: 0;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Work on mistakes: the counts as one bar with a legend, rows that say what
+ * changed. Tone classes follow the theme instead of fixed hex values.
+ * ------------------------------------------------------------------------- */
+.app-shell .tone-good { color: var(--vt-good); }
+.app-shell .tone-warning { color: var(--vt-warn); }
+.app-shell .tone-danger { color: var(--vt-bad); }
+
+html[data-theme] .app-shell .mistakes-block {
+  gap: 0;
+  border-color: var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+}
+
+.app-shell .mistakes-head {
+  padding: 14px 16px 6px;
+}
+
+.app-shell .mistakes-title {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.app-shell .mistakes-title svg {
+  margin-top: 2px;
+  color: var(--vt-text-3);
+}
+
+.app-shell .mistakes-title > span {
+  display: grid;
+  gap: 2px;
+}
+
+.app-shell .mistakes-title strong {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.app-shell .mistakes-title small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  font-weight: 450;
+}
+
+.app-shell .mistakes-summary {
+  display: grid;
+  gap: 10px;
+  padding: 6px 16px 14px;
+}
+
+.app-shell .mistakes-summary-note {
+  margin: 0;
+  padding: 4px 16px 14px;
+  color: var(--vt-text-2);
+  font-size: 0.85rem;
+}
+
+.app-shell .mistakes-bar {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--vt-track);
+  transform-origin: left center;
+  animation: vt-rail-fill 700ms var(--vt-ease) 120ms both;
+}
+
+.app-shell .mistakes-bar i {
+  display: block;
+  min-width: 4px;
+}
+
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-good { --tone: var(--vt-good-mark); }
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-bad { --tone: var(--vt-bad-mark); }
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-warn { --tone: var(--vt-warn-mark); }
+.app-shell :is(.mistakes-bar, .mistakes-legend) .is-hold { --tone: var(--vt-text-3); }
+
+.app-shell .mistakes-bar i {
+  background: var(--tone);
+}
+
+.app-shell .mistakes-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.app-shell .mistakes-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+}
+
+.app-shell .mistakes-legend li i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--tone);
+}
+
+.app-shell .mistakes-legend li b {
+  color: var(--vt-text);
+  font-weight: 650;
+}
+
+.app-shell .mistakes-body {
+  gap: 6px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--vt-line);
+}
+
+html[data-theme] .app-shell .mistakes-row,
+html[data-theme] .app-shell .growth-area {
+  border-color: transparent;
+  border-radius: 10px;
+  background: var(--vt-s2);
+}
+
+.app-shell .mistakes-verdict {
+  justify-self: start;
+  min-width: 0;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: var(--vt-soft);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.app-shell :is(.verdict-fixed, .verdict-improved) .mistakes-verdict { color: var(--vt-good); background: var(--vt-good-soft); }
+.app-shell .verdict-repeated .mistakes-verdict { color: var(--vt-bad); background: var(--vt-bad-soft); }
+.app-shell .verdict-new .mistakes-verdict { color: var(--vt-warn); background: var(--vt-warn-soft); }
+
+.app-shell .mistakes-row {
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+}
+
+.app-shell .mistakes-main strong {
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 550;
+}
+
+.app-shell .mistakes-main small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+.app-shell .mistakes-change {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-shell .mistakes-change b {
+  font-weight: 650;
+}
+
+.app-shell .mistakes-streak {
+  color: var(--vt-bad);
+}
+
+@media (max-width: 560px) {
+  .app-shell .mistakes-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Page headings: a 44px icon beside the title instead of a 110px hero square.
+ * Without the photo there is nothing to shadow the text against.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .app-page-heading h1 {
+  color: var(--vt-text);
+  font-size: 1.75rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  text-shadow: none;
+}
+
+html[data-theme] .app-shell .settings-heading.settings-heading {
+  --settings-heading-icon-size: 44px;
+  align-items: center;
+  gap: 14px;
+}
+
+html[data-theme] .app-shell .settings-heading.settings-heading > div {
+  gap: 4px;
+  min-height: 0;
+  padding: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .settings-heading .settings-heading-icon {
+  align-self: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  aspect-ratio: 1;
+  color: var(--vt-text-2);
+  border: 0;
+  border-radius: 12px;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .settings-heading .settings-heading-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+
+html[data-theme] .app-shell :is(.settings-heading, .readable-heading) :is(h1, h2) {
+  color: var(--vt-text);
+  text-shadow: none;
+}
+
+html[data-theme] .app-shell .settings-heading h1 {
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+html[data-theme] .app-shell :is(.settings-heading, .readable-heading) p {
+  color: var(--vt-text-2);
+  font-weight: 450;
+  text-shadow: none;
+}
+
+/* The 110px emblem had to take a row of its own on a phone; the 44px one fits
+   beside even «Администрирование» at the phone heading size. */
+@media (max-width: 760px) {
+  html[data-theme] .app-shell .settings-heading.settings-heading {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  html[data-theme] .app-shell .settings-heading.settings-heading > div {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  html[data-theme] .app-shell .settings-heading.settings-heading > .settings-heading-icon {
+    width: 44px;
+    justify-self: auto;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Analytics: summary tiles like the overview cards, tables as lists with thin
+ * separators instead of a box around every row, one heading per instruction.
+ * ------------------------------------------------------------------------- */
+.app-shell .analytics-summary {
+  gap: 14px;
+}
+
+html[data-theme] .app-shell .analytics-summary > div {
+  gap: 4px;
+  padding: 16px 18px;
+  border-color: var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+}
+
+.app-shell .analytics-summary small {
+  color: var(--vt-text-2);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.app-shell .analytics-summary strong {
+  color: var(--vt-text);
+  font-size: 1.9rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.app-shell .analytics-summary > div > span {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+html[data-theme] .app-shell .analytics-summary > .analytics-score-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  --gauge-size: 84px;
+}
+
+.app-shell .analytics-score-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.app-shell .analytics-score-card > div > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+html[data-theme] .app-shell :is(.analytics-trend-card, .analytics-block) {
+  padding: 18px 20px;
+  border-color: var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+}
+
+.app-shell .analytics-block h2 {
+  margin: 0 0 12px;
+  color: var(--vt-text);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.app-shell .analytics-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.app-shell .analytics-group {
+  display: grid;
+  gap: 4px;
+}
+
+.app-shell .analytics-group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 2px;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.app-shell .analytics-group-title em {
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--vt-bad);
+  background: var(--vt-bad-soft);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.app-shell .data-table {
+  gap: 0;
+}
+
+html[data-theme] .app-shell .data-table-row {
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .data-table-row:not(.data-table-head) + .data-table-row {
+  box-shadow: 0 -1px 0 var(--vt-line);
+}
+
+html[data-theme] .app-shell .data-table-head {
+  padding-block: 4px 8px;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .data-table-row.is-clickable:is(:hover, :focus-visible) {
+  background: var(--vt-hover);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .data-table-row.is-pinned {
+  background: var(--vt-s2);
+}
+
+.app-shell .analytics-name strong {
+  color: var(--vt-text);
+  font-size: 0.92rem;
+  font-weight: 550;
+}
+
+.app-shell .analytics-name small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+.app-shell .analytics-low-sample {
+  display: inline-flex;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--vt-text-3);
+  background: var(--vt-soft);
+  font-size: 0.76rem;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .distribution-bar {
+  gap: 2px;
+  height: 6px;
+  background: var(--vt-track);
+}
+
+.app-shell .distribution-bar .is-met { background: var(--vt-good-mark); }
+.app-shell .distribution-bar .is-mostly_met { background: color-mix(in srgb, var(--vt-good-mark) 70%, var(--vt-warn-mark)); }
+.app-shell .distribution-bar .is-partially_met { background: var(--vt-warn-mark); }
+.app-shell .distribution-bar .is-minimally_met { background: color-mix(in srgb, var(--vt-warn-mark) 45%, var(--vt-bad-mark)); }
+.app-shell .distribution-bar .is-missed { background: var(--vt-bad-mark); }
+
+.app-shell .delta-badge.is-up { color: var(--vt-good); }
+.app-shell .delta-badge.is-down { color: var(--vt-bad); }
+.app-shell .delta-badge:is(.is-neutral, .is-none) { color: var(--vt-text-3); }
+
+.app-shell .score-value {
+  font-weight: 650;
+}
+
+.app-shell .trend-chart-plot {
+  --mini-chart-colour: var(--vt-text);
+}
+
+.app-shell .trend-chart-line {
+  stroke: var(--vt-text);
+  stroke-width: 2;
+}
+
+.app-shell .trend-chart-line.is-reference {
+  stroke: var(--vt-text-3);
+}
+
+.app-shell .trend-chart-grid {
+  stroke: var(--vt-line-mid);
+}
+
+.app-shell .trend-chart-legend i {
+  background: var(--vt-text);
+}
+
+.app-shell .trend-chart-legend.is-reference i {
+  background: var(--vt-text-3);
+}
+
+.app-shell .mini-trend path {
+  stroke: var(--vt-text-2);
+}
+
+html[data-theme] .app-shell .analytics-team-line {
+  border-color: transparent;
+  background: var(--vt-s2);
+}
+
+.app-shell .analytics-name em {
+  color: var(--vt-text-2);
+  background: var(--vt-soft);
+}
+
+html[data-theme] .app-shell .analytics-profile-avatar {
+  width: 44px;
+  height: 44px;
+  color: var(--vt-text-2);
+  border: 0;
+  border-radius: 12px;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+.app-shell .analytics-profile-head h1 {
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.app-shell .analytics-profile-head p {
+  color: var(--vt-text-3);
+}
+
+.app-shell .mistakes-profile h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.app-shell .mistakes-profile h3 b {
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  font-size: 0.75rem;
+}
+
+.app-shell .mistakes-row.is-open-mistake {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+}
+
+.app-shell .mistakes-score {
+  display: grid;
+  width: 34px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--vt-s1);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.app-shell .mistakes-links .text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vt-text-2);
+  font-weight: 550;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.app-shell .mistakes-links .text-link:hover {
+  color: var(--vt-accent-text);
+}
+
+.app-shell .mistakes-profile-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell .mistakes-more {
+  justify-self: start;
+  margin-top: 8px;
+}
+
+.app-shell .mistakes-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.app-shell .mistakes-empty svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--vt-text-3);
+}
+
+@media (max-width: 760px) {
+  html[data-theme] .app-shell .data-table-row:not(.data-table-head) {
+    margin-bottom: 8px;
+    background: var(--vt-s2);
+    box-shadow: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Instructions: a header across the page with the actions on the right, the
+ * list as the main column and the writing tips beside it. No collapsing side
+ * panel, so no half-empty column when the example is closed.
+ * ------------------------------------------------------------------------- */
+.app-shell .instructions-page {
+  align-content: start;
+  gap: 18px;
+}
+
+.app-shell .instructions-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+html[data-theme] .app-shell .instructions-page-head .settings-heading {
+  flex: 1 1 360px;
+  width: auto;
+  max-width: 680px;
+}
+
+.app-shell .instructions-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app-shell .instructions-page-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: start;
+  gap: 18px;
+}
+
+.app-shell .instructions-catalog {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+}
+
+.app-shell .instructions-catalog-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.app-shell .instructions-catalog-head h2 {
+  margin: 0;
+  color: var(--vt-text);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.app-shell .instructions-catalog-head span {
+  color: var(--vt-text-3);
+  font-size: 0.82rem;
+}
+
+.app-shell .instructions-group {
+  display: grid;
+  gap: 6px;
+}
+
+.app-shell .instructions-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  color: var(--vt-text-3);
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-shell .instructions-group h3 b {
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+}
+
+.app-shell .instruction-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--vt-s2);
+  transition: box-shadow var(--vt-dur-fast) ease;
+}
+
+.app-shell .instruction-item:hover {
+  box-shadow: inset 0 0 0 1px var(--vt-line-strong);
+}
+
+.app-shell .instruction-item-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-shell .instruction-item-format {
+  --format: var(--vt-chart-violet);
+  display: grid;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--format);
+  background: color-mix(in srgb, var(--format) 15%, var(--vt-s1));
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+}
+
+/* On the light page the tile takes the bright colour and the small label a
+   deeper shade of it, so the label keeps 4.5:1. */
+html[data-theme="light"] .app-shell .instruction-item-format {
+  color: color-mix(in srgb, var(--format) 68%, #1c1511);
+  background: color-mix(in srgb, var(--format) 12%, var(--vt-s1));
+}
+
+.app-shell .instruction-item-format.is-docx { --format: var(--vt-chart-blue); }
+.app-shell .instruction-item-format.is-pdf { --format: var(--vt-bad-mark); }
+.app-shell .instruction-item-format.is-xlsx { --format: var(--vt-chart-green); }
+
+html[data-theme] .app-shell .instruction-item.is-off .instruction-item-format {
+  color: var(--vt-text-3);
+  background: var(--vt-soft);
+}
+
+.app-shell .instruction-item-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-shell .instruction-item-name strong {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+  transition: color var(--vt-dur-fast) ease;
+}
+
+.app-shell .instruction-item-link:hover .instruction-item-name strong {
+  color: var(--vt-accent-text);
+}
+
+.app-shell .instruction-item-name small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .instruction-item.is-off .instruction-item-name strong {
+  color: var(--vt-text-2);
+}
+
+.app-shell .instruction-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+html[data-theme] .app-shell .instruction-item-actions .icon-button {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  color: var(--vt-text-2);
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+html[data-theme] .app-shell .instruction-item-actions .icon-button:hover:not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .instruction-item-actions .instruction-delete:hover:not(:disabled) {
+  color: var(--vt-bad);
+}
+
+.app-shell .instruction-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin-right: 6px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.app-shell .instruction-switch:hover:not(:disabled) {
+  background: var(--vt-hover);
+}
+
+.app-shell .instruction-switch-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--vt-track);
+  box-shadow: inset 0 0 0 1px var(--vt-line-mid);
+  transition: background var(--vt-dur) ease;
+}
+
+.app-shell .instruction-switch.is-on .instruction-switch-track {
+  box-shadow: none;
+}
+
+.app-shell .instruction-switch-track i {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--vt-text-2);
+  transition: transform var(--vt-dur) var(--vt-ease), background var(--vt-dur) ease;
+}
+
+.app-shell .instruction-switch.is-on {
+  color: var(--vt-text);
+}
+
+.app-shell .instruction-switch.is-on .instruction-switch-track {
+  background: var(--vt-good-mark);
+}
+
+.app-shell .instruction-switch.is-on .instruction-switch-track i {
+  background: #ffffff;
+  transform: translateX(12px);
+}
+
+.app-shell .instruction-item-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.app-shell .instructions-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  border-radius: 12px;
+  background: var(--vt-s2);
+  text-align: center;
+}
+
+.app-shell .instructions-empty > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--vt-text-2);
+  background: var(--vt-s1);
+}
+
+.app-shell .instructions-empty strong {
+  color: var(--vt-text);
+}
+
+.app-shell .instructions-empty p {
+  max-width: 440px;
+  margin: 0 0 6px;
+  color: var(--vt-text-2);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.app-shell .instructions-help {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Advice is the one warm block on the page: a faint amber field behind the
+   tips, the bulb in the same amber. */
+.app-shell .instructions-help-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: var(--vt-radius-lg);
+  background: color-mix(in srgb, var(--vt-warn-mark) 9%, var(--vt-s1));
+}
+
+.app-shell .instructions-help-card strong {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.app-shell .instructions-help-card strong svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--vt-warn-mark);
+}
+
+.app-shell .instructions-help-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  color: var(--vt-text-2);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  list-style: none;
+}
+
+.app-shell .instructions-help-card li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.app-shell .instructions-help-card li::before {
+  position: absolute;
+  top: 0.55em;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  content: "";
+  background: var(--vt-warn-mark);
+  opacity: 0.8;
+}
+
+.app-shell .instructions-group h3 svg {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .instructions-help .instruction-template-example {
+  padding: 14px 16px;
+  border: 1px solid var(--vt-line);
+  border-radius: var(--vt-radius-lg);
+  background: var(--vt-s1);
+}
+
+.app-shell .instructions-help .instruction-template-example-toggle {
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+@media (max-width: 1100px) {
+  .app-shell .instructions-page-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell .instruction-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .instruction-item-actions {
+    flex-wrap: wrap;
+    padding-left: 48px;
+  }
+
+  .app-shell .instructions-page-actions,
+  .app-shell .instructions-page-actions > button {
+    width: 100%;
+  }
+
+  .app-shell .instructions-page-actions > button {
+    justify-content: center;
+  }
+
+  .app-shell .instruction-item-name small,
+  .app-shell .instructions-help-card ul {
+    font-size: var(--mobile-text-small, 14px);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Workspace switcher. What it gives up as the window narrows, in order: the
+ * name at the avatar (below 1321), the switcher's text (below 1121, the badge
+ * stays), then on a phone the whole switcher moves into the «Ещё» sheet.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .app-header .team-switcher {
+  display: inline-flex;
+  height: 44px;
+  max-width: 280px;
+  gap: 10px;
+  padding: 0 12px 0 6px;
+  color: var(--vt-text);
+  border: 1px solid var(--vt-line);
+  border-radius: 12px;
+  background: transparent;
+  transition: background var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .app-header .team-switcher:hover,
+html[data-theme] .app-shell .app-header .team-switcher.active {
+  color: var(--vt-text);
+  border-color: var(--vt-line-strong);
+  background: var(--vt-hover);
+}
+
+.app-shell .workspace-badge {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  overflow: visible;
+  border-radius: 8px;
+  color: #ffffff;
+  background: hsl(var(--badge-hue, 20) 42% 42%);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.app-shell .workspace-badge.is-personal {
+  color: var(--vt-text-2);
+  background: var(--vt-s3);
+}
+
+.app-shell .team-switcher-text {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.15;
+}
+
+.app-shell .team-switcher-text small {
+  color: var(--vt-text-3);
+  font-size: 0.7rem;
+}
+
+.app-shell .team-switcher-text strong {
+  overflow: hidden;
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .team-switcher-chevron {
+  flex: 0 0 auto;
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .team-popover {
+  min-width: 320px;
+  padding: 8px;
+  color: var(--vt-text);
+  border-color: var(--vt-line-strong);
+  border-radius: 14px;
+  background: var(--vt-s3);
+  box-shadow: var(--vt-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-shell .workspace-options {
+  display: grid;
+  gap: 2px;
+}
+
+.app-shell .workspace-options-label {
+  padding: 8px 10px 4px;
+  color: var(--vt-text-3);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+html[data-theme] .app-shell .workspace-options button {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  color: var(--vt-text);
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+}
+
+html[data-theme] .app-shell .workspace-options button:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .workspace-options button.active {
+  color: var(--vt-text);
+  background: var(--vt-s2);
+}
+
+.app-shell .workspace-options button > span:not(.workspace-badge) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .workspace-options button strong {
+  overflow: hidden;
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .workspace-options button small {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+.app-shell .workspace-option-check {
+  color: var(--vt-accent);
+}
+
+.app-shell .mobile-workspace {
+  display: none;
+}
+
+@media (min-width: 761px) and (max-width: 1120px) {
+  html[data-theme] .app-shell .app-header .team-switcher {
+    display: inline-flex;
+    gap: 6px;
+    padding: 0 8px 0 6px;
+  }
+
+  .app-shell .app-header .team-switcher-text {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-theme] .app-shell .app-header .team-switcher {
+    display: none;
+  }
+
+  .app-shell .mobile-workspace {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--vt-line);
+  }
+
+  .app-shell .mobile-workspace-label {
+    padding: 6px 12px 4px;
+    color: var(--vt-text-3);
+    font-size: 13px;
+    font-weight: 650;
+  }
+
+  .app-shell .workspace-options.is-compact .workspace-options-label {
+    display: none;
+  }
+
+  html[data-theme] .app-shell .mobile-more-sheet .workspace-options button {
+    grid-template-columns: 30px minmax(0, 1fr) 18px;
+    min-height: 54px;
+    font-size: 15px;
+  }
+
+  html[data-theme] .app-shell .mobile-more-sheet .workspace-options button span {
+    white-space: normal;
+  }
+
+  html[data-theme] .app-shell .mobile-more-sheet .workspace-options button small {
+    font-size: 14px;
+  }
+}
+
+/* The wallet cards keep fixed minimum widths; the old rule chose the column
+   count by the window, so beside the sidebar four of them ran past the panel
+   and were cut. As a wrapping row the cards keep their minimums and fill the
+   line they land on, whatever width the panel has. */
+html[data-theme] .app-shell .credit-limit-row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+html[data-theme] .app-shell .credit-limit-row > * {
+  flex: 1 1 205px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .credit-limit-row > .credit-balance-summary {
+  flex-basis: 280px;
+}
+
+html[data-theme] .app-shell .credit-limit-row > .credit-forecast {
+  flex-basis: 250px;
+}
+
+/* Credit history: rows are a fill, not a bordered box with a coloured stripe;
+   the kind of operation reads from the icon and the sign of the amount. */
+html[data-theme] .app-shell .credit-wallet-entry {
+  min-height: 52px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .credit-wallet-entry::before {
+  content: none;
+}
+
+.app-shell .credit-wallet-entry.is-credit { --entry-accent: var(--vt-good-mark); --entry-soft: var(--vt-good-soft); }
+.app-shell .credit-wallet-entry.is-debit { --entry-accent: var(--vt-bad-mark); --entry-soft: var(--vt-bad-soft); }
+.app-shell .credit-wallet-entry.is-adjustment { --entry-accent: var(--vt-info-mark); --entry-soft: var(--vt-info-soft); }
+
+/* Money going out and coming in read apart at a glance: a faint tint of the
+   row, the amount in the same tone. */
+html[data-theme] .app-shell .credit-wallet-entry.is-debit {
+  background: color-mix(in srgb, var(--vt-bad-mark) 7%, var(--vt-s2));
+}
+
+html[data-theme] .app-shell .credit-wallet-entry.is-credit {
+  background: color-mix(in srgb, var(--vt-good-mark) 7%, var(--vt-s2));
+}
+
+/* On the light page the tint starts from the panel, so the red amount keeps
+   its contrast. */
+html[data-theme="light"] .app-shell .credit-wallet-entry.is-debit {
+  background: color-mix(in srgb, var(--vt-bad-mark) 7%, var(--vt-s1));
+}
+
+html[data-theme="light"] .app-shell .credit-wallet-entry.is-credit {
+  background: color-mix(in srgb, var(--vt-good-mark) 7%, var(--vt-s1));
+}
+
+html[data-theme] .app-shell .credit-wallet-entry.is-debit strong {
+  color: var(--vt-bad);
+}
+
+html[data-theme] .app-shell .credit-wallet-entry-icon {
+  border: 0;
+}
+
+html[data-theme] .app-shell .credit-wallet-entry strong {
+  color: var(--vt-text);
+  font-weight: 650;
+}
+
+html[data-theme] .app-shell .credit-wallet-entry.is-credit strong {
+  color: var(--vt-good);
+}
+
+html[data-theme] .app-shell .credit-wallet-entry time,
+html[data-theme] .app-shell .credit-wallet-entry small {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .credit-wallet-history > header > span {
+  color: var(--vt-text-3);
+  border-color: var(--vt-line-mid);
+}
+
+/* ---------------------------------------------------------------------------
+ * Segmented controls (periods, tabs, scopes): a sunken track and a raised
+ * thumb in text colour. Orange text on a peach thumb failed contrast in the
+ * light theme and made a filter look like the page's main action.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .segmented:not(.transcript-preview) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .segmented:not(.transcript-preview) > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--vt-text-2);
+  background: transparent;
+  box-shadow: none;
+  font-size: 0.86rem;
+  font-weight: 550;
+  transition: background var(--vt-dur-fast) ease, color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .segmented:not(.transcript-preview) > button:hover:not(.active):not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .segmented:not(.transcript-preview) > button.active {
+  color: var(--vt-text);
+  background: var(--vt-s3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  font-weight: 650;
+}
+
+html[data-theme="light"] .app-shell .segmented:not(.transcript-preview) > button.active {
+  box-shadow: 0 1px 2px rgba(84, 56, 38, 0.14), 0 0 0 1px rgba(84, 56, 38, 0.06);
+}
+
+html[data-theme] .app-shell .segmented:not(.transcript-preview) > button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 1px;
+}
+
+/* Links and the active tab keep the accent, in the darker shade the light
+   theme needs for text; a value in a list is data and stays neutral. */
+html[data-theme="light"] .app-shell :is(.text-link, .settings-card-action, .mobile-bottom-nav .active, .mobile-bottom-nav .active .sidebar-label) {
+  color: var(--vt-accent-text);
+}
+
+html[data-theme="light"] .app-shell .tariff-feature-list li {
+  color: var(--vt-text-2);
+}
+
+/* The period switch of the credit activity faded its idle options to 72%. */
+html[data-theme] .app-shell .credit-activity-toolbar > div > button:not(.active) {
+  color: var(--vt-text-2);
+}
+
+html[data-theme] .app-shell .text-button:not(:disabled) {
+  color: var(--vt-text-2);
+}
+
+html[data-theme] .app-shell .text-button:hover:not(:disabled) {
+  color: var(--vt-text);
+}
+
+html[data-theme] .app-shell .analytics-list-row span {
+  color: var(--vt-text);
+  font-weight: 650;
+}
+
+/* Integration states read like the status chips; the dark theme's light
+   green was left in the light theme at 1.8:1. */
+html[data-theme] .app-shell .integration-state.is-active {
+  border-color: transparent;
+  color: var(--vt-good);
+  background: var(--vt-good-soft);
+}
+
+html[data-theme] .app-shell .integration-state.is-completed {
+  border-color: transparent;
+  color: var(--vt-text-2);
+  background: var(--vt-soft);
+}
+
+html[data-theme="light"] .app-shell .credit-usage-panel :is(small, .credit-wallet-note, .credit-limit-values span, .credit-summary-card p span) {
+  color: var(--vt-text-2);
+}
+
+/* The speaker filter of the analysis slides its thumb; it is a filter like the
+   segmented controls, so it takes their neutral thumb instead of orange. */
+html[data-theme] .app-shell .analysis-speaker-filter {
+  border: 0;
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .analysis-speaker-filter .analysis-filter-indicator {
+  background: var(--vt-s3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme="light"] .app-shell .analysis-speaker-filter .analysis-filter-indicator {
+  box-shadow: 0 1px 2px rgba(84, 56, 38, 0.14), 0 0 0 1px rgba(84, 56, 38, 0.06);
+}
+
+html[data-theme] .app-shell .analysis-speaker-filter button {
+  color: var(--vt-text-2);
+}
+
+html[data-theme] .app-shell .analysis-speaker-filter button.active {
+  color: var(--vt-text);
+}
+
+html[data-theme] .app-shell .analysis-speaker-filter button b {
+  color: var(--vt-text-3);
+}
+
+/* ---------------------------------------------------------------------------
+ * Tablet header (761–1024): the date used to be lifted out of the search row
+ * and pinned to the centre of the brand row, outside the layout. The icon row
+ * grows to the left — the calls button alone adds 42px — and slid under the
+ * date. The date stays in its own row now, after the search, in the flow, so
+ * the two rows can never overlap whatever the icons count.
+ * ------------------------------------------------------------------------- */
+@media (min-width: 761px) and (max-width: 1024px) {
+  html[data-theme] .app-shell .app-header-center {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  html[data-theme] .app-shell .app-header-center > div.header-popover-wrap {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: none;
+    transform: none;
+  }
+
+  html[data-theme] .app-shell .app-header-center .global-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* The 260px cap squeezed the calendar icon to a 2px dot; beside a search
+     that gives way, the date takes the width its text needs. */
+  html[data-theme] .app-shell .app-header .date-range-control {
+    max-width: none;
+  }
+}
+
+/* The calendar icon keeps its size at every width. */
+html[data-theme] .app-shell .date-range-control > svg {
+  flex: none;
+}
+
+/* One-row header (1025 and wider): the middle column holds the search and the
+   date and has only the width the grid gives it. The search kept a fixed
+   width, so once the calls button joined the icons the date ran 14px past
+   the column into them at 1025. The search gives way now; the date never
+   shrinks and is never cut. */
+@media (min-width: 1025px) {
+  html[data-theme] .app-shell .app-header-center .global-search {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  html[data-theme] .app-shell .app-header-center > div.header-popover-wrap {
+    flex: none;
+  }
+}
+
+/* The order of losses in the one-row header, measured with the calls button
+   and a company switcher in place, so the search never drops below ~180px:
+   the name at the avatar goes below 1441 (it went below 1321), the switcher's
+   text below 1241 (below 1121), and below 1025 the header becomes two rows. */
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .app-shell .profile-block .header-profile-link strong {
+    display: none;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1240px) {
+  html[data-theme] .app-shell .app-header .team-switcher {
+    display: inline-flex;
+    gap: 6px;
+    padding: 0 8px 0 6px;
+  }
+
+  .app-shell .app-header .team-switcher-text {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Date pickers: one field wherever a date is chosen — filters, analytics,
+ * admin, actions, integrations. The trigger used to take the font of the label
+ * it sits in, so the same "Выберите дату" was bold and large in the calls
+ * filters and "Дата" oversized in analytics; it has its own size now, the empty
+ * state is quiet, and the calendar icon is neutral.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .date-time-trigger {
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: border-color var(--vt-dur-fast) ease, background var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .date-time-trigger:is(:hover, [aria-expanded="true"]) {
+  border-color: var(--vt-line-strong);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .date-time-trigger:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 2px;
+}
+
+html[data-theme] .app-shell .date-time-trigger > svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .date-time-trigger > i {
+  height: 18px;
+  background: var(--vt-line-mid);
+}
+
+html[data-theme] .app-shell .date-time-trigger.is-empty > span {
+  color: var(--vt-text-3);
+  font-weight: 400;
+}
+
+/* The calendar itself: the same surfaces as other popovers, the chosen day in
+   the fill of the main buttons, today marked by a ring, no gradients. */
+html[data-theme] .date-time-popover.vt-portal {
+  padding: 14px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 16px;
+  color: var(--vt-text);
+  background: var(--vt-s1);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-month strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+html[data-theme] .date-time-popover.vt-portal :is(.date-time-month button, .date-time-actions button) {
+  min-height: 36px;
+  border: 1px solid var(--vt-line-mid);
+  color: var(--vt-text-2);
+  background: transparent;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+html[data-theme] .date-time-popover.vt-portal :is(.date-time-month button, .date-time-actions button):hover:not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-weekdays {
+  color: var(--vt-text-3);
+  font-size: 0.75rem;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button {
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+  border-color: transparent;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button.is-outside {
+  color: var(--vt-text-3);
+  opacity: 0.6;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button.is-today {
+  border-color: var(--vt-line-strong);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-grid button.is-selected,
+html[data-theme] .date-time-popover.vt-portal .date-time-actions .date-time-confirm {
+  border-color: transparent;
+  color: #fff;
+  background: var(--vt-accent-fill);
+  box-shadow: none;
+  opacity: 1;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-actions .date-time-confirm:hover:not(:disabled) {
+  background: var(--vt-accent-fill-hover);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-clock {
+  border-top-color: var(--vt-line);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-clock > svg {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-select-trigger {
+  border: 1px solid transparent;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-select-trigger:is(:hover, [aria-expanded="true"]) {
+  border-color: var(--vt-line-strong);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options-shell {
+  border: 1px solid var(--vt-line-mid);
+  background: var(--vt-s1);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options > button {
+  color: var(--vt-text);
+  font-weight: 500;
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options > button:hover {
+  background: var(--vt-hover);
+}
+
+html[data-theme] .date-time-popover.vt-portal .date-time-options > button.is-selected {
+  color: #fff;
+  background: var(--vt-accent-fill);
+}
+
+/* ---------------------------------------------------------------------------
+ * Primary buttons: a flat fill. The glow under them made every page look
+ * like it had several main actions at once, and white text on the bright
+ * accent read at 3.1:1; the fill is the accent a step darker.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .primary-button {
+  border: 0;
+  color: #fff;
+  background: var(--vt-accent-fill);
+  box-shadow: none;
+  text-shadow: none;
+}
+
+html[data-theme] .app-shell .primary-button:hover:not(:disabled) {
+  background: var(--vt-accent-fill-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+/* The upload steps number the current one on the same fill. */
+html[data-theme] .app-shell .step-rail .step-item.active > span:first-child {
+  color: #fff;
+  background: var(--vt-accent-fill);
+}
+
+html[data-theme] .app-shell .primary-button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Calls column: a quiet list. Each call's icon says where it stands, each
+ * folder carries the colour its owner gave it, and tools appear on hover.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .calls-sidebar .calls-list-collapse {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--vt-text-3);
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-list-collapse:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .calls-sidebar-head h2 {
+  color: var(--vt-text);
+  font-size: 1.3rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell .calls-search {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.app-shell .calls-search svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  color: var(--vt-text-3);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-filter-bar .calls-search input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px 0 36px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-size: 0.9rem;
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-search input::placeholder {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-search input:focus {
+  border-color: var(--vt-line-strong);
+  outline: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-filter-toggle {
+  gap: 7px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-filter-toggle:is(:hover, .active) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+.app-shell .call-filter-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--vt-text);
+  background: var(--vt-s3);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  width: fit-content;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: transparent;
+  font-size: 0.84rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--vt-dur-fast) ease, color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter svg {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter.checked {
+  border-color: transparent;
+  color: var(--vt-text);
+  background: var(--vt-warn-soft);
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter.checked svg {
+  color: var(--vt-warn-mark);
+}
+
+/* The checkbox is hidden; keyboard focus shows on the star beside it. */
+html[data-theme] .app-shell .calls-sidebar .call-favorite-filter-input:focus-visible + svg {
+  border-radius: 4px;
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 3px;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-panel > .call-folder-heading {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-heading strong {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-heading small,
+html[data-theme] .app-shell .calls-sidebar .muted-title {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+html[data-theme] .app-shell .calls-sidebar :is(.call-folder-heading .icon-button, .call-folder-menu-trigger, .call-row-actions .icon-button) {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--vt-text-3);
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar :is(.call-folder-heading .icon-button, .call-folder-menu-trigger, .call-row-actions .icon-button):hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+/* Every folder and every call is its own outlined card with a few pixels of
+   air around it; as bare rows the column read as one long block of text. */
+html[data-theme] .app-shell .calls-sidebar .call-folder-tree {
+  display: grid;
+  gap: 6px;
+}
+
+html[data-theme] .app-shell .calls-sidebar :is(.call-folder-project-head, .call-row) {
+  border: 1px solid var(--vt-line-mid);
+  background: color-mix(in srgb, var(--vt-s2) 55%, transparent);
+  transition: background var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .calls-sidebar :is(.call-folder-project-head, .call-row):hover {
+  border-color: var(--vt-line-strong);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-project-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+  border-radius: 12px;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-list {
+  display: grid;
+  gap: 5px;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-project-button {
+  display: grid;
+  grid-template-columns: 14px 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.app-shell .call-folder-chevron {
+  color: var(--vt-text-3);
+  transition: transform var(--vt-dur) var(--vt-ease);
+}
+
+.app-shell .call-folder-project.expanded .call-folder-chevron {
+  transform: rotate(90deg);
+}
+
+.app-shell .call-folder-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: var(--folder-color);
+  background: color-mix(in srgb, var(--folder-color) 15%, transparent);
+}
+
+.app-shell .call-folder-icon.is-bin {
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row.call-row-deleted {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row-deleted .call-row-main small {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-project-button strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--vt-text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-project-button small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-folder-child-list {
+  display: grid;
+  gap: 5px;
+  margin: 6px 0 4px 15px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid var(--vt-line-mid);
+}
+
+/* A call row: the time of the call on a tile, its status as a dot on that
+   tile, the title, then length and anything unusual. The rows are split by
+   day headings, and the open call is the one tinted row in the column —
+   active navigation is where the accent belongs. */
+.app-shell .call-day-heading {
+  margin: 12px 10px 4px;
+  color: var(--vt-text-3);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.app-shell :is(.call-folder-child-list, .call-list) > .call-day-heading:first-child {
+  margin-top: 4px;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 8px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--vt-s2) 55%, transparent);
+  box-shadow: none;
+  transform: none;
+  transition: background var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row::before {
+  content: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row:hover {
+  border-color: var(--vt-line-strong);
+  background: var(--vt-s2);
+  box-shadow: none;
+  transform: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row.selected {
+  border-color: color-mix(in srgb, var(--vt-accent) 45%, transparent);
+  background: var(--vt-accent-soft);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: -2px;
+}
+
+/* Folders are square tiles in their own colour; a call is a round neutral
+   emblem, so the two never blend in the tree. */
+.app-shell .call-row-emblem {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 50%;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  transition: background var(--vt-dur-fast) ease, color var(--vt-dur-fast) ease, border-color var(--vt-dur-fast) ease;
+}
+
+.app-shell .call-row-emblem i {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--vt-text-3);
+  box-shadow: 0 0 0 2px var(--vt-s1);
+}
+
+.app-shell .call-row-emblem.is-ok i { background: var(--vt-good-mark); }
+.app-shell .call-row-emblem.is-warn i { background: var(--vt-warn-mark); }
+.app-shell .call-row-emblem.is-bad i { background: var(--vt-bad-mark); }
+.app-shell .call-row-emblem.is-test i { background: var(--vt-info-mark); }
+
+html[data-theme] .app-shell .calls-sidebar .call-row.selected .call-row-emblem {
+  border-color: transparent;
+  color: var(--vt-accent-text);
+  background: color-mix(in srgb, var(--vt-accent) 16%, var(--vt-s1));
+}
+
+.app-shell .vt-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Folder dialog: an island with labelled fields, the folder previewed as the
+ * list will show it, colour swatches instead of gradient tiles, and the
+ * project's own checkboxes for instructions.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .call-folder-modal-layer {
+  background: rgba(10, 7, 5, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+html[data-theme="light"] .app-shell .call-folder-modal-layer {
+  background: rgba(60, 40, 28, 0.22);
+}
+
+html[data-theme] .app-shell .call-folder-modal {
+  gap: 18px;
+  width: min(480px, 100%);
+  padding: 22px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 16px;
+  color: var(--vt-text);
+  background: var(--vt-s1);
+  box-shadow: var(--vt-shadow);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head strong {
+  color: var(--vt-text);
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head small {
+  color: var(--vt-text-3);
+  font-size: 0.86rem;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head .icon-button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  color: var(--vt-text-3);
+  background: transparent;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-modal-head .icon-button:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-form.modal-form {
+  display: grid;
+  gap: 16px;
+}
+
+/* Every field has its label above it, in the same quiet style. */
+html[data-theme] .app-shell .call-folder-modal :is(.call-folder-field > span, .call-folder-scope-field > span, .call-folder-scope-picker legend, .call-folder-instructions legend, .call-folder-color-picker-head > span:first-child) {
+  margin: 0;
+  padding: 0;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field > span small {
+  color: var(--vt-text-3);
+  font-size: inherit;
+  font-weight: 450;
+  opacity: 0.8;
+}
+
+html[data-theme] .app-shell .call-folder-modal :is(.call-folder-field, .call-folder-scope-field) {
+  display: grid;
+  gap: 6px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field input,
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-field .select-trigger {
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-size: 0.92rem;
+  font-weight: 450;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field input::placeholder {
+  color: var(--vt-text-3);
+  font-weight: 400;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-field input:focus {
+  border-color: var(--vt-line-strong);
+  outline: none;
+}
+
+.app-shell .call-folder-scope-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  font-size: 0.86rem;
+}
+
+.app-shell .call-folder-scope-note svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-picker {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  gap: 8px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  box-shadow: none;
+  text-align: left;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button:hover {
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button.active {
+  border-color: var(--vt-line-strong);
+  color: var(--vt-text);
+  background: var(--vt-s3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button > svg {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button.active > svg {
+  color: var(--vt-text);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button strong {
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-scope-options > button small {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-color-picker {
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-color-picker-head {
+  justify-content: space-between;
+}
+
+.app-shell .call-folder-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 62%;
+  min-width: 0;
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.app-shell .call-folder-preview > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  aspect-ratio: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--folder-color);
+  box-shadow: none;
+  transition: transform var(--vt-dur-fast) ease, box-shadow var(--vt-dur-fast) ease;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button svg {
+  opacity: 0;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button:hover {
+  border: 0;
+  transform: scale(1.08);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button.active {
+  border: 0;
+  box-shadow: 0 0 0 2px var(--vt-s1), 0 0 0 4px var(--folder-color);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button.active svg {
+  opacity: 1;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-palette button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 4px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instructions {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instructions > small {
+  color: var(--vt-text-3);
+  font-size: 0.82rem;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options {
+  gap: 2px;
+  max-height: 200px;
+  padding-right: 2px;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label {
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label:hover {
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label.is-checked {
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options label > span {
+  color: var(--vt-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/* The project's checkbox, which this list had overridden with the native one. */
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options input[type="checkbox"] {
+  appearance: none;
+  width: 20px !important;
+  min-width: 20px;
+  max-width: 20px;
+  height: 20px;
+  border: 1px solid var(--vt-line-strong);
+  border-radius: 6px;
+  background: transparent;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-instruction-options input[type="checkbox"]:checked {
+  border-color: var(--vt-accent);
+  background: var(--vt-accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fffaf5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.8' d='m3.25 8 3.05 3.05 6.45-6.45'/%3E%3C/svg%3E") center / 15px no-repeat;
+}
+
+html[data-theme] .app-shell .call-folder-modal .call-folder-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Collapse the list: a real button, not a ghost of one. */
+html[data-theme] .app-shell .calls-sidebar .calls-list-collapse {
+  border: 1px solid var(--vt-line-mid);
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+}
+
+html[data-theme] .app-shell .calls-sidebar .calls-list-collapse:hover {
+  color: var(--vt-text);
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row-main > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--vt-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.app-shell .call-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+/* In a row the status is a coloured word, the icon already carries the tint. */
+html[data-theme] .app-shell .calls-sidebar .call-row-meta .status-chip {
+  min-height: 0;
+  padding: 0 !important;
+  background: transparent !important;
+  font-size: 0.78rem;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row-meta .status-chip::before {
+  content: none;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row-meta small,
+html[data-theme] .app-shell .calls-sidebar .call-source-line {
+  overflow: visible;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+@media (hover: hover) {
+  html[data-theme] .app-shell .calls-sidebar :is(.call-folder-menu-trigger, .call-row-menu-trigger, .call-favorite-button:not(.active)) {
+    opacity: 0;
+    transition: opacity var(--vt-dur-fast) ease, background var(--vt-dur-fast) ease, color var(--vt-dur-fast) ease;
+  }
+
+  html[data-theme] .app-shell .calls-sidebar :is(.call-folder-project-head, .call-row):is(:hover, :focus-within, .menu-open, .selected) :is(.call-folder-menu-trigger, .call-row-menu-trigger, .call-favorite-button),
+  html[data-theme] .app-shell .calls-sidebar :is(.call-folder-menu-trigger, .call-row-menu-trigger)[aria-expanded="true"] {
+    opacity: 1;
+  }
+}
+
+html[data-theme] .app-shell .calls-sidebar .call-favorite-button.active {
+  color: var(--vt-warn-mark);
+}
+
+/* ---------------------------------------------------------------------------
+ * Admin toolbar: the search and its buttons on one line, the action filters
+ * as an even row under it; every control is the same 40px field.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .admin-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+html[data-theme] .app-shell .admin-toolbar > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text-3);
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .admin-toolbar > label:focus-within {
+  border-color: var(--vt-line-strong);
+}
+
+html[data-theme] .app-shell .admin-toolbar > label input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  color: var(--vt-text);
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+html[data-theme] .app-shell .admin-action-filter-fields {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .admin-action-filter-fields > input,
+html[data-theme] .app-shell .admin-action-filter-fields .select-trigger {
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  box-shadow: none;
+  font-size: 0.9rem;
+}
+
+html[data-theme] .app-shell .admin-action-filter-fields > input::placeholder,
+html[data-theme] .app-shell .admin-toolbar > label input::placeholder {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .admin-action-filter-fields > input:focus-visible,
+html[data-theme] .app-shell .admin-action-filter-fields .select-trigger:focus-visible {
+  border-color: var(--vt-line-strong);
+  outline: none;
+}
+
+html[data-theme] .app-shell .admin-action-filter-fields .select-control {
+  width: 100%;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .admin-toolbar > .ghost-button {
+  height: 40px;
+  min-height: 40px;
+}
+
+html[data-theme] .app-shell .admin-toolbar > .icon-button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  color: var(--vt-text-2);
+  background: transparent;
+}
+
+html[data-theme] .app-shell .admin-toolbar > .icon-button:hover:not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+@media (max-width: 640px) {
+  html[data-theme] .app-shell .admin-action-filter-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The role badge closes the heading row on the right, not in its middle; on
+   a phone it moves under the title instead of squeezing it letter by letter. */
+html[data-theme] .app-shell .admin-heading .admin-role-badge {
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  html[data-theme] .app-shell .admin-heading.settings-heading {
+    flex-wrap: wrap;
+  }
+
+  html[data-theme] .app-shell .admin-heading .admin-role-badge {
+    margin-left: 58px;
+  }
+
+  /* The same squeeze on the sessions panel: the button goes under the text. */
+  html[data-theme] .app-shell .devices-panel-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-theme] .app-shell .devices-panel-head > .primary-button {
+    justify-self: start;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Emblems: one neutral tile for every icon that names a page or a block.
+ * Colour belongs to data and actions, so the tile never takes the accent.
+ * ------------------------------------------------------------------------- */
+.app-shell .page-emblem {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+}
+
+.app-shell .page-emblem svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+
+/* Emblems that still named a page or a block in orange take the same tile. */
+html[data-theme] .app-shell :is(
+  .privacy-settings-heading > span:first-child,
+  .company-create-icon,
+  .next-step .step-icon
+) {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell :is(
+  .analysis-personalization-heading > span:first-child,
+  .monitoring-metric > span:first-child,
+  .device-card .device-icon
+) {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  color: var(--vt-text-2);
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .device-card .device-icon {
+  background: var(--vt-s3);
+}
+
+/* An emblem on a card that is itself the s2 surface needs the next shade up,
+   otherwise the tile disappears into the card it sits on. */
+html[data-theme] .app-shell .atmospheric-page :is(.glass, .glass-panel) > .page-emblem,
+html[data-theme] .app-shell .atmospheric-page .privacy-settings-heading.glass-panel > span:first-child,
+html[data-theme] .app-shell .atmospheric-page .settings-heading.glass-panel > .settings-heading-icon {
+  background: var(--vt-s3);
+}
+
+/* In the light theme a tile and the card under it are two shades of the same
+   paper (1.1:1), so every emblem keeps a hairline instead of relying on fill. */
+html[data-theme] .app-shell :is(
+  .page-emblem,
+  .privacy-settings-heading > span:first-child,
+  .company-create-icon,
+  .next-step .step-icon,
+  .settings-heading .settings-heading-icon,
+  .analysis-personalization-heading > span:first-child,
+  .monitoring-metric > span:first-child,
+  .device-card .device-icon
+) {
+  box-shadow: inset 0 0 0 1px var(--vt-line);
+}
+
+html[data-theme] .app-shell :is(.privacy-settings-heading > span:first-child, .company-create-icon, .next-step .step-icon) svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Initials stand in for a missing photo; they are a name, not an action,
+   so they sit on the neutral tile too. */
+html[data-theme] .app-shell .admin-avatar {
+  border: 0;
+  color: var(--vt-text-2);
+  background: var(--vt-s3);
+  box-shadow: none;
+}
+
+/* A done step is a fact, so it keeps the tone of success. */
+html[data-theme] .app-shell .next-step .step-icon.is-complete {
+  color: var(--vt-good-mark);
+  background: var(--vt-good-soft);
+}
+
+html[data-theme] .app-shell .calls-list-collapse.calls-list-emblem {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: var(--vt-s1);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .calls-list-collapse.calls-list-emblem:hover {
+  color: var(--vt-text);
+  background: var(--vt-s2);
+}
+
+/* ---------------------------------------------------------------------------
+ * Status chips: a dot and a word on a faint tint of the same tone.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .status-chip {
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 9px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--vt-text-2);
+  background: var(--vt-soft);
+  box-shadow: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+html[data-theme] .app-shell .status-chip::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  content: "";
+  background: currentColor;
+}
+
+html[data-theme] .app-shell .status-chip.ok { color: var(--vt-good); background: var(--vt-good-soft); }
+html[data-theme] .app-shell .status-chip.warn { color: var(--vt-warn); background: var(--vt-warn-soft); }
+html[data-theme] .app-shell .status-chip.bad { color: var(--vt-bad); background: var(--vt-bad-soft); }
+html[data-theme] .app-shell .status-chip.test { color: var(--vt-info); background: var(--vt-info-soft); border: 0; }
+
+/* ---------------------------------------------------------------------------
+ * Call header: the call's own emblem, its facts with icons, and the score in
+ * the colour of its level — the same thresholds as the gauge below.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .call-overview .panel-heading.large h2 {
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .selected-call-card {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+.app-shell .selected-call-card .page-emblem {
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .selected-call-main {
+  gap: 8px;
+}
+
+.app-shell .selected-call-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .selected-call-card .selected-call-title strong {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--vt-text);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+html[data-theme] .app-shell .selected-call-card .status-chip {
+  padding: 0 9px 0 8px !important;
+  background: var(--vt-soft) !important;
+}
+
+html[data-theme] .app-shell .selected-call-card .status-chip.ok { background: var(--vt-good-soft) !important; }
+html[data-theme] .app-shell .selected-call-card .status-chip.warn { background: var(--vt-warn-soft) !important; }
+html[data-theme] .app-shell .selected-call-card .status-chip.bad { background: var(--vt-bad-soft) !important; }
+html[data-theme] .app-shell .selected-call-card .status-chip.test { background: var(--vt-info-soft) !important; }
+
+.app-shell .selected-call-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--vt-text-2);
+  font-size: 0.86rem;
+}
+
+html[data-theme] .app-shell .selected-call-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vt-text-2);
+}
+
+.app-shell .selected-call-meta svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+.app-shell .selected-call-score {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  padding-left: 18px;
+  border-left: 1px solid var(--vt-line);
+}
+
+html[data-theme] .app-shell .selected-call-score strong {
+  margin: 0;
+  color: var(--vt-text);
+  font-size: 1.9rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+html[data-theme] .app-shell .selected-call-score small {
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+html[data-theme] .app-shell .selected-call-score.is-good strong { color: var(--vt-good-mark); }
+html[data-theme] .app-shell .selected-call-score.is-warning strong { color: var(--vt-warn-mark); }
+html[data-theme] .app-shell .selected-call-score.is-danger strong { color: var(--vt-bad-mark); }
+
+/* A 30px number needs 3:1, which the bright amber and green miss on the light
+   fill; a step toward the text shade keeps them bright enough and readable. */
+html[data-theme="light"] .app-shell .selected-call-score.is-good strong { color: color-mix(in srgb, var(--vt-good-mark) 55%, var(--vt-good)); }
+html[data-theme="light"] .app-shell .selected-call-score.is-warning strong { color: color-mix(in srgb, var(--vt-warn-mark) 55%, var(--vt-warn)); }
+
+@media (max-width: 560px) {
+  html[data-theme] .app-shell .selected-call-card {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .app-shell .selected-call-score {
+    grid-column: 1 / -1;
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: baseline;
+    gap: 6px;
+    padding: 12px 0 0;
+    border-top: 1px solid var(--vt-line);
+    border-left: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Cards of the call page: tools sit quietly beside the title, the long text
+ * opens from a plain footer button, and the floating "collapse" is a neutral
+ * pill instead of a second orange button.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .info-card > .card-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px 10px;
+  margin-bottom: 14px;
+}
+
+html[data-theme] .app-shell .info-card > .card-title h3 {
+  margin: 0;
+  color: var(--vt-text);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.app-shell .card-title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.app-shell .card-tool-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--vt-text-2);
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--vt-dur-fast) ease, color var(--vt-dur-fast) ease;
+}
+
+.app-shell .card-tool-button svg {
+  color: var(--vt-text-3);
+  transition: color var(--vt-dur-fast) ease;
+}
+
+.app-shell .card-tool-button:is(:hover, .is-active):not(:disabled) {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+}
+
+.app-shell .card-tool-button:is(:hover, .is-active):not(:disabled) svg {
+  color: var(--vt-text-2);
+}
+
+.app-shell .card-tool-button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 1px;
+}
+
+.app-shell .card-tool-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+html[data-theme] .app-shell .transcript-history-actions {
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+html[data-theme] .app-shell .segment-meta span {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+html[data-theme] .app-shell .segment-meta strong {
+  color: var(--vt-text);
+  font-weight: 600;
+}
+
+.app-shell .segment-meta strong.has-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-shell .segment-meta strong.has-color::before {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  content: "";
+  background: var(--speaker-color);
+}
+
+html[data-theme] .app-shell .info-card > .analysis-toggle-button {
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-top: 14px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: var(--vt-soft);
+  box-shadow: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+  transform: none;
+}
+
+html[data-theme] .app-shell .info-card > .analysis-toggle-button:hover {
+  color: var(--vt-text);
+  background: var(--vt-hover);
+  border: 0;
+  transform: none;
+}
+
+html[data-theme] .app-shell .info-card > .analysis-toggle-button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 2px;
+}
+
+html[data-theme] .app-shell .analysis-toggle-button .analysis-toggle-icon {
+  width: auto;
+  height: auto;
+  flex: none;
+  color: var(--vt-text-3);
+  background: none;
+}
+
+html[data-theme] .app-shell .analysis-toggle-button .analysis-toggle-icon svg {
+  transition: transform var(--vt-dur) var(--vt-ease);
+}
+
+html[data-theme] .app-shell .analysis-toggle-button.expanded .analysis-toggle-icon svg {
+  transform: rotate(180deg);
+}
+
+html[data-theme] .app-shell .transcript-card > .analysis-toggle-button.is-island-receiving {
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--vt-line-strong);
+}
+
+html[data-theme] .transcript-collapse-island button {
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 16px 0 12px;
+  border: 1px solid var(--vt-line-strong);
+  color: var(--vt-text);
+  background: var(--vt-s3);
+  box-shadow: var(--vt-shadow);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+html[data-theme] .transcript-collapse-island button svg {
+  color: var(--vt-text-2);
+}
+
+html[data-theme] .transcript-collapse-island button:hover {
+  background: color-mix(in srgb, var(--vt-text) 6%, var(--vt-s3));
+  filter: none;
+}
+
+html[data-theme] .transcript-collapse-island button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 2px;
+}
+
+/* Human review: a row with a neutral emblem and a secondary button; the
+   primary colour stays with the call's main actions. */
+html[data-theme] .app-shell .quality-review-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--vt-s2);
+  box-shadow: none;
+}
+
+html[data-theme] .app-shell .quality-review-entry > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .quality-review-entry > div:first-child > svg {
+  box-sizing: content-box;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--vt-text-2);
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .quality-review-entry span {
+  display: grid;
+  gap: 2px;
+}
+
+html[data-theme] .app-shell .quality-review-entry strong {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+  font-weight: 620;
+}
+
+html[data-theme] .app-shell .quality-review-entry small {
+  color: var(--vt-text-2);
+  font-size: 0.84rem;
+}
+
+@media (max-width: 900px) {
+  html[data-theme] .app-shell .quality-review-entry {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* On a phone no text of the new blocks goes under the 14px floor. */
+@media (max-width: 760px) {
+  .app-shell :is(
+    .audio-lane-legend li,
+    .audio-lane-note,
+    .call-day-heading,
+    .analysis-item-title small,
+    .criterion-detail-label,
+    .criterion-detail-coverage,
+    .criterion-detail-basis,
+    .criterion-detail-list small,
+    .analysis-recommendation-priority,
+    .analysis-recommendation-note > span,
+    .selected-call-meta,
+    .selected-call-score small,
+    .status-chip,
+    .card-tool-button,
+    .segment-meta span,
+    .calls-sidebar-head p,
+    .call-folder-row small,
+    .call-row-meta,
+    .analysis-item-score small,
+    .analysis-distribution-legend,
+    .analysis-score-summary-title,
+    .analysis-score-summary-note,
+    .kpi-note,
+    .dashboard-kpi-card > .kpi-head,
+    .mistakes-legend li,
+    .mistakes-main small,
+    .mistakes-title small,
+    .analytics-group-title,
+    .analytics-summary > div > span,
+    .analytics-summary small,
+    .analytics-name small,
+    .analytics-low-sample,
+    .analytics-score-card > div > span,
+    .stage-rail-summary-facts,
+    .stage-rail-status,
+    .stage-rail-failure-text small,
+    .evidence-link time,
+    .instructions-catalog-head span
+  ) {
+    font-size: var(--mobile-text-small, 14px);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Notifications: which events arrive and where. The native checkbox was the
+ * last unstyled control in the app — a white box that belonged to no theme —
+ * so the cell carries the same switch as an instruction's «Активна».
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .notification-matrix {
+  padding: 6px 12px 10px;
+  border-radius: 16px;
+}
+
+html[data-theme] .app-shell .notification-matrix-row {
+  grid-template-columns: minmax(0, 1fr) repeat(3, 148px);
+  gap: 8px 12px;
+  padding: 14px 10px;
+  border-top-color: var(--vt-line);
+  border-radius: 12px;
+}
+
+html[data-theme] .app-shell .notification-matrix-row:not(.is-head):hover {
+  background: var(--vt-hover);
+}
+
+html[data-theme] .app-shell .notification-matrix-row.is-head {
+  padding-bottom: 10px;
+  color: var(--vt-text-3);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+html[data-theme] .app-shell .notification-matrix-row.is-head > span:not(:first-child) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+html[data-theme] .app-shell .notification-matrix-row.is-head svg {
+  flex: none;
+  color: var(--vt-text-3);
+}
+
+/* «скоро» is a state of the channel, not a call to act: a quiet outline. */
+html[data-theme] .app-shell .notification-matrix-row.is-head em {
+  margin-left: 0;
+  padding: 2px 7px;
+  color: var(--vt-text-3);
+  background: transparent;
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+}
+
+html[data-theme] .app-shell .notification-matrix-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+html[data-theme] .app-shell .notification-matrix-event > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .notification-matrix-emblem {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .notification-matrix-emblem svg {
+  width: 18px;
+  height: 18px;
+}
+
+html[data-theme] .app-shell .notification-matrix-event strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+html[data-theme] .app-shell .notification-matrix-event small {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+html[data-theme] .app-shell .notification-matrix-cell {
+  gap: 10px;
+  cursor: pointer;
+}
+
+html[data-theme] .app-shell .notification-matrix-cell.is-waiting {
+  cursor: not-allowed;
+}
+
+html[data-theme] .app-shell .notification-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--vt-track);
+  transition: background var(--vt-dur) ease;
+}
+
+html[data-theme] .app-shell .notification-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--vt-text-2);
+  transition: transform var(--vt-dur) var(--vt-ease), background var(--vt-dur) ease;
+}
+
+/* The off track is a faint tint that all but vanishes on light paper, so it
+   keeps an edge; the on track carries its own colour and needs none. */
+html[data-theme] .app-shell .notification-matrix-cell input:not(:checked) + .notification-switch {
+  box-shadow: inset 0 0 0 1px var(--vt-line-mid);
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:checked + .notification-switch {
+  background: var(--vt-good-mark);
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:checked + .notification-switch i {
+  background: #ffffff;
+  transform: translateX(14px);
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:disabled + .notification-switch {
+  opacity: 0.45;
+}
+
+html[data-theme] .app-shell .notification-matrix-cell input:focus-visible + .notification-switch {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 3px;
+}
+
+html[data-theme] .app-shell .notification-matrix-channel {
+  color: var(--vt-text-3);
+  font-size: 0.85rem;
+}
+
+/* Three channel columns plus a readable event text need the wide layout; from
+   the tablet width down the row stacks and every switch says which channel it
+   is, instead of the column headings breaking into fragments. */
+@media (max-width: 1240px) {
+  html[data-theme] .app-shell .notification-matrix-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-theme] .app-shell .notification-matrix-row.is-head {
+    display: none;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-row.is-head + .notification-matrix-row {
+    border-top: 0;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-event {
+    margin-bottom: 4px;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-cell {
+    justify-content: flex-start;
+    padding-left: 50px;
+  }
+
+  html[data-theme] .app-shell .notification-matrix-channel {
+    display: inline;
+  }
+}
+
+/* Skeletons referenced keyframes that never existed and stood still. */
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes app-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Anything that moves stops moving for people who asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

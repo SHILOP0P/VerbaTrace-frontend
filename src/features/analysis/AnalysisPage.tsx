@@ -344,7 +344,7 @@ export function AnalysisPage({
         {error && <div className="form-error">{error}</div>}
         {deleteError && <div className="form-error">{deleteError}</div>}
         {selectedCall && (
-          <StatusTimeline transcriptionOnly={Boolean(selectedCall.transcription_only && !analysis)} current={selectedCall.status} statuses={selectedCallTimeline} analysisProgress={analysisProgress(analysis)} analysisStatus={analysis?.status} />
+          <StatusTimeline transcriptionOnly={Boolean(selectedCall.transcription_only && !analysis)} current={selectedCall.status} statuses={selectedCallTimeline} analysisProgress={analysisProgress(analysis)} analysisStatus={analysis?.status} acceptedAt={selectedCall.created_at} />
         )}
         {selectedCall && <ReportExportPanel call={selectedCall} analysis={analysis} />}
         <div className="analysis-content-grid">

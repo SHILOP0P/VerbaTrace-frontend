@@ -2,6 +2,7 @@ import { Activity, ArrowDownLeft, ArrowUpRight, FlaskConical, RefreshCw, Trendin
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { CompanyResponse, CreditDashboardResponse, CreditWalletEntry, SandboxWalletDashboard, SessionState } from "../../types";
+import { creditForecast } from "../../shared/lib/credits";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { SelectControl } from "../../shared/ui/primitives";
 import { CreditActivityChart } from "./CreditActivityChart";
@@ -130,7 +131,7 @@ function WalletHistory({ title, entries, timeZone, sandbox = false }: { title: s
   const listRef = useRef<HTMLDivElement>(null);
   const scrollable = entries.length > 8;
   return <section className={`credit-wallet-history${sandbox ? " is-sandbox" : ""}`}>
-    <header><h3>{sandbox && <FlaskConical size={17}/>} {title}</h3><span title={`Время операций: ${resolvedTimeZone}`}>{timeZoneLabel(resolvedTimeZone)}</span></header>
+    <header><h3>{sandbox && <FlaskConical size={17}/>} {title}</h3><span>{timeZoneLabel(resolvedTimeZone)}</span></header>
     {scrollable && <CustomScrollbar targetRef={listRef} rightOffset={6} />}
     {entries.length === 0 ? <p className="credit-history-empty">{sandbox ? "Операций с тестовыми кредитами пока нет." : "Операций с кредитами пока нет."}</p> : <div ref={listRef} className={`credit-wallet-entry-list${scrollable ? " is-scrollable custom-scroll-target" : ""}`}>{entries.map((entry) => {
       const kind = walletEntryKind(entry);
@@ -199,6 +200,7 @@ function localizedUtcOffset(timeZone: string) {
 function walletReason(reason: string, sandbox: boolean) {
   if (!sandbox && reason === "transcription") return "Транскрибация звонка";
   if (!sandbox && reason === "analysis") return "Анализ звонка";
+  if (!sandbox && reason === "scorecard_compile") return "Подготовка критериев";
   if (!sandbox && reason === "deep_analysis") return "Глубокий анализ звонка";
   if (!sandbox && reason === "assistant_generation") return "Ответ помощника по звонкам";
   if (!sandbox && reason === "sandbox wallet add") return "Тестовое пополнение основного кошелька";
@@ -217,20 +219,4 @@ function pendingQueueNote(data: CreditDashboardResponse) {
   if (limit === null || limit === undefined) return `Ждут кредитов: ${waiting} звонк${waiting === 1 ? "" : "ов"}`;
   if (limit === 0) return "Звонки без кредитов не принимаются";
   return `Ждут кредитов: ${waiting} из ${limit}`;
-}
-
-// The limit runs for 30 days from the day the subscription started, not for a
-// calendar month, so the elapsed part of the period is counted the same way.
-const creditPeriodDays = 30;
-
-function creditForecast(data: CreditDashboardResponse) {
-  const used = Math.max(0, data.allowance_credits - data.allowance_remaining);
-  const reset = new Date(data.resets_at);
-  const start = new Date(reset.getTime() - creditPeriodDays * 86_400_000);
-  const elapsed = Math.max(1, Math.ceil((Date.now() - start.getTime()) / 86_400_000));
-  const daily = Math.round(used / elapsed);
-  const atReset = Math.max(0, data.allowance_remaining - daily * Math.max(0, data.days_until_reset));
-  const daysLeft = daily > 0 ? Math.floor(data.allowance_remaining / daily) : Number.POSITIVE_INFINITY;
-  const depletion = !Number.isFinite(daysLeft) || daysLeft > data.days_until_reset ? "до сброса" : `${daysLeft} дн.`;
-  return { used, daily, atReset, depletion };
 }

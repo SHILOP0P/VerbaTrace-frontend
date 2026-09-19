@@ -5,17 +5,21 @@ import {
   ChevronUp,
   ChevronRight,
   CloudUpload,
-  Filter,
+  Folder,
+  FolderOpen,
   MoreHorizontal,
   MoreVertical,
   PanelLeftClose,
   Pencil,
-  Play,
+  PhoneCall,
   Plus,
+  Search,
+  SlidersHorizontal,
   Star,
   Trash2,
   UserRound,
   UsersRound,
+  Video,
   X
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +44,9 @@ import type {
 } from "../../types";
 
 import { formatDate, formatDuration } from "../../shared/lib/formatters";
+import { callStatusChip, callStatusTone } from "../../shared/lib/call-status";
+import { isVideoCall } from "../../shared/lib/media";
+import { pluralizeRu } from "../../shared/lib/plans";
 import { activeDepartmentLeaderIds, isCompanyManager } from "../../shared/lib/access";
 import { enterOverlayMode } from "../../shared/lib/page-scroll";
 import { useDrawerLayout } from "../../shared/lib/drawer-layout";
@@ -286,10 +293,10 @@ export function CallsPage({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isDrawerLayout = useDrawerLayout();
   const [callListCollapsed, setCallListCollapsed] = useState(() => window.localStorage.getItem("verbatrace:calls-list-collapsed") === "1");
-  const effectiveScopeFilter =
-    companies.length === 0 && (scopeFilter === "company" || scopeFilter === "department")
-      ? "all"
-      : scopeFilter;
+  // Without a company every call is personal, so there is no scope to choose:
+  // neither the tabs nor a chip for it are shown.
+  const hasScopes = companies.length > 0;
+  const effectiveScopeFilter = hasScopes ? scopeFilter : "all";
   const filterValidationError = (() => {
     const minDuration = durationMin === "" ? undefined : Number(durationMin);
     const maxDuration = durationMax === "" ? undefined : Number(durationMax);
@@ -434,12 +441,8 @@ export function CallsPage({
   const scopeOptions: Array<[VisibilityScope | "all", string]> = [
     ["all", "Все"],
     ["personal", "Личные"],
-    ...(companies.length > 0
-      ? ([
-        ["company", "Компания"],
-        ["department", "Отдел"]
-      ] as Array<[VisibilityScope, string]>)
-      : [])
+    ["company", "Компания"],
+    ["department", "Отдел"]
   ];
   const filtersChanged =
     statusFilter !== "all" ||
@@ -1041,10 +1044,28 @@ export function CallsPage({
     };
   }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, callsRefreshKey, restoredCallsToken]);
 
+  // Calls sorted by time are split by day, so a long list has landmarks; a
+  // list sorted by length has no order in time to show.
+  const groupByDay = sortFilter !== "duration";
+
+  function renderSidebarCallRows(list: CallResponse[], folderId?: string) {
+    if (!groupByDay) return list.map((call) => renderSidebarCallRow(call, folderId));
+    let previousDay = "";
+    return list.flatMap((call) => {
+      const day = callDayLabel(callMoment(call));
+      const header = day !== previousDay
+        ? [<p className="call-day-heading" key={`${folderId ?? "unfiled"}-day-${day}-${call.id}`}>{day}</p>]
+        : [];
+      previousDay = day;
+      return [...header, renderSidebarCallRow(call, folderId)];
+    });
+  }
+
   function renderSidebarCallRow(call: CallResponse, folderId?: string) {
     const selected = selectedCallId === call.id;
     const open = openCallMenuId === call.id;
     const isFavorite = favoriteCallIds.includes(call.id);
+    const rowTone = callRowTone(call, analyses[call.id]?.status);
     const selectCallFromRow = () => {
       if (folderId) {
         selectFolderCall(call.id, folderId);
@@ -1067,16 +1088,23 @@ export function CallsPage({
           selectCallFromRow();
         }}
       >
-        <span className="play-dot">
-          <Play size={14} fill="currentColor" />
+        {/* A round, neutral emblem, so a call never reads as one of the square
+            coloured folder tiles above it; the dot keeps the status. */}
+        <span className={`call-row-emblem is-${rowTone}`} aria-hidden="true">
+          {isVideoCall(call) ? <Video size={16} /> : <PhoneCall size={16} />}
+          <i />
         </span>
         <span className="call-row-main">
-          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} />
           <strong>{call.title}</strong>
-          <small>
-            {formatDate(call.display_time || call.occurred_at || call.created_at)} · {formatDuration(call.duration_seconds)}
-            {call.time_source === "upload_fallback" ? " · время загрузки" : ""}
-          </small>
+          <span className="call-row-meta">
+            {rowTone === "ok"
+              ? <span className="vt-sr-only">{callStatusChip(call.status, call.is_test ? undefined : analyses[call.id]?.status)}</span>
+              : <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />}
+            <small>
+              {groupByDay ? `${callClock(callMoment(call))} · ` : `${formatDate(callMoment(call))} · `}{formatDuration(call.duration_seconds)}
+              {call.time_source === "upload_fallback" ? " · время загрузки" : ""}
+            </small>
+          </span>
           {call.source_provider && <small className="call-source-line">{call.source_provider === "bitrix24" ? "Bitrix24" : "API"}{call.external_call_id ? ` · #${call.external_call_id}` : ""}</small>}
         </span>
         <span
@@ -1136,6 +1164,11 @@ export function CallsPage({
       ? folderBusyId === pendingDelete.folder.id
       : callBusyId === pendingDelete.call.id
     : false;
+  const folderScopeOptions: Array<{ scope: VisibilityScope; title: string; hint: string; icon: typeof UserRound }> = [
+    { scope: "personal", title: "Личная", hint: "Только ваши звонки", icon: UserRound },
+    ...(managedCompanyIds.size > 0 ? [{ scope: "company" as const, title: "Компания", hint: "Для всей компании", icon: Building2 }] : []),
+    ...(manageableDepartments.length > 0 ? [{ scope: "department" as const, title: "Отдел", hint: "Для выбранного отдела", icon: UsersRound }] : [])
+  ];
 
   return (
     <section className={`calls-layout atmospheric-page ${callListCollapsed ? "call-list-collapsed" : ""}`}>
@@ -1156,10 +1189,9 @@ export function CallsPage({
         >
           <PanelLeftClose size={19} />
         </button>
-        <div className="panel-heading">
+        <div className="panel-heading calls-sidebar-head">
           <div>
             <h2>Звонки</h2>
-            <p>Фильтры и детали выбранного звонка.</p>
           </div>
           <div className="mobile-call-drawer-heading-actions">
             <button className="primary-button small" onClick={() => onNavigate("upload")}>
@@ -1177,12 +1209,15 @@ export function CallsPage({
           </div>
         </div>
         <div className="calls-filter-bar">
-          <input
-            aria-label="Поиск звонка"
-            placeholder="Поиск по названию"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
+          <label className="calls-search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              aria-label="Поиск звонка"
+              placeholder="Поиск по названию"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </label>
           <button
             className={`ghost-button call-filter-toggle ${filtersExpanded ? "active" : ""}`}
             type="button"
@@ -1190,8 +1225,8 @@ export function CallsPage({
             aria-controls="call-advanced-filters"
             onClick={() => setFiltersExpanded((value) => !value)}
           >
-            <Filter size={16} />
-            Фильтры{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+            <SlidersHorizontal size={16} />
+            Фильтры{activeFilterCount > 0 && <b className="call-filter-count">{activeFilterCount}</b>}
           </button>
         </div>
         {activeFilterChips.length > 0 && <div className="call-filter-chips" aria-label="Активные фильтры">
@@ -1216,8 +1251,8 @@ export function CallsPage({
             <label><span>Источник</span><SelectControl aria-label="Источник" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}><option value="all">Все источники</option><option value="manual">Ручная загрузка</option><option value="generic_api">API</option><option value="bitrix24">Bitrix24</option></SelectControl></label>
             <label><span>Подключение</span><SelectControl aria-label="Подключение" value={connectionFilter} onChange={(event) => setConnectionFilter(event.target.value)}><option value="all">Все подключения</option>{connectionOptions.map((connection) => <option key={connection.id} value={connection.id}>{connection.name}{connection.provider === "bitrix24" ? " · Bitrix24" : ""}</option>)}</SelectControl></label>
             <label><span>Быстрый период</span><SelectControl aria-label="Период" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value as "all" | "7d" | "30d")}><option value="all">Все даты</option><option value="7d">Последние 7 дней</option><option value="30d">Последние 30 дней</option></SelectControl></label>
-            <label><span>Разговор с</span><DateTimePicker mode="date" placement="right-center" ariaLabel="Дата начала периода" value={occurredFrom} onChange={(value) => { setOccurredFrom(value); setPeriodFilter("all"); }} /></label>
-            <label><span>Разговор до</span><DateTimePicker mode="date" placement="right-center" ariaLabel="Дата окончания периода" value={occurredTo} onChange={(value) => { setOccurredTo(value); setPeriodFilter("all"); }} /></label>
+            <label><span>Разговор с</span><DateTimePicker mode="date" display="compact" placement="right-center" ariaLabel="Дата начала периода" value={occurredFrom} onChange={(value) => { setOccurredFrom(value); setPeriodFilter("all"); }} /></label>
+            <label><span>Разговор до</span><DateTimePicker mode="date" display="compact" placement="right-center" ariaLabel="Дата окончания периода" value={occurredTo} onChange={(value) => { setOccurredTo(value); setPeriodFilter("all"); }} /></label>
             <label><span>Длительность от, сек.</span><DurationFilterInput label="Длительность от, сек." value={durationMin} onChange={setDurationMin} /></label>
             <label><span>Длительность до, сек.</span><DurationFilterInput label="Длительность до, сек." value={durationMax} onChange={setDurationMax} /></label>
             <label><span>Анализ</span><SelectControl aria-label="Наличие анализа" value={analysisFilter} onChange={(event) => setAnalysisFilter(event.target.value as typeof analysisFilter)}><option value="all">Не важно</option><option value="yes">Есть анализ</option><option value="no">Без анализа</option></SelectControl></label>
@@ -1237,22 +1272,22 @@ export function CallsPage({
             checked={favoriteOnly}
             onChange={(event) => setFavoriteOnly(event.target.checked)}
           />
-          <span className="call-favorite-filter-box" aria-hidden="true">
-            {favoriteOnly && <Check size={12} strokeWidth={3} />}
-          </span>
+          <Star size={14} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden="true" />
           <span>Только избранные</span>
         </label>
-        <div className="call-scope-tabs segmented scope">
-          {scopeOptions.map(([value, label]) => (
-            <button
-              key={value}
-              className={effectiveScopeFilter === value ? "active" : ""}
-              onClick={() => setScopeFilter(value as VisibilityScope | "all")}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {hasScopes && (
+          <div className="call-scope-tabs segmented scope">
+            {scopeOptions.map(([value, label]) => (
+              <button
+                key={value}
+                className={effectiveScopeFilter === value ? "active" : ""}
+                onClick={() => setScopeFilter(value as VisibilityScope | "all")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <section className="call-folder-panel">
           <div className="call-folder-heading">
             <div>
@@ -1285,16 +1320,17 @@ export function CallsPage({
                       aria-expanded={expanded}
                       onClick={() => toggleFolder(folder.id)}
                     >
-                      {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      <ChevronRight className="call-folder-chevron" size={15} aria-hidden="true" />
                       <span
-                        className="folder-color-dot"
+                        className="call-folder-icon"
+                        aria-hidden="true"
                         style={{ "--folder-color": folder.color || "#ff7a43" } as React.CSSProperties}
-                      />
+                      >
+                        {expanded ? <FolderOpen size={17} /> : <Folder size={17} />}
+                      </span>
                       <span>
                         <strong title={folder.name}>{folder.name}</strong>
-                        <small>
-                          {folderScopeLabel(folder)} · {folder.calls_count} звонков · {folder.instructions?.length ?? 0} инструкций
-                        </small>
+                        <small>{folderMeta(folder)}</small>
                       </span>
                     </button>
                     {canManageFolder(folder) && <div
@@ -1348,7 +1384,7 @@ export function CallsPage({
                       ) : folderCalls.length === 0 ? (
                         <div className="call-folder-child-empty">Нет звонков по текущим фильтрам.</div>
                       ) : (
-                        folderCalls.map((call) => renderSidebarCallRow(call, folder.id))
+                        renderSidebarCallRows(folderCalls, folder.id)
                       )}
                     </div>
                   )}
@@ -1371,7 +1407,7 @@ export function CallsPage({
         <div className="call-list">
           {(loading || filtersLoading || folderCallsLoading) && <CallListSkeleton count={4} />}
           {!loading && !filtersLoading && !folderCallsLoading &&
-            callsWithoutVisibleFolder.filter((call) => !favoriteOnly || favoriteCallIds.includes(call.id)).map((call) => renderSidebarCallRow(call))}
+            renderSidebarCallRows(callsWithoutVisibleFolder.filter((call) => !favoriteOnly || favoriteCallIds.includes(call.id)))}
           {!loading && !filtersLoading && !folderCallsLoading && callsWithoutVisibleFolder.length === 0 && (
             <div className="empty-state">{calls.length === 0 ? "Звонков пока нет." : "Звонков без папки по фильтрам нет."}</div>
           )}
@@ -1468,21 +1504,16 @@ export function CallsPage({
             </div>
             {folderError && <div className="form-error compact">{folderError}</div>}
             <div className="call-folder-form modal-form">
-              {!editingFolderId && (
+              {/* With one possible place there is nothing to choose: a line says
+                  where the folder goes instead of a lone selected tile. */}
+              {!editingFolderId && folderScopeOptions.length === 1 && (
+                <p className="call-folder-scope-note"><UserRound size={15} aria-hidden="true" />Личная папка — её видите только вы.</p>
+              )}
+              {!editingFolderId && folderScopeOptions.length > 1 && (
                 <fieldset className="call-folder-scope-picker">
-                  <legend>Куда добавить папку?</legend>
+                  <legend>Где будет папка</legend>
                   <div className="call-folder-scope-options">
-                    {([
-                      { scope: "personal", title: "Личная", hint: "Только ваши звонки", icon: UserRound },
-                      ...(managedCompanyIds.size > 0
-                        ? [
-                            { scope: "company", title: "Компания", hint: "Для всей компании", icon: Building2 },
-                          ]
-                        : [])
-                      ,...(manageableDepartments.length > 0
-                        ? [{ scope: "department", title: "Отдел", hint: "Для выбранного отдела", icon: UsersRound }]
-                        : [])
-                    ] as Array<{ scope: VisibilityScope; title: string; hint: string; icon: typeof UserRound }>).map((option) => {
+                    {folderScopeOptions.map((option) => {
                       const Icon = option.icon;
                       return (
                         <button
@@ -1540,27 +1571,36 @@ export function CallsPage({
                   </SelectControl>
                 </label>
               )}
-              <input
-                aria-label="Название папки"
-                placeholder="Название папки"
-                value={folderForm.name}
-                maxLength={120}
-                onChange={(event) => setFolderForm((current) => ({ ...current, name: event.target.value }))}
-              />
-              <input
-                aria-label="Описание папки"
-                placeholder="Описание"
-                value={folderForm.description}
-                maxLength={1000}
-                onChange={(event) => setFolderForm((current) => ({ ...current, description: event.target.value }))}
-              />
+              <label className="call-folder-field">
+                <span>Название</span>
+                <input
+                  aria-label="Название папки"
+                  placeholder="Например, «Входящие продажи»"
+                  value={folderForm.name}
+                  maxLength={120}
+                  onChange={(event) => setFolderForm((current) => ({ ...current, name: event.target.value }))}
+                />
+              </label>
+              <label className="call-folder-field">
+                <span>Описание <small>необязательно</small></span>
+                <input
+                  aria-label="Описание папки"
+                  placeholder="Что в ней собирается"
+                  value={folderForm.description}
+                  maxLength={1000}
+                  onChange={(event) => setFolderForm((current) => ({ ...current, description: event.target.value }))}
+                />
+              </label>
               <div className="call-folder-color-picker" aria-label="Цвет папки">
                 <div className="call-folder-color-picker-head">
-                  <span>Цвет папки</span>
-                  <span
-                    className="folder-color-dot preview"
-                    style={{ "--folder-color": folderForm.color || folderPalette[0] } as React.CSSProperties}
-                  />
+                  <span>Цвет</span>
+                  {/* The folder as it will look in the list. */}
+                  <span className="call-folder-preview" aria-hidden="true">
+                    <span className="call-folder-icon" style={{ "--folder-color": folderForm.color || folderPalette[0] } as React.CSSProperties}>
+                      <Folder size={16} />
+                    </span>
+                    <span>{folderForm.name.trim() || "Новая папка"}</span>
+                  </span>
                 </div>
                 <div className="call-folder-palette" role="radiogroup" aria-label="Выбор цвета папки">
                   {folderPalette.map((color) => (
@@ -1574,7 +1614,7 @@ export function CallsPage({
                       onClick={() => setFolderForm((current) => ({ ...current, color }))}
                       style={{ "--folder-color": color } as React.CSSProperties}
                     >
-                      <span />
+                      <Check size={14} strokeWidth={3} aria-hidden="true" />
                     </button>
                   ))}
                 </div>
@@ -1591,7 +1631,7 @@ export function CallsPage({
                 ) : (
                   <div className="call-folder-instruction-options" aria-label={`Доступные инструкции: ${folderInstructionOptions.length}`}>
                     {folderInstructionOptions.map((instruction) => (
-                      <label key={instruction.id}>
+                      <label className={`checkbox-row${folderForm.instruction_uuids.includes(instruction.id) ? " is-checked" : ""}`} key={instruction.id}>
                         <input
                           type="checkbox"
                           checked={folderForm.instruction_uuids.includes(instruction.id)}
@@ -1602,23 +1642,23 @@ export function CallsPage({
                               : [...current.instruction_uuids, instruction.id]
                           }))}
                         />
-                        <span title={instruction.original_filename}>{instruction.original_filename}</span>
+                        <span>{instruction.title || instruction.original_filename}</span>
                       </label>
                     ))}
                   </div>
                 )}
               </fieldset>
               <div className="call-folder-form-actions">
+                <button className="ghost-button small" type="button" onClick={cancelFolderEdit}>
+                  Отмена
+                </button>
                 <button
                   className="primary-button small"
                   type="submit"
                   disabled={folderBusyId === "create" || (Boolean(editingFolderId) && folderBusyId === editingFolderId)}
                 >
                   <Check size={15} />
-                  {editingFolderId ? "Сохранить" : "Создать"}
-                </button>
-                <button className="ghost-button small" type="button" onClick={cancelFolderEdit}>
-                  Отмена
+                  {editingFolderId ? "Сохранить" : "Создать папку"}
                 </button>
               </div>
             </div>
@@ -1731,6 +1771,46 @@ const folderPalette = [
 type FolderPayloadResult =
   | { ok: true; value: CreateCallFolderRequest | UpdateCallFolderRequest }
   | { ok: false; error: string };
+
+// Where the call stands, as a tone for the dot on its time: "ok" is the usual
+// finished state and needs no words in the row; every other state is spelled
+// out next to the dot.
+function callRowTone(call: CallResponse, analysisStatus?: AnalysisResponse["status"]) {
+  if (call.is_test) return "test";
+  if (call.status === "cancelled") return "neutral";
+  if (call.transcription_only && call.status === "transcribed" && !analysisStatus) return "ok";
+  return callStatusTone(call.status, analysisStatus);
+}
+
+function callMoment(call: CallResponse) {
+  return call.display_time || call.occurred_at || call.created_at;
+}
+
+function callClock(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+
+function callDayLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Без даты";
+  const startOf = (moment: Date) => new Date(moment.getFullYear(), moment.getMonth(), moment.getDate()).getTime();
+  const days = Math.round((startOf(new Date()) - startOf(date)) / 86_400_000);
+  if (days === 0) return "Сегодня";
+  if (days === 1) return "Вчера";
+  return date.toLocaleDateString("ru-RU", date.getFullYear() === new Date().getFullYear()
+    ? { day: "numeric", month: "long" }
+    : { day: "numeric", month: "long", year: "numeric" });
+}
+
+function folderMeta(folder: CallFolderResponse) {
+  const instructions = folder.instructions?.length ?? 0;
+  return [
+    folderScopeLabel(folder),
+    `${folder.calls_count} ${pluralizeRu(folder.calls_count, "звонок", "звонка", "звонков")}`,
+    instructions > 0 ? `${instructions} ${pluralizeRu(instructions, "инструкция", "инструкции", "инструкций")}` : ""
+  ].filter(Boolean).join(" · ");
+}
 
 function emptyFolderForm(): FolderFormState {
   return {

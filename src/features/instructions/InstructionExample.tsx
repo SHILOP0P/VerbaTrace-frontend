@@ -18,7 +18,17 @@ const exampleMarkdown = `# Контроль следующего шага
 ## Рекомендация
 Если договорённость неполная, укажи, чего именно не хватает.`;
 
-export function InstructionExample() {
+// The instruction is broken into criteria once per version; these rules are
+// what makes each criterion one checkable requirement.
+export const writingTips = [
+  "Одно требование — один пункт списка. «Поздоровался и представился» — это два пункта.",
+  "Пишите то, что слышно в разговоре: слова и действия, а не тон, улыбку или экран.",
+  "Говорите, что нужно сделать, а не чего избегать.",
+  "Важность называйте прямо: «обязательно», «грубое нарушение». Так пункт получит больший вес или отметку «критичный».",
+  "Условие пишите рядом с требованием: «при первом звонке», «если клиент возражает по цене».",
+];
+
+export function InstructionExample({ showTips = true }: { /** Off where the tips already stand open beside it. */ showTips?: boolean }) {
   const [open, setOpen] = useState(false);
   return <section className={`instruction-template-example${open ? " open" : ""}`}>
     <button className="instruction-template-example-toggle" type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
@@ -26,6 +36,7 @@ export function InstructionExample() {
     </button>
     <div className="instruction-template-example-collapse" aria-hidden={!open}>
       <div className="instruction-template-example-collapse-inner">
+        {showTips && <div className="instruction-writing-tips"><strong>Как писать, чтобы критерии оценки получились точными</strong><ul>{writingTips.map((tip) => <li key={tip}>{tip}</li>)}</ul></div>}
         <div className="instruction-template-example-content"><InstructionDocumentViewer filename="example.md" markdown={exampleMarkdown}/></div>
       </div>
     </div>

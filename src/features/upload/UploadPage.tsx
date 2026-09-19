@@ -675,6 +675,7 @@ export function UploadPage({
         />
         {error && <div className="form-error">{error}</div>}
         <p className="upload-processing-hint">«Транскрибировать» — получить текст разговора. «Анализировать» — получить текст и анализ по выбранным инструкциям. Транскрипция доступна на всех тарифах; анализ можно запустить позже.</p>
+        <p className="upload-processing-hint">Важный или нетиповой разговор? Выберите «Транскрибировать», поправьте роли участников и запустите анализ вручную.</p>
         {/* Running out of credits does not lose the upload: the call is accepted
             and starts by itself. Saying so here keeps the wait from looking
             like a failure. */}

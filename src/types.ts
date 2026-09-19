@@ -1,5 +1,7 @@
 export type AppPage =
   | "overview"
+  | "teamAnalytics"
+  | "teamAnalyticsEmployee"
   | "calls"
   | "transcriptionEdit"
   | "transcriptionCompare"
@@ -23,6 +25,7 @@ export type AppPage =
   | "settingsCompanies"
   | "settingsInstructions"
   | "settingsPrivacy"
+  | "settingsNotifications"
   | "settingsInvitations"
   | "profile"
   | "profileEdit"
@@ -356,6 +359,30 @@ export interface UpdatePreferencesRequest {
   date_range?: PreferencesDateRange;
 }
 
+export interface CallAccess {
+  can_edit: boolean;
+  // Owner, deputy or department leader: they alone say whom a call counts for.
+  can_manage_subjects?: boolean;
+  via: "uploader" | "management" | "subject";
+}
+
+export interface CallSubject {
+  user_uuid: string;
+  full_name: string;
+  source: "uploader" | "speaker_match" | "manual";
+  is_primary: boolean;
+  grants_access: boolean;
+  speaker_key: string | null;
+  talk_share: number | null;
+  match_signals: string[];
+}
+
+export interface CallSubjectCandidate {
+  user_uuid: string;
+  full_name: string;
+  username: string;
+}
+
 export interface CallResponse {
   transcription_only?: boolean;
   id: string;
@@ -397,6 +424,13 @@ export interface CallResponse {
   ingest_error_code?: string | null;
   has_analysis?: boolean;
   has_actions?: boolean;
+  // Only on a single call: how the viewer reaches it and whom it counts for.
+  access?: CallAccess;
+  subjects?: CallSubject[];
+  is_shared?: boolean;
+  is_internal?: boolean;
+  subjects_changed_manually?: boolean;
+  speech?: CallSpeech | null;
   created_at: string;
   privacy?: CallPrivacy;
 }
@@ -881,6 +915,65 @@ export interface AnalysisInstructionVersion {
   published_at: string;
 }
 
+export type ScorecardStatus = "not_compiled" | "queued" | "compiling" | "ready" | "failed";
+export type CriterionChangeKind = "new" | "unchanged" | "reworded";
+export type ScorecardEditableField = "title" | "weight" | "is_critical" | "enabled";
+
+export interface ScorecardCriterionRef {
+  criterion_key: string;
+  title: string;
+}
+
+export interface ScorecardCriterion {
+  criterion_key: string;
+  position: number;
+  title: string;
+  requirement: string;
+  source_excerpt: string;
+  applicability: string;
+  depth: string;
+  required_question: boolean;
+  cross_cutting: boolean;
+  weight: number;
+  is_critical: boolean;
+  enabled: boolean;
+  edited_fields: ScorecardEditableField[];
+  change_kind: CriterionChangeKind;
+  warnings: string[];
+  same_as: ScorecardCriterionRef | null;
+}
+
+export interface InstructionScorecard {
+  scorecard_uuid: string | null;
+  instruction_uuid: string;
+  instruction_title: string;
+  instruction_version_uuid: string;
+  instruction_version: number;
+  revision: number;
+  status: ScorecardStatus;
+  origin: "compiled" | "copied" | "edited" | "";
+  is_current: boolean;
+  awaiting_confirmation: boolean;
+  confirm_required: boolean;
+  lock_version: number;
+  compile_after: string | null;
+  enabled_count: number;
+  estimated_requests_per_call: number;
+  criteria: ScorecardCriterion[];
+  removed_criteria: ScorecardCriterionRef[];
+  error: { code: string; message: string } | null;
+  confirmed_at: string | null;
+  created_at: string | null;
+}
+
+export interface ScorecardCriterionEdit {
+  criterion_key: string;
+  title?: string;
+  weight?: number;
+  is_critical?: boolean;
+  enabled?: boolean;
+}
+
 export interface SubscriptionUsageResponse {
   subscription: Subscription;
   period_start: string;
@@ -1021,6 +1114,9 @@ export interface BitrixConnectionHealth {
   reconnect_required: boolean;
   oauth_configured: boolean;
   connector_verified: boolean;
+  /** Comments in CRM cards need the crm scope; old connections have to authorise again. */
+  crm_notes_writable?: boolean;
+  crm_note_mode?: "off" | "auto";
   last_success_at?: string | null;
   last_error_code?: string | null;
 }
@@ -1306,6 +1402,8 @@ export interface AnalyticsOverviewResponse {
     duration_by_day: Array<{ date: string; average_duration_seconds: number }>;
     risks_by_day: Array<{ date: string; count: number }>;
   };
+  /** False when a company's plan has no team analytics: the breakdowns come empty. */
+  team_analytics_enabled?: boolean;
 }
 
 export interface CallFolderResponse {
@@ -1811,8 +1909,11 @@ export interface AnalysisV3Item {
   fulfilled_earlier: boolean; answer_summary: string | null; status: AnalysisV3Status; weight: number; score: number | null;
   explanation: string; strengths: string[]; gaps: AnalysisV3Gap[];
   improvement_kind: "grounded_answer" | "advice" | "clarification_needed" | "not_needed";
-  improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[];
+  improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[]; instruction_titles: string[];
+  // Set on requirement cards scored by an instruction's scorecard.
+  criterion_key?: string; scorecard_uuid?: string; is_critical?: boolean;
 }
+export type AnalysisScorecardMode = "fixed" | "partial" | "adhoc" | "none";
 export interface AnalysisV3Recommendation {
   id: string; title: string; action: string; reason: string; expected_result: string; item_ids: string[];
   affects_score: boolean; importance: number; impact: number | null; repetition: number;
@@ -1825,6 +1926,7 @@ export interface AnalysisV3Result {
   coverage: { status: "complete" | "partial"; actual_question_count: number; analyzed_actual_question_count: number; required_question_count: number; complete_without_separate_question: number; limitations: string[]; };
   overall_score: number | null; overall_score_label: string; items: AnalysisV3Item[];
   recommendations: AnalysisV3Recommendation[]; priority_recommendation_ids: string[];
+  scorecard_mode?: AnalysisScorecardMode;
 }
 
 export interface AssistantCapabilities { search_enabled:boolean; chat_enabled:boolean; aggregate_enabled:boolean; export_enabled:boolean; company_uuid:string; role:string; department_uuids:string[]; reason_code?:string }
@@ -1879,4 +1981,119 @@ export interface AdminAuditTrailResponse {
   total: number;
   limit: number;
   offset: number;
+}
+// Analytics built on facts (spec, section 18).
+export type AnalyticsSample = "none" | "low" | "thin" | "ok";
+export interface AnalyticsPeriod { from: string; to: string; previous_from: string; previous_to: string; bucket: "day" | "week" | "month"; timezone: string }
+export interface AnalyticsDelta { value: number | null; significant: boolean; comparable: boolean; criteria_changed: boolean }
+export interface AnalyticsTrendPoint { bucket: string; avg: number | null; n: number }
+export interface AnalyticsMarker { date: string; kind: "instruction_version" | "judge_changed"; label: string }
+export interface AnalyticsCapabilities {
+  scope: "company" | "personal"; role: "company_manager" | "company_deputy" | "department_leader" | "employee" | "personal";
+  team_analytics_enabled: boolean; personal_progress_enabled: boolean; can_view_company: boolean; can_view_departments: boolean;
+  can_view_employees: boolean; department_uuids: string[]; own_profile_only: boolean; min_sample: number; thin_sample: number;
+  timezone: string; retention_days: number;
+}
+export interface AnalyticsSummary {
+  period: AnalyticsPeriod; calls_total: number; calls_analyzed: number; calls_without_fixed_scorecard: number; calls_shared: number;
+  calls_internal_excluded: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample;
+  critical_missed: number; trend: AnalyticsTrendPoint[]; markers: AnalyticsMarker[]; company_avg_score?: number | null;
+  worth_listening?: AnalyticsWorthListening[];
+}
+export interface AnalyticsInstructionRef { uuid: string; title: string; deleted: boolean }
+export interface AnalyticsDistribution { met: number; mostly_met: number; partially_met: number; minimally_met: number; missed: number }
+export interface AnalyticsCriterionRow {
+  criterion_key: string; title: string; instruction: AnalyticsInstructionRef; weight: number; is_critical: boolean;
+  n_scored: number; n_not_applicable: number; n_unassessed: number; avg_score: number | null; pass_rate: number | null;
+  delta: AnalyticsDelta; sample: AnalyticsSample; distribution: AnalyticsDistribution; trend: AnalyticsTrendPoint[]; sort_rank: number;
+}
+export interface AnalyticsCriteriaResponse { period: AnalyticsPeriod; criteria: AnalyticsCriterionRow[]; total: number }
+export interface AnalyticsWeakestCriterion { criterion_key: string; title: string; avg_score: number }
+export interface AnalyticsTeamRow { calls: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample; trend: AnalyticsTrendPoint[]; speech?: AnalyticsSpeech | null }
+export interface AnalyticsEmployeeRow {
+  user_uuid: string; full_name: string; avatar_url: string | null; department: { uuid: string; name: string } | null;
+  is_former_member: boolean; is_me: boolean; calls: number; calls_shared: number; avg_score: number | null; avg_criteria_score: number | null;
+  delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number; weakest_criterion: AnalyticsWeakestCriterion | null; speech: AnalyticsSpeech | null; trend: AnalyticsTrendPoint[];
+}
+export interface AnalyticsEmployeesResponse { period: AnalyticsPeriod; team: AnalyticsTeamRow | null; employees: AnalyticsEmployeeRow[]; total: number }
+export interface AnalyticsDepartmentRow {
+  department_uuid: string; name: string; employees: number; calls: number; avg_score: number | null; avg_criteria_score: number | null;
+  delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number; weakest_criterion: AnalyticsWeakestCriterion | null; trend: AnalyticsTrendPoint[];
+}
+export interface AnalyticsDepartmentsResponse { period: AnalyticsPeriod; company: AnalyticsTeamRow | null; departments: AnalyticsDepartmentRow[]; total: number }
+export interface AnalyticsMatrixResponse {
+  period: AnalyticsPeriod; instruction: AnalyticsInstructionRef;
+  criteria: Array<{ criterion_key: string; title: string; is_critical: boolean }>;
+  rows: Array<{ user_uuid: string; full_name: string; cells: Array<{ criterion_key: string; avg_score: number | null; n: number; sample: AnalyticsSample }> }>;
+}
+export interface AnalyticsWorthListening { call_uuid: string; title: string; occurred_at: string; overall_score: number | null; critical_missed: number; can_open: boolean }
+export interface AnalyticsProfile {
+  period: AnalyticsPeriod;
+  employee: { user_uuid: string; full_name: string; department: { uuid: string; name: string } | null; is_former_member: boolean };
+  totals: { calls: number; avg_score: number | null; avg_criteria_score: number | null; delta: AnalyticsDelta; sample: AnalyticsSample; critical_missed: number };
+  trend: AnalyticsTrendPoint[];
+  reference: { label: string; avg_score: number | null; trend: AnalyticsTrendPoint[]; hidden: boolean };
+  criteria: Array<{ criterion_key: string; title: string; instruction: AnalyticsInstructionRef; own_avg: number | null; own_n: number; reference_avg: number | null; delta: AnalyticsDelta; sample: AnalyticsSample }>;
+  worth_listening: AnalyticsWorthListening[];
+  speech?: { own: AnalyticsSpeech | null; team_median: AnalyticsSpeech | null } | null;
+}
+export type ProgressVerdict = "fixed" | "repeated" | "new" | "holding" | "first_time";
+export interface CallProgressCriterion {
+  criterion_key: string; title: string; verdict: ProgressVerdict;
+  current: { score: number; item_id: string };
+  previous: { call_uuid: string; occurred_at: string; score: number; item_id: string; can_open: boolean } | null;
+  repeat_streak: number;
+}
+export interface CallGrowthObservation { area_uuid: string; title: string; verdict: "new" | "repeated" | "improved" | "not_applicable"; note: string; item_ids: string[] }
+export interface CallProgress {
+  available: boolean;
+  unavailable_reason: "shared_call" | "internal_call" | "no_fixed_scorecard" | "no_analysis" | null;
+  employee: { user_uuid: string; full_name: string } | null;
+  counts: { fixed: number; repeated: number; new: number; holding: number; first_time: number };
+  criteria: CallProgressCriterion[];
+  growth_areas: CallGrowthObservation[];
+}
+export interface EmployeeGrowthArea {
+  area_uuid: string; title: string; description: string; status: "open" | "resolved" | "dismissed";
+  occurrences: number; clean_streak: number; returned: boolean;
+  observations: Array<{ call_uuid: string; occurred_at: string; verdict: "new" | "repeated" | "improved" | "not_applicable"; note: string; item_ids: string[]; can_open: boolean }>;
+}
+export interface EmployeeProgress {
+  open: Array<{ criterion_key: string; title: string; last_score: number; repeat_streak: number; first_failed_at: string; last_call_uuid: string }>;
+  closed_in_period: Array<{ criterion_key: string; title: string; closed_at: string }>;
+  growth_areas: EmployeeGrowthArea[];
+}
+export interface AnalyticsCriterionCall {
+  call_uuid: string; title: string; occurred_at: string; employees: Array<{ user_uuid: string; full_name: string }>;
+  status: string; score: number | null; score_source: "ai" | "human"; item_id: string; evidence_start_seconds: number | null;
+  is_shared: boolean; subjects_changed_manually: boolean; can_open: boolean;
+}
+export interface AnalyticsCriterionCallsResponse {
+  criterion: { criterion_key: string; title: string; instruction: AnalyticsInstructionRef };
+  calls: AnalyticsCriterionCall[]; total: number; limit: number; offset: number;
+}
+/** Speech numbers of a call, measured from word timings; shares are fractions. */
+export interface CallSpeech {
+  speaker_switches_per_5min: number | null;
+  pauses_over_threshold: number;
+  longest_pause_seconds: number;
+  speakers: Array<{
+    speaker_key: string; display_name: string; is_subject: boolean; talk_seconds: number; talk_share: number; words: number;
+    words_per_minute: number | null; longest_monologue_seconds: number; questions: number; questions_per_hour: number | null; response_pause_median_ms: number | null;
+  }>;
+}
+export interface AnalyticsSpeech {
+  talk_share: number | null; longest_monologue_seconds: number | null; words_per_minute: number | null;
+  questions_per_hour: number | null; response_pause_median_ms: number | null; n: number;
+}
+export interface NotificationSubscription {
+  kind: "weekly_digest" | "critical_call_alert";
+  channel: "in_app" | "email" | "telegram";
+  enabled: boolean;
+  available: boolean;
+}
+export interface AnalyticsSettings { critical_alert_threshold: number; growth_areas_enabled: boolean; lock_version: number; updated_at: string }
+export interface AnalyticsFilters {
+  company_uuid?: string; scope?: "personal"; department_uuid?: string; employee_uuid?: string; instruction_uuid?: string;
+  from?: string; to?: string; include_internal?: boolean; exclude_shared?: boolean;
 }

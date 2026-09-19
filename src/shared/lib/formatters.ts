@@ -112,6 +112,8 @@ export function speakerLabel(speaker: string) {
 export function transcriptionSpeakerLabel(speaker: string, assignments: TranscriptionSpeakerAssignment[] = []) {
   const key = speaker.trim() || "unknown";
   const displayName = assignments.find((item) => item.speaker_key === key)?.display_name.trim();
+  // A bare diarization letter is no name; it reads as the player shows it.
+  if ((!displayName || displayName === key) && /^[A-Z]$/i.test(key)) return `Спикер ${key.toUpperCase()}`;
   return displayName || speakerLabel(key === "unknown" ? "" : key);
 }
 

@@ -8,7 +8,8 @@ import {
   ListTodo,
   ShieldCheck,
   ClipboardCheck,
-  BookOpenText
+  BookOpenText,
+  BarChart3
 } from "lucide-react";
 import { useEffect } from "react";
 import type {
@@ -39,6 +40,8 @@ export function readThemePreference(): ThemePreference {
 
 export const pageRoutes: Record<AppPage, string> = {
   overview: "/app/overview",
+  teamAnalytics: "/app/analytics",
+  teamAnalyticsEmployee: "/app/analytics/employees",
   calls: "/app/calls",
   transcriptionEdit: "/app/calls/transcription-edit",
   transcriptionCompare: "/app/calls/transcription-compare",
@@ -63,6 +66,7 @@ export const pageRoutes: Record<AppPage, string> = {
   settingsInstructions: "/app/instructions",
   settingsPrivacy: "/app/settings/privacy",
   settingsInvitations: "/app/settings/invitations",
+  settingsNotifications: "/app/settings/notifications",
   profile: "/app/profile",
   profileEdit: "/app/profile/edit",
   profileDevices: "/app/settings/devices",
@@ -73,13 +77,14 @@ export const pageRoutes: Record<AppPage, string> = {
 export const navItems: Array<{ page: AppPage; label: string; }> = [
   { page: "overview", label: "Обзор" },
   { page: "calls", label: "Звонки" },
-  { page: "analysis", label: "Аналитика" },
+  { page: "analysis", label: "AI-анализ" },
   { page: "reports", label: "AI-отчеты" },
   { page: "actions", label: "Действия" }
 ];
 
 export const sidebarItems: Array<{ page: AppPage; label: string; icon: React.ReactNode; }> = [
   { page: "overview", label: "Обзор", icon: <LayoutDashboard size={19} /> },
+  { page: "teamAnalytics", label: "Аналитика", icon: <BarChart3 size={19} /> },
   { page: "calls", label: "Звонки", icon: <PhoneCall size={19} /> },
   { page: "qualityReviews", label: "QA-проверка", icon: <ClipboardCheck size={19} /> },
   { page: "actions", label: "Действия", icon: <ListTodo size={19} /> },
@@ -122,6 +127,11 @@ export const settingsRoutes: Array<{ page: AppPage; label: string; description: 
     description: "Русские смысловые маркеры, доступ к оригиналу и очищенные записи."
   },
   {
+    page: "settingsNotifications",
+    label: "Уведомления",
+    description: "Итоги недели и провальные звонки: что приходит и куда."
+  },
+  {
     page: "profileDevices",
     label: "Устройства",
     description: "Активные входы, завершение отдельных сеансов и выход со всех устройств."
@@ -155,6 +165,7 @@ export function pageFromPath(pathname: string): AppPage {
   if (/^\/app\/actions\/[^/]+$/.test(pathname)) return "action";
   if (/^\/app\/calls\/[^/]+\/analyses\/[^/]+\/instructions\/[^/]+$/.test(pathname)) return "instructionHistory";
   if (pathname === "/app/instructions/new") return "instructionCreate";
+  if (/^\/app\/analytics\/employees\/[^/]+$/.test(pathname) || pathname === "/app/analytics/me") return "teamAnalyticsEmployee";
   if (/^\/app\/instructions\/[^/]+\/compare$/.test(pathname)) return "instructionCompare";
   if (/^\/app\/instructions\/[^/]+$/.test(pathname)) return "instruction";
   if (/^\/app\/admin\/(?:users|companies|actions|audit|restore)$/.test(pathname)) return "admin";

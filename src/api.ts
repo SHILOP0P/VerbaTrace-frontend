@@ -1,4 +1,8 @@
 import type {
+  NotificationSubscription,
+  CallProgress,
+  EmployeeGrowthArea,
+  EmployeeProgress,
   AdminCapabilitiesResponse,
   AdminCompanyLifecycleResponse,
   AdminCompanyResponse,
@@ -81,6 +85,20 @@ import type {
   ReportResponse,
   ReportStatus,
   ReportsResponse,
+  InstructionScorecard,
+  ScorecardCriterionEdit,
+  CallSubject,
+  CallSubjectCandidate,
+  AnalyticsCapabilities,
+  AnalyticsCriteriaResponse,
+  AnalyticsCriterionCallsResponse,
+  AnalyticsDepartmentsResponse,
+  AnalyticsEmployeesResponse,
+  AnalyticsFilters,
+  AnalyticsMatrixResponse,
+  AnalyticsProfile,
+  AnalyticsSettings,
+  AnalyticsSummary,
   SupportAccessJournalEntry,
   SearchResponse,
   Subscription,
@@ -273,6 +291,24 @@ const apiErrorMessages: Record<string, string> = {
   quality_review_active_appeal_exists:
     "Этот анализ уже находится на пересмотре",
   quality_review_failed: "Не удалось сохранить изменения анализа",
+  call_edit_forbidden: "Вы можете только просматривать этот звонок",
+  personal_progress_access_denied: "Личный прогресс доступен на тарифах Plus и Pro",
+  analytics_settings_conflict: "Настройки изменили в другом окне",
+  growth_area_not_found: "Зона роста не найдена или скрывать её вам нельзя",
+  invalid_growth_area_reason: "Укажите, почему зона скрывается",
+  growth_area_not_dismissed: "Зона уже не скрыта",
+  notification_channel_unavailable: "Почта и Telegram появятся позже",
+  invalid_password_reset_token: "Ссылка устарела или уже использована. Запросите новую",
+  invalid_notification_subscription: "Неизвестное событие или канал",
+  invalid_call_subjects: "Сотрудниками звонка могут быть только активные участники его компании",
+  call_subjects_locked: "У личного звонка один сотрудник — тот, кто его загрузил",
+  scorecard_not_found: "Критерии этой версии не найдены",
+  scorecard_not_ready: "Критерии ещё готовятся",
+  scorecard_version_conflict: "Карту изменили в другом окне",
+  scorecard_invalid: "Такое изменение критериев недопустимо",
+  scorecard_limit: "Включено слишком много критериев: не больше 40",
+  scorecard_recompile_limited:
+    "Критерии только что пересобирались. Повторить можно через минуту",
 };
 
 type ApiPayload = Record<string, unknown>;
@@ -1142,6 +1178,18 @@ export const api = {
       `/admin/users/${encodeURIComponent(userId)}/calls${queryString(input)}`,
     );
   },
+  getAuthCapabilities() {
+    return request<{ password_reset_enabled: boolean }>("/auth/capabilities");
+  },
+
+  requestPasswordReset(email: string) {
+    return request<void>("/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email }) });
+  },
+
+  confirmPasswordReset(token: string, newPassword: string) {
+    return request<void>("/auth/password-reset/confirm", { method: "POST", body: JSON.stringify({ token, new_password: newPassword }) });
+  },
+
   login(input: LoginRequest) {
     return request<AuthResponse>("/auth/login", {
       method: "POST",
@@ -1831,6 +1879,10 @@ export const api = {
 
   pauseBitrixConnection(connectionId: string, lockVersion: number) {
     return request<import("./types").BitrixConnectionHealth>(`/integrations/${encodeURIComponent(connectionId)}/pause`, { method: "POST", headers: { "If-Match": String(lockVersion) } });
+  },
+
+  setBitrixCRMNoteMode(connectionId: string, mode: "off" | "auto", lockVersion: number) {
+    return request<import("./types").BitrixConnectionHealth>(`/integrations/${encodeURIComponent(connectionId)}/crm-notes`, { method: "PUT", headers: { "If-Match": String(lockVersion) }, body: JSON.stringify({ mode }) });
   },
 
   resumeBitrixConnection(connectionId: string, lockVersion: number) {
@@ -2609,6 +2661,83 @@ export const api = {
     });
   },
 
+  getAnalyticsCapabilities(filters: AnalyticsFilters) {
+    return request<AnalyticsCapabilities>(`/analytics/capabilities${queryString(filters)}`);
+  },
+
+  getAnalyticsSummary(filters: AnalyticsFilters) {
+    return request<AnalyticsSummary>(`/analytics/summary${queryString(filters)}`);
+  },
+
+  getAnalyticsCriteria(filters: AnalyticsFilters & { sort?: string; order?: "asc" | "desc" }) {
+    return request<AnalyticsCriteriaResponse>(`/analytics/criteria${queryString(filters)}`);
+  },
+
+  getAnalyticsEmployees(filters: AnalyticsFilters) {
+    return request<AnalyticsEmployeesResponse>(`/analytics/employees${queryString(filters)}`);
+  },
+
+  getAnalyticsDepartments(filters: AnalyticsFilters) {
+    return request<AnalyticsDepartmentsResponse>(`/analytics/departments${queryString(filters)}`);
+  },
+
+  getAnalyticsMatrix(filters: AnalyticsFilters & { instruction_uuid: string }) {
+    return request<AnalyticsMatrixResponse>(`/analytics/matrix${queryString(filters)}`);
+  },
+
+  // "me" is the viewer's own profile.
+  getAnalyticsProfile(userId: string, filters: AnalyticsFilters) {
+    return request<AnalyticsProfile>(`/analytics/employees/${encodeURIComponent(userId)}${queryString(filters)}`);
+  },
+
+  getEmployeeProgress(userId: string, filters: AnalyticsFilters) {
+    return request<EmployeeProgress>(`/analytics/employees/${encodeURIComponent(userId)}/progress${queryString(filters)}`);
+  },
+
+  getCallProgress(callId: string) {
+    return request<CallProgress>(`/calls/${encodeURIComponent(callId)}/progress`);
+  },
+
+  getAnalyticsCriterionCalls(criterionKey: string, filters: AnalyticsFilters & { status?: string; sort?: "occurred_at" | "score"; limit?: number; offset?: number }) {
+    return request<AnalyticsCriterionCallsResponse>(`/analytics/criteria/${encodeURIComponent(criterionKey)}/calls${queryString(filters)}`);
+  },
+
+  getCompanyAnalyticsSettings(companyId: string) {
+    return request<AnalyticsSettings>(`/companies/${encodeURIComponent(companyId)}/analytics-settings`);
+  },
+
+  updateCompanyAnalyticsSettings(companyId: string, input: { lock_version: number; critical_alert_threshold?: number; growth_areas_enabled?: boolean }) {
+    return request<AnalyticsSettings>(`/companies/${encodeURIComponent(companyId)}/analytics-settings`, { method: "PATCH", body: JSON.stringify(input) });
+  },
+
+  getNotificationSubscriptions() {
+    return request<{ items: NotificationSubscription[] }>("/notification-subscriptions");
+  },
+
+  updateNotificationSubscriptions(items: Array<Pick<NotificationSubscription, "kind" | "channel" | "enabled">>) {
+    return request<{ items: NotificationSubscription[] }>("/notification-subscriptions", { method: "PUT", body: JSON.stringify({ items }) });
+  },
+
+  getPersonalAnalyticsSettings() {
+    return request<AnalyticsSettings>("/analytics/personal-settings");
+  },
+
+  updatePersonalAnalyticsSettings(input: { critical_alert_threshold?: number; growth_areas_enabled?: boolean }) {
+    return request<AnalyticsSettings>("/analytics/personal-settings", { method: "PATCH", body: JSON.stringify(input) });
+  },
+
+  getEmployeeGrowthAreas(userId: string, filters: AnalyticsFilters & { status?: "open" | "resolved" | "dismissed" }) {
+    return request<{ areas: EmployeeGrowthArea[] }>(`/analytics/employees/${encodeURIComponent(userId)}/growth-areas${queryString(filters)}`);
+  },
+
+  dismissGrowthArea(areaId: string, reason: string) {
+    return request<void>(`/growth-areas/${encodeURIComponent(areaId)}/dismiss`, { method: "POST", body: JSON.stringify({ reason }) });
+  },
+
+  reopenGrowthArea(areaId: string) {
+    return request<void>(`/growth-areas/${encodeURIComponent(areaId)}/reopen`, { method: "POST" });
+  },
+
   getAnalyticsOverview(filters?: {
     from?: string;
     to?: string;
@@ -2806,6 +2935,87 @@ export const api = {
   getInstructionVersionFile(id: string, versionId: string) {
     return requestBlob(
       `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/file`,
+    );
+  },
+
+  // Employees of the call's company who may be marked as its speakers; only
+  // those who may change the call get the list.
+  listCallSubjectCandidates(callId: string) {
+    return request<{ items: CallSubjectCandidate[] }>(
+      `/calls/${encodeURIComponent(callId)}/subject-candidates`,
+    );
+  },
+
+  setCallSubjects(callId: string, input: { user_uuids: string[]; primary_user_uuid?: string }) {
+    return request<{ subjects: CallSubject[]; is_shared: boolean; is_internal: boolean; subjects_changed_manually: boolean }>(
+      `/calls/${encodeURIComponent(callId)}/subjects`,
+      { method: "PUT", body: JSON.stringify(input) },
+    );
+  },
+
+  getInstructionScorecard(id: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard`,
+    );
+  },
+
+  getInstructionVersionScorecard(id: string, versionId: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/scorecard`,
+    );
+  },
+
+  // Starts the compile of the latest version at once instead of after the
+  // quiet period; does nothing when the version already has a scorecard.
+  ensureInstructionScorecard(id: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/ensure`,
+      { method: "POST" },
+    );
+  },
+
+  editInstructionScorecard(
+    id: string,
+    input: {
+      lock_version: number;
+      criteria?: ScorecardCriterionEdit[];
+      confirm_required?: boolean;
+    },
+  ) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard`,
+      { method: "PATCH", body: JSON.stringify(input) },
+    );
+  },
+
+  recompileInstructionScorecard(id: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/recompile`,
+      { method: "POST" },
+    );
+  },
+
+  confirmInstructionScorecard(
+    id: string,
+    input: { scorecard_uuid: string; lock_version: number },
+  ) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/confirm`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  },
+
+  linkScorecardCriterion(id: string, criterionKey: string, canonicalKey: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/criteria/${encodeURIComponent(criterionKey)}/same-as`,
+      { method: "POST", body: JSON.stringify({ canonical_key: canonicalKey }) },
+    );
+  },
+
+  splitScorecardCriterion(id: string, criterionKey: string) {
+    return request<InstructionScorecard>(
+      `/instructions/${encodeURIComponent(id)}/scorecard/criteria/${encodeURIComponent(criterionKey)}/split`,
+      { method: "POST" },
     );
   },
 

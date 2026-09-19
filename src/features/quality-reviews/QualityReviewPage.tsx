@@ -4,6 +4,7 @@ import { api, ApiError } from "../../api";
 import type { AnalysisComment, QualityReviewCriterion, QualityReviewResponse } from "../../types";
 import { FrozenRegion } from "../../shared/ui/frozen-region";
 import { AnalysisComments } from "../calls/AnalysisComments";
+import { readableAnalysisText } from "../../shared/lib/analysis-refs";
 
 type CriterionDraft = { key: string; title: string; custom: boolean; persistedEdited: boolean; aiScore?: number; scoreMin: number; scoreMax: number; storageMax: number; humanScore?: number; notApplicable: boolean; comment: string };
 
@@ -132,7 +133,7 @@ export function QualityReviewPage({ reviewId, onBack }: { reviewId: string; onBa
   const revisions = review.revisions ?? [];
   const readOnly = selectedVersion !== "active" || !review.capabilities.can_edit || review.status === "resolved";
   const openAppeal = review.appeals.find((item) => item.status === "open" || item.status === "in_review");
-  const sourceSummary = analysisSummary(review.analysis);
+  const sourceSummary = readableAnalysisText(analysisSummary(review.analysis));
 
   return <FrozenRegion
     frozen={review.call_in_bin}
@@ -188,9 +189,9 @@ function isMeaningfullyEdited(criterion: CriterionDraft) { return criterion.pers
 function toTenPointScale(value: number | undefined, max: number) { return value === undefined ? undefined : Math.round((value / Math.max(max, 1)) * 100) / 10; }
 function fromTenPointScale(value: number | undefined, max: number) { return value === undefined ? undefined : Math.round((value / 10) * max * 10) / 10; }
 function formatTenPoint(value: number | undefined) { return value === undefined ? "— / 10" : `${Number.isInteger(value) ? value : value.toFixed(1)} / 10`; }
-function criterionTitle(key: string, fallback: string) { return ({ greeting: "Приветствие и начало разговора", needs_discovery: "Выявление потребностей", question_quality: "Качество вопросов", answer_quality: "Качество ответов", solution_relevance: "Соответствие решения задаче", objection_handling: "Работа с возражениями", pricing_clarity: "Понятность условий и стоимости", tone_professionalism: "Профессиональный тон общения", next_step_quality: "Качество следующих шагов", outcome_clarity: "Ясность результата разговора", custom_instruction_match: "Соблюдение дополнительных инструкций" } as Record<string, string>)[key] ?? fallback.replaceAll("_", " "); }
+function criterionTitle(key: string, fallback: string) { return ({ greeting: "Приветствие и начало разговора", needs_discovery: "Выявление потребностей", question_quality: "Качество вопросов", answer_quality: "Качество ответов", solution_relevance: "Соответствие решения задаче", objection_handling: "Работа с возражениями", pricing_clarity: "Понятность условий и стоимости", tone_professionalism: "Профессиональный тон общения", next_step_quality: "Качество следующих шагов", outcome_clarity: "Ясность результата разговора", custom_instruction_match: "Соблюдение дополнительных инструкций" } as Record<string, string>)[key] ?? (readableAnalysisText(fallback).replaceAll("_", " ") || "Критерий"); }
 function analysisSummary(analysis: Record<string, unknown>) { return stringField(analysis.summary) || stringField(analysis.call_summary) || stringField(analysis.result_text) || "ИИ не сформировал отдельное резюме для этого анализа."; }
-function criterionSource(analysis: Record<string, unknown>, key: string) { const item = sourceCriteria(analysis).find(value => sourceCriterionKey(value) === key); const evidence = item && Array.isArray(item.evidence_quotes) ? item.evidence_quotes : item && Array.isArray(item.evidence) ? item.evidence : []; const quoteValue = evidence[0]; const quote = typeof quoteValue === "string" ? quoteValue : quoteValue && typeof quoteValue === "object" && !Array.isArray(quoteValue) ? stringField((quoteValue as Record<string, unknown>).quote) || stringField((quoteValue as Record<string, unknown>).text) : ""; return { topic: stringField(item?.topic), explanation: stringField(item?.explanation) || stringField(item?.reason), recommendation: stringField(item?.improvement) || stringField(item?.recommendation), quote }; }
+function criterionSource(analysis: Record<string, unknown>, key: string) { const item = sourceCriteria(analysis).find(value => sourceCriterionKey(value) === key); const evidence = item && Array.isArray(item.evidence_quotes) ? item.evidence_quotes : item && Array.isArray(item.evidence) ? item.evidence : []; const quoteValue = evidence[0]; const quote = typeof quoteValue === "string" ? quoteValue : quoteValue && typeof quoteValue === "object" && !Array.isArray(quoteValue) ? stringField((quoteValue as Record<string, unknown>).quote) || stringField((quoteValue as Record<string, unknown>).text) : ""; return { topic: readableAnalysisText(stringField(item?.topic)), explanation: readableAnalysisText(stringField(item?.explanation) || stringField(item?.reason)), recommendation: readableAnalysisText(stringField(item?.improvement) || stringField(item?.recommendation)), quote }; }
 function stringField(value: unknown) { return typeof value === "string" ? value.trim() : ""; }
 function reviewStatusLabel(status: string) { return ({ unassigned: "Ожидает проверки", assigned: "Ожидает проверки", in_review: "В работе", published: "Проверка завершена", appealed: "На пересмотре", resolved: "Пересмотрено", canceled: "Отменена" } as Record<string, string>)[status] ?? "Статус уточняется"; }
 function message(cause: unknown) { return cause instanceof Error ? cause.message : "Не удалось выполнить действие"; }

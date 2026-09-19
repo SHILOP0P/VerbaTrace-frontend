@@ -1604,6 +1604,36 @@ button.sidebar-plan-card:focus-visible {
   color: var(--app-accent-strong);
 }
 
+/* Placeholders take the place and size of what they stand for, so nothing
+   jumps when the numbers arrive. */
+.dashboard-kpi-card .overview-kpi-value-skeleton {
+  width: 92px;
+  height: 31px;
+  margin-top: 18px;
+  border-radius: 10px;
+}
+
+.dashboard-kpi-card .overview-kpi-chart-skeleton {
+  position: absolute;
+  right: 28px;
+  bottom: 30px;
+  left: 28px;
+  width: auto;
+  height: 26px;
+  border-radius: 10px;
+}
+
+.overview-donut-skeleton {
+  justify-self: center;
+  width: 124px;
+  height: 124px;
+}
+
+.analytics-insight-card .overview-trend-skeleton {
+  height: 160px;
+  border-radius: 12px;
+}
+
 .mini-chart {
   --mini-chart-colour: var(--app-accent);
   position: absolute;
@@ -1786,6 +1816,58 @@ html[data-theme="light"] .app-shell .chart-tooltip {
 
 html[data-theme="light"] .app-shell .chart-tooltip::after {
   border-color: rgba(141, 101, 79, 0.18);
+}
+
+/* Hints outside the charts wear the same tooltip. The cursor stays as it is:
+   a hint is something to read, not a control. */
+.hover-hint {
+  cursor: default;
+  outline: 0;
+}
+
+:is(button, a, .is-clickable) .hover-hint {
+  cursor: inherit;
+}
+
+.hover-hint:focus-visible {
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--app-accent-line, rgba(255, 102, 55, 0.56));
+}
+
+/* The width follows the text, not the distance to the viewport edge, so a hint
+   near the edge does not wrap on its second placement. */
+.chart-tooltip.hover-hint-tooltip {
+  position: fixed;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 16px));
+  transform: translateY(4px);
+}
+
+.chart-tooltip.hover-hint-tooltip.is-above {
+  transform: translateY(-4px);
+}
+
+.chart-tooltip.hover-hint-tooltip.is-placed {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+}
+
+.chart-tooltip.hover-hint-tooltip span {
+  overflow: visible;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.chart-tooltip.hover-hint-tooltip::after {
+  left: var(--hint-arrow);
+}
+
+.chart-tooltip.hover-hint-tooltip.is-above::after {
+  top: auto;
+  bottom: -5px;
+  transform: translateX(-50%) rotate(225deg);
 }
 
 html[data-theme="light"] .app-shell .quality-donut {
@@ -2317,6 +2399,28 @@ html[data-theme="dark"] .app-shell .select-menu {
 
 .app-shell :is(.call-row, .dashboard-call-row) .status-chip.bad {
   color: var(--app-accent-strong);
+}
+
+/* A test call is not a processing state, so it gets a colour of its own
+   rather than the orange that means "in progress". */
+.app-shell .status-chip.test {
+  color: #8cc4ff;
+  background: rgba(99, 167, 255, 0.14);
+  border: 1px solid rgba(140, 196, 255, 0.3);
+}
+
+.app-shell :is(.call-row, .dashboard-call-row, .selected-call-card) .status-chip.test {
+  color: #8cc4ff;
+}
+
+html[data-theme="light"] .app-shell .status-chip.test,
+html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row, .selected-call-card) .status-chip.test {
+  color: #2a6fb8;
+}
+
+html[data-theme="light"] .app-shell .status-chip.test {
+  background: rgba(99, 167, 255, 0.16);
+  border-color: rgba(42, 111, 184, 0.24);
 }
 
 .dashboard-detail-panel {
@@ -4046,6 +4150,59 @@ html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
   gap: 12px;
 }
 
+/* A form, not a poster: a small heading and switches as wide as their words,
+   side by side, so the text of the instruction starts high on the page. */
+.instruction-create-page .instructions-form {
+  gap: 18px;
+}
+
+.instruction-create-page .instructions-form .settings-heading {
+  --settings-heading-icon-size: 56px;
+}
+
+.instruction-create-page .instructions-form .settings-heading-icon {
+  width: 56px;
+  height: 56px;
+}
+
+.instruction-create-page .instructions-form .app-page-heading h1 {
+  font-size: clamp(24px, 2vw, 30px);
+}
+
+.instruction-create-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.instruction-create-page .instructions-form .segmented.scope {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(150px, 1fr);
+  width: auto;
+  margin: 0;
+}
+
+.instruction-create-page .instructions-form .segmented.scope button {
+  justify-content: center;
+  padding-inline: 18px;
+}
+
+.instruction-create-page .instruction-live-editor-field .live-markdown-editor {
+  min-height: 360px;
+}
+
+@media (max-width: 560px) {
+  .instruction-create-options > .segmented {
+    flex: 1 1 100%;
+  }
+
+  .instruction-create-page .instructions-form .segmented.scope {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+}
+
 .instruction-template-example-content .instruction-article {
   margin: 12px 0 0;
   padding: 18px 20px;
@@ -4177,6 +4334,18 @@ html[data-theme="light"] .app-shell .call-filter-chips button:focus-visible {
 
 .instruction-row-link small {
   color: var(--app-muted, #746861);
+}
+
+.instruction-row-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.instruction-row-name small {
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 html[data-theme="light"] .app-shell .live-markdown-editor {
@@ -4882,6 +5051,17 @@ html[data-theme="light"] .progress-ring::before {
     0 2px 8px rgba(16, 10, 7, 0.16);
   will-change: transform, height;
   transition: width 140ms ease, background-color 140ms ease, opacity 140ms ease;
+}
+
+/* Nested in a scrolling page, the thumb sits next to its list and scrolls with
+   it; the layout rules of the list's parent must not place or size it. */
+.custom-scroll-thumb.is-local,
+.app-shell .custom-scroll-thumb.is-local {
+  position: absolute;
+  z-index: 3;
+  margin: 0;
+  grid-area: auto;
+  flex: none;
 }
 
 .custom-scroll-thumb:hover {
@@ -5721,6 +5901,41 @@ html[data-theme="light"] .app-shell .timeline-step.processing::before {
 
 .report-action-row small {
   color: var(--app-muted);
+}
+
+.overview-insights-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin: 24px 0 0;
+}
+
+.overview-insights-head h2 {
+  margin: 0;
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 18px;
+}
+
+.overview-insights-head .icon-button {
+  flex: none;
+  color: var(--app-muted);
+}
+
+.overview-insights-head .is-spinning {
+  animation: overview-refresh-spin 0.9s linear infinite;
+}
+
+@keyframes overview-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overview-insights-head .is-spinning {
+    animation: none;
+  }
 }
 
 .analytics-insight-grid {
@@ -7800,7 +8015,7 @@ html[data-theme="dark"] .app-shell :is(.instruction-mini-list strong, .instructi
 }
 
 .app-shell :is(.call-row, .dashboard-call-row) .status-chip,
-html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row) .status-chip:is(.ok, .warn, .bad) {
+html[data-theme="light"] .app-shell :is(.call-row, .dashboard-call-row) .status-chip:is(.ok, .warn, .bad, .test) {
   background: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;

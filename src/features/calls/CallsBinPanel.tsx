@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronRight, RotateCcw, Trash2 } from "lucide-react";
+import { ChevronRight, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../api";
 import type { DeletedCallResponse } from "../../types";
 import { formatDate } from "../../shared/lib/formatters";
+import { pluralizeRu } from "../../shared/lib/plans";
 
 /**
  * CallsBinPanel lists calls waiting out their 30 days in the bin. Only the
@@ -51,25 +52,25 @@ export function CallsBinPanel({
   if (items.length === 0) return null;
 
   return (
-    <section className="call-folder-panel">
-      <div className="call-folder-heading">
+    <section className={`call-folder-panel call-bin-panel${expanded ? " call-folder-project expanded" : " call-folder-project"}`}>
+      <div className="call-folder-project-head">
         <button
           className="call-folder-project-button"
           type="button"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-          <Trash2 size={15} />
+          <ChevronRight className="call-folder-chevron" size={15} aria-hidden="true" />
+          <span className="call-folder-icon is-bin" aria-hidden="true"><Trash2 size={16} /></span>
           <span>
             <strong>Корзина</strong>
-            <small>{items.length} удалённых · восстановление доступно 30 дней</small>
+            <small>{items.length} {pluralizeRu(items.length, "удалённый", "удалённых", "удалённых")} · восстановить можно 30 дней</small>
           </span>
         </button>
       </div>
       {error && <div className="form-error compact">{error}</div>}
       {expanded && (
-        <div className="call-folder-tree">
+        <div className="call-folder-child-list">
           {items.map((item) => (
             <div className="call-row call-row-deleted" key={item.call.id}>
               <span className="call-row-main">

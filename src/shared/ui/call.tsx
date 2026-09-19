@@ -1,8 +1,7 @@
 import {
   Check,
+  ChevronDown,
   ChevronRight,
-  CloudUpload,
-  FileText,
   RefreshCw,
   X
 } from "lucide-react";
@@ -29,6 +28,8 @@ import {
   timelineFromStatus
 } from "../lib/call-status";
 import { formatSegmentTimeRange, transcriptionSpeakerLabel } from "../lib/formatters";
+import { pluralizeRu } from "../lib/plans";
+import { speakerColor } from "../lib/speaker-colors";
 import { TextBlockSkeleton } from "./loading";
 
 type StatusTone = "ok" | "warn" | "bad";
@@ -37,74 +38,174 @@ export function StatusChip({
   status,
   analysisStatus,
   label,
-  transcriptionOnly = false
+  transcriptionOnly = false,
+  isTest = false
 }: {
   status: CallStatus;
   analysisStatus?: AnalysisResponse["status"];
   label?: string;
   transcriptionOnly?: boolean;
+  /** A test call is marked in its own blue, apart from the processing colours. */
+  isTest?: boolean;
 }) {
   const transcriptReady = transcriptionOnly && status === "transcribed" && !analysisStatus;
-  return <span className={`status-chip ${transcriptReady ? "ok" : callStatusTone(status, analysisStatus)}`}>{label ?? (transcriptReady ? "Транскрипция готова" : callStatusChip(status, analysisStatus))}</span>;
+  const tone = isTest ? "test" : transcriptReady ? "ok" : callStatusTone(status, analysisStatus);
+  return <span className={`status-chip ${tone}`}>{label ?? (transcriptReady ? "Транскрипция готова" : callStatusChip(status, analysisStatus))}</span>;
 }
+
+type RailState = "done" | "active" | "failed" | "pending";
+type RailStep = { label: string; state: RailState; meta: string; progress?: number };
 
 export function StatusTimeline({
   current,
   statuses,
   analysisProgress,
   analysisStatus,
-  transcriptionOnly = false
+  transcriptionOnly = false,
+  acceptedAt,
+  transcriptionSeconds,
+  onRetry,
+  retryBusy = false
 }: {
   transcriptionOnly?: boolean;
   current: CallStatus;
   statuses?: CallStatus[];
   analysisProgress?: AnalysisProgress;
   analysisStatus?: AnalysisResponse["status"];
+  /** When the call was accepted; shown under the upload step. */
+  acceptedAt?: string;
+  /** How long speech-to-text took, when that is known. */
+  transcriptionSeconds?: number | null;
+  onRetry?: () => void;
+  retryBusy?: boolean;
 }) {
-  if (!transcriptionOnly) return <AnalysisTimeline current={current} analysisStatus={analysisStatus} progress={analysisProgress} />;
-  const steps = visibleTimelineSteps(current, statuses).filter((step) => !transcriptionOnly || step !== "analyzed");
-  const currentIndex = steps.indexOf(current);
-
-  return (
-    <div
-      className="status-timeline"
-      style={{ "--timeline-steps": steps.length } as React.CSSProperties}
-    >
-      {steps.map((step, index) => (
-        <div
-          className={`timeline-step ${timelineStepClass(step, index, current, currentIndex, analysisStatus)}`}
-          key={step}
-        >
-          <span>
-            {step === "new" && <CloudUpload size={19} />}
-            {step === "processing" && <RefreshCw size={19} />}
-            {step === "transcribed" && <FileText size={19} />}
-            {step === "analyzed" && <Check size={19} />}
-            {step === "failed" && <X size={19} />}
-          </span>
-          <strong>{transcriptionOnly && step === "transcribed" ? "Транскрипция готова" : timelineStepLabel(step)}</strong>
-          <small>{transcriptionOnly && step === "transcribed" && current === "transcribed" ? "Транскрипция готова" : timelineStepCaption(step, index, current, currentIndex, analysisStatus)}</small>
-        </div>
-      ))}
-    </div>
-  );
+  if (!transcriptionOnly) {
+    return <AnalysisTimeline current={current} analysisStatus={analysisStatus} progress={analysisProgress} acceptedAt={acceptedAt} transcriptionSeconds={transcriptionSeconds} onRetry={onRetry} retryBusy={retryBusy} />;
+  }
+  const visible: CallStatus[] = visibleTimelineSteps(current, statuses).filter((step) => step !== "analyzed");
+  const currentIndex = visible.indexOf(current);
+  const steps: RailStep[] = visible.map((step, index) => {
+    const tone = timelineStepClass(step, index, current, currentIndex, analysisStatus);
+    const state: RailState = tone.includes("danger") ? "failed" : tone.includes("processing") ? "active" : tone === "ready" ? "done" : "pending";
+    const label = step === "transcribed" ? "Транскрипция готова" : timelineStepLabel(step);
+    const caption = step === "transcribed" && current === "transcribed" ? "готово" : timelineStepCaption(step, index, current, currentIndex, analysisStatus);
+    const meta = step === "new" && state === "done" && acceptedAt ? acceptedLabel(acceptedAt) : caption || (state === "pending" ? "ожидает" : "");
+    return { label, state, meta: meta.toLocaleLowerCase("ru") };
+  });
+  return <StageRail steps={steps} label="Этапы обработки звонка" />;
 }
 
-function AnalysisTimeline({ current, analysisStatus, progress }: { current: CallStatus; analysisStatus?: string; progress?: AnalysisProgress }) {
-  const steps = ["Загрузка", "Транскрипция", "Поиск вопросов", "Разбор ответов", "Проверка и итог"];
+function AnalysisTimeline({
+  current,
+  analysisStatus,
+  progress,
+  acceptedAt,
+  transcriptionSeconds,
+  onRetry,
+  retryBusy
+}: {
+  current: CallStatus;
+  analysisStatus?: string;
+  progress?: AnalysisProgress;
+  acceptedAt?: string;
+  transcriptionSeconds?: number | null;
+  onRetry?: () => void;
+  retryBusy: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const labels = ["Загрузка", "Транскрипция", "Поиск вопросов", "Разбор ответов", "Проверка и итог"];
   const finished = analysisStatus === "done" || (current === "analyzed" && !analysisStatus);
   const failed = analysisStatus === "failed" || current === "failed";
-  const active = finished ? 4 : progress ? ({ inventory: 2, answers: 3, validation: 4, complete: 4 }[progress.stage]) : current === "new" ? 0 : current === "processing" || (current === "failed" && !analysisStatus) ? 1 : 2;
-  return <div className="status-timeline analysis-stage-timeline" style={{ "--timeline-steps": steps.length } as CSSProperties} aria-label="Этапы обработки звонка">
-    {steps.map((label, index) => {
-      const ready = finished || index < active;
-      const ongoing = !finished && index === active;
-      const caption = ready ? "готово" : ongoing ? failed ? "не завершено" : index === 2 && progress ? `${progress.questions_found} вопросов` : index === 3 && progress ? `${progress.items_done} из ${progress.items_total}` : index === 0 ? "в очереди" : "выполняется" : "ожидает";
-      return <div key={label} className={`timeline-step ${ready ? "ready" : ongoing ? failed ? "danger current" : "processing current" : ""}`} aria-current={ongoing ? "step" : undefined}>
-        <span>{ready ? <Check size={19} /> : index === 0 ? <CloudUpload size={19} /> : index === 1 ? <RefreshCw size={19} /> : <FileText size={19} />}</span><strong>{label}</strong><small>{caption}</small>
-      </div>;
-    })}
+  const active = finished ? 5 : progress ? ({ inventory: 2, answers: 3, validation: 4, complete: 4 }[progress.stage]) : current === "new" ? 0 : current === "processing" || (current === "failed" && !analysisStatus) ? 1 : 2;
+  const questions = progress ? `${progress.questions_found} ${pluralizeRu(progress.questions_found, "вопрос", "вопроса", "вопросов")}` : "";
+  const transcribed = transcriptionSeconds ? formatStageDuration(transcriptionSeconds) : "готово";
+
+  const steps: RailStep[] = labels.map((label, index) => {
+    const state: RailState = index < active ? "done" : index === active ? failed ? "failed" : "active" : "pending";
+    let meta = state === "done" ? "готово" : state === "pending" ? "ожидает" : state === "failed" ? "не завершено" : "идёт…";
+    let fraction: number | undefined;
+    if (index === 0) meta = state === "done" ? acceptedAt ? acceptedLabel(acceptedAt) : "принят" : state === "active" ? "в очереди" : meta;
+    if (index === 1 && state === "done") meta = transcribed;
+    if (index === 2 && progress && state !== "pending") meta = state === "active" ? `найдено ${progress.questions_found}` : questions;
+    if (index === 3 && progress && progress.items_total > 0) {
+      if (state === "active") meta = `${progress.items_done} из ${progress.items_total} ответов`;
+      if (state === "failed") meta = `остановился на ${progress.items_done} из ${progress.items_total}`;
+      if (state === "done") meta = `${progress.items_total} ${pluralizeRu(progress.items_total, "ответ", "ответа", "ответов")}`;
+      if (state !== "done") fraction = progress.items_done / progress.items_total;
+    }
+    return { label, state, meta, progress: fraction };
+  });
+
+  if (finished && !expanded) {
+    const facts = [acceptedAt ? acceptedLabel(acceptedAt).replace("принят", "загружен") : "", transcriptionSeconds ? `расшифровка ${formatStageDuration(transcriptionSeconds)}` : "", questions].filter(Boolean);
+    return <div className="stage-rail is-summary" aria-label="Этапы обработки звонка">
+      <div className="stage-rail-summary">
+        <span className="stage-rail-summary-icon" aria-hidden="true"><Check size={13} strokeWidth={3} /></span>
+        <strong>Обработано</strong>
+        {facts.length > 0 && <span className="stage-rail-summary-facts">{facts.join(" · ")}</span>}
+        <button type="button" className="ghost-button small" aria-expanded={false} onClick={() => setExpanded(true)}>Этапы<ChevronRight size={15} className="stage-rail-chevron" /></button>
+      </div>
+      <div className="stage-rail-summary-line" aria-hidden="true">{labels.map((label) => <span key={label} />)}</div>
+    </div>;
+  }
+
+  const failedStep = steps.find((step) => step.state === "failed");
+  return <div className="stage-rail-wrap">
+    <StageRail steps={steps} label="Этапы обработки звонка" status={failed ? "Обработка остановилась" : !finished ? `Идёт ${labels[Math.min(active, 4)].toLocaleLowerCase("ru")}` : undefined} onCollapse={finished ? () => setExpanded(false) : undefined} />
+    {failedStep && analysisStatus === "failed" && <div className="stage-rail-failure" role="note">
+      <span className="stage-rail-failure-icon" aria-hidden="true"><X size={15} strokeWidth={2.6} /></span>
+      <span className="stage-rail-failure-text"><strong>Анализ не завершился на этапе «{failedStep.label}»</strong><small>Повторный запуск проходит анализ целиком и списывает кредиты заново.</small></span>
+      {onRetry && <button type="button" className="primary-button small" disabled={retryBusy} onClick={onRetry}><RefreshCw size={15} />{retryBusy ? "Запускаю…" : "Запустить заново"}</button>}
+    </div>}
   </div>;
+}
+
+function StageRail({ steps, label, status, onCollapse }: { steps: RailStep[]; label: string; status?: string; onCollapse?: () => void }) {
+  return <div className="stage-rail" aria-label={label}>
+    {(status || onCollapse) && <div className="stage-rail-head">
+      {status && <span className="stage-rail-status">{status}</span>}
+      {onCollapse && <button type="button" className="ghost-button small" aria-expanded={true} onClick={onCollapse}>Свернуть</button>}
+    </div>}
+    <ol className="stage-rail-steps" style={{ "--rail-steps": steps.length } as CSSProperties}>
+      {steps.map((step, index) => (
+        <li key={step.label} className={`stage-rail-step is-${step.state}`} aria-current={step.state === "active" ? "step" : undefined} style={{ "--rail-index": index } as CSSProperties}>
+          <span className="stage-rail-track" aria-hidden="true">
+            {index < steps.length - 1 && <span className="stage-rail-line"><span className="stage-rail-fill" style={railProgressStyle(step.progress)} /></span>}
+            <span className="stage-rail-dot">
+              {step.state === "done" && <Check size={10} strokeWidth={4} />}
+              {step.state === "failed" && <X size={9} strokeWidth={4} />}
+            </span>
+          </span>
+          <span className="stage-rail-label">{step.label}</span>
+          {step.meta && <span className="stage-rail-meta">{step.meta}</span>}
+        </li>
+      ))}
+    </ol>
+  </div>;
+}
+
+// The same share fills the rail across on a wide screen and down on a phone.
+function railProgressStyle(progress?: number): CSSProperties | undefined {
+  if (progress === undefined) return undefined;
+  const share = `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`;
+  return { width: share, "--rail-progress": share } as CSSProperties;
+}
+
+function acceptedLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "принят";
+  const time = date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return `принят в ${time}`;
+  return `принят ${date.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}, ${time}`;
+}
+
+function formatStageDuration(seconds: number) {
+  const total = Math.max(1, Math.round(seconds));
+  if (total < 60) return `${total} с`;
+  const minutes = Math.floor(total / 60);
+  const rest = total % 60;
+  return rest ? `${minutes} мин ${rest} с` : `${minutes} мин`;
 }
 
 function visibleTimelineSteps(current: CallStatus, statuses?: CallStatus[]) {
@@ -187,7 +288,8 @@ export function InfoCard({
   expanded = false,
   cardRef,
   className = "",
-  style
+  style,
+  headerActions
 }: {
   title: string;
   status: string;
@@ -201,12 +303,15 @@ export function InfoCard({
   cardRef?: Ref<HTMLDivElement>;
   className?: string;
   style?: CSSProperties;
+  /** Quiet tools of the card, on the right of its title. */
+  headerActions?: React.ReactNode;
 }) {
   return (
     <div className={`info-card ${className}`.trim()} ref={cardRef} style={style}>
-      <div className="card-title">
+      <div className={`card-title${headerActions ? " has-actions" : ""}`}>
         <h3>{title}</h3>
         <span className={`status-chip ${statusTone} ${statusThinking ? "thinking-status" : ""}`}>{status}</span>
+        {headerActions && <div className="card-title-actions">{headerActions}</div>}
       </div>
       {children}
       {action && (actionVariant === "analysis" ? (
@@ -217,8 +322,8 @@ export function InfoCard({
           onClick={onAction}
         >
           <span>{action}</span>
-          <span className="analysis-toggle-icon">
-            <ChevronRight size={18} />
+          <span className="analysis-toggle-icon" aria-hidden="true">
+            <ChevronDown size={16} />
           </span>
         </button>
       ) : (
@@ -238,6 +343,7 @@ export function TranscriptPreview({
   activeWordIndex = -1,
   selectedEvidence,
   speakerAssignments = [],
+  speakerKeys = [],
   onOverflowChange
 }: {
   transcription?: TranscriptionResponse;
@@ -246,8 +352,13 @@ export function TranscriptPreview({
   activeWordIndex?: number;
   selectedEvidence?: MediaSeekTarget | null;
   speakerAssignments?: TranscriptionSpeakerAssignment[];
+  /** The call's speakers; each name gets the colour the player gives it. */
+  speakerKeys?: string[];
   onOverflowChange?: (overflowing: boolean) => void;
 }) {
+  const speakerStyle = (speaker: string) => speakerKeys.length > 0 && speaker.trim()
+    ? { "--speaker-color": speakerColor(speaker, speakerKeys) } as CSSProperties
+    : undefined;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wordRefs = useRef(new Map<number, HTMLSpanElement>());
   const pendingEvidenceScrollRef = useRef(false);
@@ -324,7 +435,7 @@ export function TranscriptPreview({
           {wordGroups.some((group) => group.speaker) ? wordGroups.map((group) => (
             <div className="transcript-segment word-segment" key={`${group.startIndex}-${group.speaker}`}>
               <div className="segment-meta">
-                <strong>{transcriptionSpeakerLabel(group.speaker, speakerAssignments)}</strong>
+                <strong className={speakerStyle(group.speaker) ? "has-color" : undefined} style={speakerStyle(group.speaker)}>{transcriptionSpeakerLabel(group.speaker, speakerAssignments)}</strong>
                 <span>{formatSegmentTimeRange(group.words[0]?.start_seconds, group.words.at(-1)?.end_seconds)}</span>
               </div>
               <p>{group.words.map((word, offset) => renderWord(word, group.startIndex + offset, offset === 0))}</p>
@@ -357,7 +468,7 @@ export function TranscriptPreview({
         {segments.map((segment, index) => (
           <div className="transcript-segment" key={`${segment.start_seconds ?? index}-${segment.text}`}>
             <div className="segment-meta">
-              <strong>{transcriptionSpeakerLabel(segment.speaker, speakerAssignments)}</strong>
+              <strong className={speakerStyle(segment.speaker) ? "has-color" : undefined} style={speakerStyle(segment.speaker)}>{transcriptionSpeakerLabel(segment.speaker, speakerAssignments)}</strong>
               <span>{formatSegmentTimeRange(segment.start_seconds, segment.end_seconds)}</span>
             </div>
             <p>{segment.text}</p>

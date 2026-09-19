@@ -114,7 +114,7 @@ export function TranscriptCollapseIsland({ cardRef, onCollapse, label = "Све�
     };
   }, [blockedByVisibleSelector, cardRef]);
 
-  return createPortal(<div ref={islandRef} className="transcript-collapse-island" data-collapse-kind={kind} hidden>
+  return createPortal(<div ref={islandRef} className="transcript-collapse-island vt-portal" data-collapse-kind={kind} hidden>
     <button type="button" aria-expanded="true" onClick={onCollapse}><ChevronUp size={18} />{label}</button>
   </div>, document.body);
 }

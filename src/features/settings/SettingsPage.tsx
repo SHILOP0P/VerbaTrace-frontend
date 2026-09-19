@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BellRing,
   Building2,
   CreditCard,
   FileText,
@@ -17,6 +18,7 @@ const settingsIcons: Partial<Record<AppPage, React.ReactNode>> = {
   settingsCompanies: <Building2 size={22} />,
   settingsInstructions: <FileText size={22} />,
   settingsPrivacy: <ShieldCheck size={22} />,
+  settingsNotifications: <BellRing size={22} />,
   profileDevices: <MonitorSmartphone size={22} />
 };
 

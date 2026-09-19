@@ -4,12 +4,15 @@ import {
   CheckCircle2,
   Clock3,
   Phone,
+  RefreshCw,
   Star
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { api } from "../../api";
 import type {
   AnalyticsOverviewResponse,
+  AnalyticsSummary,
+  AppPage,
   CallResponse,
   ProcessingMonitoringResponse
 } from "../../types";
@@ -20,32 +23,78 @@ import {
   formatScore
 } from "../../shared/lib/analysis";
 import { formatDuration } from "../../shared/lib/formatters";
+import { useReloadScrollRestoration } from "../../shared/lib/reload-scroll";
+import { pluralizeRu } from "../../shared/lib/plans";
+import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
+import { DeltaBadge, TrendChart } from "../../shared/ui/analytics-ui";
+import { ScoreGauge } from "../../shared/ui/score-gauge";
+import { TextBlockSkeleton } from "../../shared/ui/loading";
+import { WorthListening, type OpenCallAt } from "../analytics/AnalyticsPage";
 import { sparklineCoordinates, SPARKLINE_HEIGHT, SPARKLINE_WIDTH } from "./sparkline-geometry";
 
-export function OverviewPage({ calls, callsVersion }: { calls: CallResponse[]; callsVersion: string }) {
+/**
+ * The overview follows the company chosen in the header, like the calls list:
+ * a company shows that company, the personal workspace shows only personal
+ * calls, and a device where nothing was chosen yet sees everything it can reach.
+ */
+function runningTasksNote(running: number) {
+  if (running === 0) return "сейчас ничего не выполняется";
+  return `${running} ${pluralizeRu(running, "задача выполняется", "задачи выполняются", "задач выполняется")}`;
+}
+
+function overviewFilters(workspaceCompanyId: string | null): Parameters<typeof api.getAnalyticsOverview>[0] {
+  if (workspaceCompanyId === null) return {};
+  return workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" };
+}
+
+export function OverviewPage({
+  calls,
+  callsVersion,
+  onNavigate,
+  onOpenCall
+}: {
+  calls: CallResponse[];
+  callsVersion: string;
+  onNavigate?: (page: AppPage) => void;
+  onOpenCall?: OpenCallAt;
+}) {
+  const workspaceCompanyId = useWorkspaceCompanyId();
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverviewResponse | null>(null);
+  // The dynamics and the calls worth listening to come from the facts;
+  // a plan without them simply leaves the two cards empty.
+  const [teamSummary, setTeamSummary] = useState<AnalyticsSummary | null>(null);
   const [processingMonitoring, setProcessingMonitoring] = useState<ProcessingMonitoringResponse | null>(null);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  // Placeholders stand in until the first answer for the chosen workspace; a
+  // later refresh keeps the numbers on screen instead of blinking.
+  const scopeKey = workspaceCompanyId ?? "all";
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const loaded = loadedScope === scopeKey;
+  useReloadScrollRestoration("overview", loaded);
   const avgDuration = analyticsOverview?.average_duration_seconds === null || analyticsOverview === null
     ? "Нет данных"
     : formatDuration(Math.round(analyticsOverview.average_duration_seconds));
   const analyticsScore = overviewScore(analyticsOverview);
   const chartSeries = buildOverviewChartSeries(analyticsOverview);
   const recentUploads = useMemo(() => buildRecentUploadChart(calls), [calls]);
-  const qualityDonutPercent = analyticsScore.score === null ? 0 : (analyticsScore.score / analyticsScore.scale) * 100;
-  const qualityDonutLabel = analyticsScore.score === null
-    ? "нет данных"
-    : `${formatScore(analyticsScore.score)} / ${analyticsScore.scale}`;
 
+  // The aggregates read every visible analysis, so they are fetched when the
+  // calls change, when the tab comes back and on request — never on a timer.
   useEffect(() => {
     let cancelled = false;
-    let intervalId = 0;
 
     async function loadOverview() {
-      const overview = await api.getAnalyticsOverview().catch(() => null);
-      const monitoring = await api.getProcessingMonitoring().catch(() => null);
+      setRefreshing(true);
+      const [overview, summary] = await Promise.all([
+        api.getAnalyticsOverview(overviewFilters(workspaceCompanyId)).catch(() => null),
+        api.getAnalyticsSummary(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" }).catch(() => null),
+      ]);
       if (!cancelled) {
         setAnalyticsOverview(overview);
-        setProcessingMonitoring(monitoring);
+        setTeamSummary(summary);
+        setRefreshing(false);
+        setLoadedScope(workspaceCompanyId ?? "all");
       }
     }
 
@@ -54,49 +103,107 @@ export function OverviewPage({ calls, callsVersion }: { calls: CallResponse[]; c
     }
 
     void loadOverview();
-    intervalId = window.setInterval(loadOverview, 5000);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     window.addEventListener("focus", refreshWhenVisible);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.removeEventListener("focus", refreshWhenVisible);
     };
-  }, [callsVersion]);
+  }, [callsVersion, workspaceCompanyId, refreshToken]);
+
+  // The queue counters are cheap and move by the second, so they keep polling.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMonitoring() {
+      const monitoring = await api
+        .getProcessingMonitoring(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : undefined)
+        .catch(() => null);
+      if (!cancelled) setProcessingMonitoring(monitoring);
+    }
+
+    void loadMonitoring();
+    const intervalId = window.setInterval(loadMonitoring, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [workspaceCompanyId]);
 
   return (
     <section className="dashboard-page app-page">
       <div className="dashboard-kpi-grid">
-        <MetricCard icon={<BarChart3 size={20} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
+        <MetricCard loading={!loaded} series="blue" icon={<BarChart3 size={18} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
         <MetricCard
-          icon={<Phone size={20} />}
+          loading={!loaded}
+          series="violet"
+          icon={<Phone size={18} />}
           title="Новые сегодня"
           value={metricCount(analyticsOverview?.calls_created_today)}
           points={recentUploads}
           note="за последние 24 часа"
         />
-        <MetricCard icon={<Activity size={20} />} title="Звонки в обработке" value={metricCount(analyticsOverview?.calls_processing)} note={`${processingMonitoring?.queue.running ?? 0} задач выполняется`} />
-        <MetricCard icon={<CheckCircle2 size={20} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} tone="success" points={chartSeries.analyzedCalls} note="готовый результат анализа" />
-        <MetricCard icon={<Clock3 size={20} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} />
         <MetricCard
-          icon={<Star size={20} />}
-          title="Средняя оценка"
-          value={analyticsScore.score === null ? "Нет данных" : `${formatScore(analyticsScore.score)} / ${analyticsScore.scale}`}
-          tone="success"
-          points={chartSeries.quality}
-          donutPercent={qualityDonutPercent}
-          donutLabel={qualityDonutLabel}
+          loading={!loaded}
+          icon={<Activity size={18} />}
+          title="Звонки в обработке"
+          value={metricCount(analyticsOverview?.calls_processing)}
+          live={(analyticsOverview?.calls_processing ?? 0) > 0}
+          note={runningTasksNote(processingMonitoring?.queue.running ?? 0)}
         />
+        <MetricCard loading={!loaded} series="green" icon={<CheckCircle2 size={18} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} points={chartSeries.analyzedCalls} note="готовый результат анализа" />
+        <MetricCard loading={!loaded} series="teal" icon={<Clock3 size={18} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} note="по звонкам в выбранной области" />
+        <ScoreKpiCard loading={!loaded} score={analyticsScore.score === null ? null : (analyticsScore.score / analyticsScore.scale) * 100} summary={teamSummary} />
       </div>
 
-      <AnalyticsOverviewInsights overview={analyticsOverview} />
+      <div className="overview-insights-head">
+        <h2>Качество разговоров</h2>
+        <button
+          className="icon-button"
+          type="button"
+          onClick={() => setRefreshToken((token) => token + 1)}
+          disabled={refreshing}
+          title="Обновить"
+          aria-label="Обновить аналитику"
+        >
+          <RefreshCw size={18} className={refreshing ? "is-spinning" : undefined} />
+        </button>
+      </div>
+
+      {loaded ? (
+        <AnalyticsOverviewInsights overview={analyticsOverview} summary={teamSummary} onNavigate={onNavigate} onOpenCall={onOpenCall} />
+      ) : (
+        <OverviewInsightsSkeleton />
+      )}
     </section>
   );
 }
 
-function AnalyticsOverviewInsights({ overview }: { overview: AnalyticsOverviewResponse | null; }) {
+function OverviewInsightsSkeleton() {
+  return (
+    <div className="analytics-insight-grid" aria-busy="true" aria-label="Загрузка аналитики">
+      <InsightCard title="Распределение оценок" note="шкала 0-100"><TextBlockSkeleton rows={5} /></InsightCard>
+      <InsightCard title="Слабые критерии" note="по пропущенным и частичным критериям"><TextBlockSkeleton rows={4} /></InsightCard>
+      <InsightCard title="Динамика" note="средний балл по дням"><span className="skeleton-line overview-trend-skeleton" /></InsightCard>
+      <InsightCard title="Стоит послушать" note="слабые звонки и критичные пропуски"><TextBlockSkeleton rows={4} /></InsightCard>
+    </div>
+  );
+}
+
+function AnalyticsOverviewInsights({
+  overview,
+  summary,
+  onNavigate,
+  onOpenCall
+}: {
+  overview: AnalyticsOverviewResponse | null;
+  summary: AnalyticsSummary | null;
+  onNavigate?: (page: AppPage) => void;
+  onOpenCall?: OpenCallAt;
+}) {
   const distribution = overview?.score_distribution;
   const distributionRows = distribution
     ? [
@@ -108,29 +215,49 @@ function AnalyticsOverviewInsights({ overview }: { overview: AnalyticsOverviewRe
     ] as Array<[string, string, number]>
     : [];
   const weakCriteria = overview?.top_weak_criteria ?? [];
-  const criteriaSummary = overview?.criteria_summary ?? [];
-  const issueCodes = overview?.top_issue_codes ?? [];
-  const outcomes = overview?.business_outcomes ?? [];
-  const nextSteps = overview?.next_step_summary;
-  const topics = overview?.top_topics ?? [];
+  // Older servers do not send the flag; they had no plan check at all.
+  const teamAnalytics = overview?.team_analytics_enabled !== false;
+
+  const distributionCard = (
+    <InsightCard title="Распределение оценок" note="шкала 0-100">
+      {distributionRows.length === 0 ? (
+        <p className="analysis-empty">Нет данных по распределению.</p>
+      ) : (
+        <div className="score-distribution-list">
+          {distributionRows.map(([key, label, count]) => (
+            <div className="score-distribution-row" key={key}>
+              <span>{label}</span>
+              <strong>{count}</strong>
+              <i style={{ "--bar": overview?.calls_analyzed ? `${Math.min(100, (count / overview.calls_analyzed) * 100)}%` : "0%" } as React.CSSProperties} />
+            </div>
+          ))}
+        </div>
+      )}
+    </InsightCard>
+  );
+
+  if (!teamAnalytics) {
+    return (
+      <div className="analytics-insight-grid">
+        {distributionCard}
+        <InsightCard title="Командная аналитика" note="не входит в тариф компании">
+          <p className="analysis-empty">
+            Разбор по критериям, темам и итогам звонков доступен на старших бизнес-тарифах.
+            Общий балл и распределение оценок остаются на любом тарифе.
+          </p>
+          {onNavigate ? (
+            <button className="ghost-button small" type="button" onClick={() => onNavigate("settingsTariffs")}>
+              Посмотреть тарифы
+            </button>
+          ) : null}
+        </InsightCard>
+      </div>
+    );
+  }
 
   return (
     <div className="analytics-insight-grid">
-      <InsightCard title="Распределение оценок" note="шкала 0-100">
-        {distributionRows.length === 0 ? (
-          <p className="analysis-empty">Нет данных по распределению.</p>
-        ) : (
-          <div className="score-distribution-list">
-            {distributionRows.map(([key, label, count]) => (
-              <div className="score-distribution-row" key={key}>
-                <span>{label}</span>
-                <strong>{count}</strong>
-                <i style={{ "--bar": overview?.calls_analyzed ? `${Math.min(100, (count / overview.calls_analyzed) * 100)}%` : "0%" } as React.CSSProperties} />
-              </div>
-            ))}
-          </div>
-        )}
-      </InsightCard>
+      {distributionCard}
 
       <InsightCard title="Слабые критерии" note="по пропущенным и частичным критериям">
         {weakCriteria.length === 0 ? (
@@ -152,83 +279,24 @@ function AnalyticsOverviewInsights({ overview }: { overview: AnalyticsOverviewRe
         )}
       </InsightCard>
 
-      <InsightCard title="Критерии" note="«Не применимо» считается отдельно">
-        {criteriaSummary.length === 0 ? (
-          <p className="analysis-empty">Сводка критериев пока пустая.</p>
+      <InsightCard title="Динамика" note="средний балл по дням">
+        {!summary ? (
+          <p className="analysis-empty">Динамика появится, когда накопятся оценённые звонки.</p>
         ) : (
-          <div className="analytics-list">
-            {criteriaSummary.slice(0, 6).map((item, index) => (
-              <div className="analytics-list-row criteria" key={item.code}>
-                <div>
-                  <strong>{item.title || `Критерий ${index + 1}`}</strong>
-                  <small>
-                    {item.met} выполнено · {item.partially_met} частично · {item.missed} пропущено ·{" "}
-                    {item.not_applicable} не применимо
-                  </small>
-                </div>
-                <span>{formatNullableScore(item.average_score)}</span>
-              </div>
-            ))}
-          </div>
+          <TrendChart points={summary.trend} markers={summary.markers} label="Средний балл" />
         )}
       </InsightCard>
 
-      <InsightCard title="Коды проблем" note="частые коды проблем">
-        {issueCodes.length === 0 ? (
-          <p className="analysis-empty">Коды проблем не указаны.</p>
+      <InsightCard title="Стоит послушать" note="слабые звонки и критичные пропуски">
+        {!summary || !onOpenCall ? (
+          <p className="analysis-empty">Слабых звонков за период нет.</p>
         ) : (
-          <div className="topic-list analytics-topic-list">
-            {issueCodes.slice(0, 10).map((item, index) => (
-              <span key={item.code}>{issueCodeLabel(item.code, index)} · {item.count}</span>
-            ))}
-          </div>
-        )}
-      </InsightCard>
-
-      <InsightCard title="Темы" note="самые частые темы">
-        {topics.length === 0 ? (
-          <p className="analysis-empty">Темы пока не найдены.</p>
-        ) : (
-          <div className="topic-list analytics-topic-list">
-            {topics.slice(0, 10).map((item) => (
-              <span key={item.title}>{item.title} · {item.count}</span>
-            ))}
-          </div>
-        )}
-      </InsightCard>
-
-      <InsightCard title="Итоги звонков" note="бизнес-результат разговора">
-        {outcomes.length === 0 ? (
-          <p className="analysis-empty">Итоги звонков не указаны.</p>
-        ) : (
-          <div className="analytics-list compact">
-            {outcomes.slice(0, 6).map((item) => (
-              <div className="analytics-list-row" key={item.status}>
-                <strong>{enumLabel(item.status, businessOutcomeLabels) ?? "Неясный итог"}</strong>
-                <span>{item.count}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </InsightCard>
-
-      <InsightCard title="Следующий шаг" note="качество договоренности">
-        {!nextSteps ? (
-          <p className="analysis-empty">Сводка следующих шагов пустая.</p>
-        ) : (
-          <div className="analytics-list compact">
-            <MetricLine label="Есть шаг" value={nextSteps.with_next_step} />
-            <MetricLine label="Конкретный" value={nextSteps.specific} />
-            <MetricLine label="Со сроком" value={nextSteps.with_deadline} />
-            <MetricLine label="С ответственным" value={nextSteps.with_responsible_person} />
-            <MetricLine label="Отсутствует" value={nextSteps.missing} />
-          </div>
+          <WorthListening items={summary.worth_listening ?? []} onOpenCall={onOpenCall} />
         )}
       </InsightCard>
     </div>
   );
 }
-
 function InsightCard({
   title,
   note,
@@ -262,41 +330,85 @@ function MetricCard({
   icon,
   title,
   value,
-  tone = "accent",
+  tone = "neutral",
   points,
   note,
-  donutPercent,
-  donutLabel
+  live = false,
+  loading = false,
+  series
 }: {
   icon: React.ReactNode;
   title: string;
-  value: string;
-  tone?: "accent" | "success" | "warning";
+  value: React.ReactNode;
+  tone?: "neutral" | "success" | "warning";
   points?: ChartPoint[];
   note?: string;
-  donutPercent?: number;
-  donutLabel?: string;
+  /** Something is running right now: a quiet amber pulse next to the number. */
+  live?: boolean;
+  loading?: boolean;
+  /** The metric's own colour, shared by its icon and its line. */
+  series?: "blue" | "violet" | "green" | "teal";
 }) {
-  const hasDonut = typeof donutPercent === "number";
+  const hasChart = Boolean(points && points.length > 0);
+  const seriesClass = series ? ` kpi-series-${series}` : "";
+
+  if (loading) {
+    return (
+      <article className={`dashboard-kpi-card glass-panel ${tone}${seriesClass}`} aria-busy="true">
+        <div className="kpi-head">
+          <span>{title}</span>
+          <span className="metric-icon">{icon}</span>
+        </div>
+        <span className="skeleton-line overview-kpi-value-skeleton" />
+        <span className="skeleton-line overview-kpi-chart-skeleton" />
+      </article>
+    );
+  }
 
   return (
-    <article className={`dashboard-kpi-card glass-panel ${tone} ${hasDonut ? "with-donut" : ""}`}>
-      <div>
-        <span className="metric-icon">{icon}</span>
+    <article className={`dashboard-kpi-card glass-panel ${tone}${seriesClass}${hasChart ? "" : " is-plain"}`}>
+      <div className="kpi-head">
         <span>{title}</span>
+        <span className="metric-icon">{icon}</span>
       </div>
-      {hasDonut ? (
-        <QualityDonut percent={donutPercent} label={donutLabel ?? value} />
-      ) : (
-        <>
-          <strong>{value}</strong>
-          {points && points.length > 0 ? (
-            <MiniSparkline points={points} tone={tone} />
+      <strong className="kpi-value">{value}{live && <i className="kpi-live" aria-hidden="true" />}</strong>
+      {note && <span className="kpi-note">{note}</span>}
+      {hasChart && <MiniSparkline points={points!} tone={tone} />}
+    </article>
+  );
+}
+
+// The average over everything visible, with the change over the analytics
+// period next to it. The period is named, because the two numbers cover
+// different spans and must not read as one.
+function ScoreKpiCard({ score, summary, loading }: { score: number | null; summary: AnalyticsSummary | null; loading: boolean }) {
+  const periodDays = summary ? Math.max(1, Math.round((Date.parse(summary.period.to) - Date.parse(summary.period.from)) / 86_400_000)) : null;
+  return (
+    <article className="dashboard-kpi-card glass-panel is-score" aria-busy={loading || undefined}>
+      <div className="kpi-head">
+        <span>Средняя оценка</span>
+        <span className="metric-icon"><Star size={18} /></span>
+      </div>
+      <div className="kpi-score-body">
+        <ScoreGauge value={loading ? null : score} size={112} loading={loading} />
+        {!loading && <div className="kpi-score-side">
+          {score === null ? (
+            <span className="kpi-note">Оценок пока нет: общий балл появится после первого анализа.</span>
+          ) : summary && periodDays ? (
+            summary.avg_score !== null && summary.sample !== "none" && summary.sample !== "low" ? (
+              <>
+                <span className="kpi-note">за {periodDays} {pluralizeRu(periodDays, "день", "дня", "дней")}</span>
+                <span className="kpi-score-period"><b>{formatScore(summary.avg_score)}</b><DeltaBadge delta={summary.delta} /></span>
+                <span className="kpi-note">к прошлым {periodDays} {pluralizeRu(periodDays, "дню", "дням", "дням")}</span>
+              </>
+            ) : (
+              <span className="kpi-note">Сравнение с прошлым периодом появится от 5 оценённых звонков за {periodDays} {pluralizeRu(periodDays, "день", "дня", "дней")}.</span>
+            )
           ) : (
-            <span className="dashboard-kpi-note">{note ?? "нет динамики"}</span>
+            <span className="kpi-note">по всем оценённым звонкам</span>
           )}
-        </>
-      )}
+        </div>}
+      </div>
     </article>
   );
 }
@@ -308,17 +420,31 @@ type ChartPoint = {
   detail?: string;
 };
 
-export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "accent" | "success" | "warning"; }) {
+export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "neutral" | "accent" | "success" | "warning"; }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  // useId returns characters a url(#…) reference does not accept everywhere.
+  const gradientId = `spark-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const prepared = points.length > 0 ? points : [{ label: "Нет данных", value: 0, display: "0" }];
   const animationKey = prepared.map((point) => `${point.label}:${point.value}:${point.display}`).join("|");
   const coordinates = sparklineCoordinates(prepared);
   const path = smoothPath(coordinates);
+  const first = coordinates[0];
+  const last = coordinates[coordinates.length - 1];
+  const area = coordinates.length > 1 ? `${path} L ${last.x} ${SPARKLINE_HEIGHT} L ${first.x} ${SPARKLINE_HEIGHT} Z` : "";
 
   return (
     <div className={`mini-chart ${tone}${coordinates.length === 1 ? " is-single-point" : ""}`}>
       <svg key={animationKey} className="mini-sparkline" viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="График значения">
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" className="mini-sparkline-stop-top" />
+            <stop offset="1" className="mini-sparkline-stop-bottom" />
+          </linearGradient>
+        </defs>
+        {/* Inline, because the older stylesheet sets fill: none on every path. */}
+        {area && <path className="mini-sparkline-area" d={area} style={{ fill: `url(#${gradientId})` }} />}
         <path
+          className="mini-sparkline-line"
           d={path}
           vectorEffect="non-scaling-stroke"
         />
@@ -333,7 +459,7 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "a
       </svg>
       {coordinates.map((point, index) => (
         <span
-          className={`chart-hit ${activeIndex === index ? "active" : ""} ${index <= 1 ? "edge-start" : ""} ${index >= coordinates.length - 2 ? "edge-end" : ""}`}
+          className={`chart-hit ${activeIndex === index ? "active" : ""} ${index <= 1 ? "edge-start" : ""} ${index >= coordinates.length - 2 ? "edge-end" : ""} ${index === coordinates.length - 1 ? "is-last" : ""}`}
           style={{
             left: `${point.left}%`,
             top: `${point.top}%`
@@ -356,36 +482,6 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "a
   );
 }
 
-function QualityDonut({ percent, label }: { percent: number; label: string; }) {
-  const [active, setActive] = useState(false);
-  const clamped = Math.max(0, Math.min(100, percent));
-  const drawProgress = useDrawProgress(`${clamped}:${label}`, 1600);
-  const drawnPercent = clamped * drawProgress;
-  const percentLabel = `${Math.round(clamped)}%`;
-  return (
-    <span
-      className={`quality-donut-wrap ${active ? "active" : ""}`}
-      style={{ "--quality-donut-percent": `${drawnPercent}%` } as React.CSSProperties}
-      tabIndex={0}
-      aria-label={`Заполнение диаграммы: ${percentLabel}`}
-      onBlur={() => setActive(false)}
-      onFocus={() => setActive(true)}
-      onMouseEnter={() => setActive(true)}
-      onMouseLeave={() => setActive(false)}
-    >
-      <span className="quality-donut" role="img" aria-label="Круговая диаграмма оценки качества">
-        <span className="quality-donut-core">
-          <span>{label}</span>
-        </span>
-      </span>
-      <span className="chart-tooltip donut-tooltip">
-        <strong>{percentLabel}</strong>
-        <span>заполнение диаграммы</span>
-      </span>
-    </span>
-  );
-}
-
 const issueCodeLabels: Record<string, string> = {
   weak_next_step: "Слабый следующий шаг",
   no_needs_discovery: "Потребность не выявлена",
@@ -399,36 +495,6 @@ const issueCodeLabels: Record<string, string> = {
 
 function issueCodeLabel(code: string, index: number) {
   return issueCodeLabels[code] ?? `Код проблемы ${index + 1}`;
-}
-
-function useDrawProgress(key: string, durationMs: number) {
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    let frameId = 0;
-    let startedAt = 0;
-
-    setProgress(0);
-
-    const tick = (time: number) => {
-      if (!startedAt) startedAt = time;
-      const rawProgress = Math.min(1, (time - startedAt) / durationMs);
-      const easedProgress = 1 - Math.pow(1 - rawProgress, 3);
-      setProgress(easedProgress);
-
-      if (rawProgress < 1) {
-        frameId = window.requestAnimationFrame(tick);
-      }
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [durationMs, key]);
-
-  return progress;
 }
 
 function buildOverviewChartSeries(overview: AnalyticsOverviewResponse | null) {

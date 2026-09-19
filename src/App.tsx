@@ -36,6 +36,7 @@ import { ActionDetailPage, ActionsPage } from "./features/actions/ActionsPage";
 import { ContactsPage } from "./features/contacts/ContactsPage";
 import { InstructionsPage } from "./features/instructions/InstructionsPage";
 import { InstructionHistoryPage } from "./features/instructions/InstructionHistoryPage";
+import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { InstructionComparePage } from "./features/instructions/InstructionComparePage";
 import { NewInstructionPage } from "./features/instructions/NewInstructionPage";
 import { InvitationsPage } from "./features/invitations/InvitationsPage";
@@ -48,6 +49,7 @@ import { DevicesPage, ProfileEditPage, ProfilePage } from "./features/profile/Pr
 import { AiReportsPage } from "./features/reports/AiReportsPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { PrivacySettingsPage } from "./features/settings/PrivacySettingsPage";
+import { NotificationSettingsPage } from "./features/settings/NotificationSettingsPage";
 import { TariffsPage } from "./features/tariffs/TariffsPage";
 import { IntegrationsPage } from "./features/integrations/IntegrationsPage";
 import { UploadPage } from "./features/upload/UploadPage";
@@ -423,6 +425,16 @@ function App() {
     }
   }
 
+  // openCallAt opens a call on the analysis card an analytics number rests on,
+  // and plays the recording from that moment.
+  function openCallAt(callId: string, itemId?: string, seconds?: number | null) {
+    openCallPage(callId);
+    const url = new URL(window.location.href);
+    if (itemId) url.searchParams.set("item", itemId);
+    if (seconds !== undefined && seconds !== null) url.searchParams.set("evidence_time", String(seconds));
+    window.history.replaceState({}, "", url);
+  }
+
   function openCallPage(callId: string, nextPage: AppPage = "calls") {
     setShowPublicLanding(false);
     setPage(nextPage);
@@ -470,12 +482,22 @@ function App() {
       openCallPage(notification.entity_uuid);
       return;
     }
+    if (notification.type === "weekly_digest_ready") {
+      window.history.pushState({}, "", "/app/analytics?period=last_week");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     if (notification.entity_type === "company" && notification.entity_uuid) {
       openCompany(notification.entity_uuid);
       return;
     }
     if (notification.entity_type === "call_action" && notification.entity_uuid) {
       window.history.pushState({}, "", `/app/actions/${encodeURIComponent(notification.entity_uuid)}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
+    if ((notification.type === "scorecard_failed" || notification.type === "scorecard_review_needed") && notification.entity_uuid) {
+      window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(notification.entity_uuid)}?tab=criteria`);
       window.dispatchEvent(new PopStateEvent("popstate"));
       return;
     }
@@ -674,10 +696,21 @@ function App() {
       onToggleTheme={toggleTheme}
       onLogout={logout}
     >
+      {(page === "teamAnalytics" || page === "teamAnalyticsEmployee") && (
+        <AnalyticsPage
+          departments={departments}
+          profileUserId={page === "teamAnalyticsEmployee" ? decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "") : undefined}
+          onNavigate={navigate}
+          onOpenCall={openCallAt}
+        />
+      )}
+
       {page === "overview" && (
           <OverviewPage
             calls={calls}
             callsVersion={calls.map((call) => `${call.id}:${call.status}:${call.created_at}`).join("|")}
+            onNavigate={navigate}
+            onOpenCall={openCallAt}
           />
       )}
 
@@ -720,6 +753,7 @@ function App() {
       {page === "transcriptionEdit" && (
         <TranscriptionEditPage
           call={selectedCall}
+          currentUser={session.user}
           transcription={selectedCall ? transcriptions[selectedCall.id] : undefined}
           loading={selectedCallDetailsLoading}
           onBack={() => selectedCall ? openCallPage(selectedCall.id) : navigate("calls")}
@@ -817,6 +851,7 @@ function App() {
 
       {page === "settings" && <SettingsPage onNavigate={navigate} />}
       {page === "settingsPrivacy" && <PrivacySettingsPage companies={companies} departments={departments} onBack={() => navigate("settings")} />}
+      {page === "settingsNotifications" && <NotificationSettingsPage onBack={() => navigate("settings")} />}
 
       {page === "settingsInstructions" && (
         <InstructionsPage

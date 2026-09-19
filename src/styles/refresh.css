@@ -2384,17 +2384,22 @@ html[data-theme] .app-shell .instructions-page-head .settings-heading {
   place-items: center;
   border-radius: 10px;
   color: var(--format);
-  background: color-mix(in srgb, var(--format) 13%, var(--vt-s1));
+  background: color-mix(in srgb, var(--format) 15%, var(--vt-s1));
   font-size: 0.68rem;
   font-weight: 750;
   letter-spacing: 0.03em;
+}
+
+/* On the light page a lighter tile keeps the small label at 4.5:1. */
+html[data-theme="light"] .app-shell .instruction-item-format {
+  background: color-mix(in srgb, var(--format) 12%, var(--vt-s1));
 }
 
 .app-shell .instruction-item-format.is-docx { --format: var(--vt-chart-blue); }
 .app-shell .instruction-item-format.is-pdf { --format: var(--vt-bad); }
 .app-shell .instruction-item-format.is-xlsx { --format: var(--vt-chart-green); }
 
-.app-shell .instruction-item.is-off .instruction-item-format {
+html[data-theme] .app-shell .instruction-item.is-off .instruction-item-format {
   color: var(--vt-text-3);
   background: var(--vt-soft);
 }

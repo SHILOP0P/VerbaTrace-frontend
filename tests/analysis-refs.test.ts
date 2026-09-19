@@ -29,9 +29,23 @@ test("schema field names and segment pointers leave no trace", () => {
     stripAnalysisRefs("Ирина представилась, что соответствует части assigned_unit. Все требуемые элементы assigned_unit присутствуют в s3.1."),
     "Ирина представилась, что соответствует части пункта. Все требуемые элементы пункта присутствуют."
   );
-  assert.equal(stripAnalysisRefs("Проверено по source_segments и полю segment_id."), "Проверено по реплики и полю.");
+  assert.equal(stripAnalysisRefs("Проверено по source_segments и полю segment_id."), "Проверено по репликам и полю.");
   assert.equal(stripAnalysisRefs("Цитата в сегменте s2.1 подтверждает ответ."), "Цитата подтверждает ответ.");
   assert.equal(stripAnalysisRefs("Почта ivan_petrov@mail.ru и файл report_final.pdf"), "Почта ivan_petrov@mail.ru и файл report_final.pdf");
+});
+
+test("a field name after a preposition takes the case the preposition asks for", () => {
+  assert.equal(stripAnalysisRefs("Это покрывает текст требования в assigned_unit."), "Это покрывает текст требования в пункте.");
+  assert.equal(stripAnalysisRefs("Слова из assigned_unit прозвучали."), "Слова из пункта прозвучали.");
+  assert.equal(stripAnalysisRefs("Это соответствует частям assigned_unit."), "Это соответствует частям пункта.");
+  assert.equal(stripAnalysisRefs("Вопрос юнита относится к брони, как и юниты выше."), "Вопрос пункта относится к брони, как и пункты выше.");
+  assert.equal(stripAnalysisRefs("Ответ есть в source_segments."), "Ответ есть в репликах.");
+  assert.equal(stripAnalysisRefs("Участник в реплике s1.1 сообщил о записи."), "Участник сообщил о записи.");
+});
+
+test("speaker markers survive untouched for the name lookup that follows", () => {
+  assert.equal(stripAnalysisRefs("{{speaker:speaker_0}} назвал цену (u1.2)."), "{{speaker:speaker_0}} назвал цену.");
+  assert.equal(stripAnalysisRefs("{{speaker:s1}} и {{speaker:A}} договорились."), "{{speaker:s1}} и {{speaker:A}} договорились.");
 });
 
 test("ordinary text with letters and digits stays as it is", () => {

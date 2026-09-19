@@ -1,5 +1,6 @@
 import {
   Check,
+  ChevronDown,
   ChevronRight,
   RefreshCw,
   X
@@ -28,6 +29,7 @@ import {
 } from "../lib/call-status";
 import { formatSegmentTimeRange, transcriptionSpeakerLabel } from "../lib/formatters";
 import { pluralizeRu } from "../lib/plans";
+import { speakerColor } from "../lib/speaker-colors";
 import { TextBlockSkeleton } from "./loading";
 
 type StatusTone = "ok" | "warn" | "bad";
@@ -286,7 +288,8 @@ export function InfoCard({
   expanded = false,
   cardRef,
   className = "",
-  style
+  style,
+  headerActions
 }: {
   title: string;
   status: string;
@@ -300,12 +303,15 @@ export function InfoCard({
   cardRef?: Ref<HTMLDivElement>;
   className?: string;
   style?: CSSProperties;
+  /** Quiet tools of the card, on the right of its title. */
+  headerActions?: React.ReactNode;
 }) {
   return (
     <div className={`info-card ${className}`.trim()} ref={cardRef} style={style}>
-      <div className="card-title">
+      <div className={`card-title${headerActions ? " has-actions" : ""}`}>
         <h3>{title}</h3>
         <span className={`status-chip ${statusTone} ${statusThinking ? "thinking-status" : ""}`}>{status}</span>
+        {headerActions && <div className="card-title-actions">{headerActions}</div>}
       </div>
       {children}
       {action && (actionVariant === "analysis" ? (
@@ -316,8 +322,8 @@ export function InfoCard({
           onClick={onAction}
         >
           <span>{action}</span>
-          <span className="analysis-toggle-icon">
-            <ChevronRight size={18} />
+          <span className="analysis-toggle-icon" aria-hidden="true">
+            <ChevronDown size={16} />
           </span>
         </button>
       ) : (
@@ -337,6 +343,7 @@ export function TranscriptPreview({
   activeWordIndex = -1,
   selectedEvidence,
   speakerAssignments = [],
+  speakerKeys = [],
   onOverflowChange
 }: {
   transcription?: TranscriptionResponse;
@@ -345,8 +352,13 @@ export function TranscriptPreview({
   activeWordIndex?: number;
   selectedEvidence?: MediaSeekTarget | null;
   speakerAssignments?: TranscriptionSpeakerAssignment[];
+  /** The call's speakers; each name gets the colour the player gives it. */
+  speakerKeys?: string[];
   onOverflowChange?: (overflowing: boolean) => void;
 }) {
+  const speakerStyle = (speaker: string) => speakerKeys.length > 0 && speaker.trim()
+    ? { "--speaker-color": speakerColor(speaker, speakerKeys) } as CSSProperties
+    : undefined;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wordRefs = useRef(new Map<number, HTMLSpanElement>());
   const pendingEvidenceScrollRef = useRef(false);
@@ -423,7 +435,7 @@ export function TranscriptPreview({
           {wordGroups.some((group) => group.speaker) ? wordGroups.map((group) => (
             <div className="transcript-segment word-segment" key={`${group.startIndex}-${group.speaker}`}>
               <div className="segment-meta">
-                <strong>{transcriptionSpeakerLabel(group.speaker, speakerAssignments)}</strong>
+                <strong className={speakerStyle(group.speaker) ? "has-color" : undefined} style={speakerStyle(group.speaker)}>{transcriptionSpeakerLabel(group.speaker, speakerAssignments)}</strong>
                 <span>{formatSegmentTimeRange(group.words[0]?.start_seconds, group.words.at(-1)?.end_seconds)}</span>
               </div>
               <p>{group.words.map((word, offset) => renderWord(word, group.startIndex + offset, offset === 0))}</p>
@@ -456,7 +468,7 @@ export function TranscriptPreview({
         {segments.map((segment, index) => (
           <div className="transcript-segment" key={`${segment.start_seconds ?? index}-${segment.text}`}>
             <div className="segment-meta">
-              <strong>{transcriptionSpeakerLabel(segment.speaker, speakerAssignments)}</strong>
+              <strong className={speakerStyle(segment.speaker) ? "has-color" : undefined} style={speakerStyle(segment.speaker)}>{transcriptionSpeakerLabel(segment.speaker, speakerAssignments)}</strong>
               <span>{formatSegmentTimeRange(segment.start_seconds, segment.end_seconds)}</span>
             </div>
             <p>{segment.text}</p>

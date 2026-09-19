@@ -5,8 +5,10 @@ import type {
   TranscriptionSpeakerAssignment
 } from "../../types";
 import { createContext, useContext, useLayoutEffect, useRef, useState } from "react";
-import { BookOpen, CheckCircle2, ChevronDown, Info, ListChecks, MessageSquareText, Quote, Sparkles, Target, TriangleAlert } from "lucide-react";
+import type { CSSProperties } from "react";
+import { CheckCircle2, ChevronDown, Info, ListChecks, Sparkles, Target } from "lucide-react";
 import { transcriptionSpeakerLabel } from "../lib/formatters";
+import { speakerColor } from "../lib/speaker-colors";
 import { maskProfanity } from "../lib/display-text";
 import { stripAnalysisRefs } from "../lib/analysis-refs";
 import { pluralizeRu } from "../lib/plans";
@@ -36,6 +38,7 @@ import {
 import { TextBlockSkeleton } from "./loading";
 
 const AnalysisSpeakerAssignmentsContext = createContext<TranscriptionSpeakerAssignment[]>([]);
+const AnalysisSpeakerKeysContext = createContext<string[]>([]);
 
 export function AnalysisPreview({
   analysis,
@@ -43,7 +46,8 @@ export function AnalysisPreview({
   loading,
   pendingMessage,
   onEvidenceActivate,
-  speakerAssignments = []
+  speakerAssignments = [],
+  speakerKeys = []
 }: {
   analysis?: AnalysisResponse;
   expanded: boolean;
@@ -51,6 +55,8 @@ export function AnalysisPreview({
   pendingMessage?: string;
   onEvidenceActivate?: (target: MediaSeekTarget) => void;
   speakerAssignments?: TranscriptionSpeakerAssignment[];
+  /** The call's speakers, so a quote's speaker has the colour the player gives them. */
+  speakerKeys?: string[];
 }) {
   if (loading) {
     return <TextBlockSkeleton rows={4} />;
@@ -63,7 +69,9 @@ export function AnalysisPreview({
   return (
     <div className={`analysis-preview analysis-full-text expandable-content ${expanded || !isAnalysisDone(analysis) ? "expanded" : "collapsed"}`}>
       <AnalysisSpeakerAssignmentsContext.Provider value={speakerAssignments}>
-        <AnalysisStructuredView analysis={analysis} onEvidenceActivate={onEvidenceActivate} />
+        <AnalysisSpeakerKeysContext.Provider value={speakerKeys}>
+          <AnalysisStructuredView analysis={analysis} onEvidenceActivate={onEvidenceActivate} />
+        </AnalysisSpeakerKeysContext.Provider>
       </AnalysisSpeakerAssignmentsContext.Provider>
     </div>
   );
@@ -223,7 +231,7 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
     ...result.items.map((item): [string, string] => [item.id, stripAnalysisRefs(item.title)]),
     ...result.recommendations.map((item): [string, string] => [item.id, stripAnalysisRefs(item.title)])
   ]);
-  const displayText = (value: string) => resolveAnalysisSpeakers(stripAnalysisRefs(cleanAnalysisText(value), refTitles), speakerAssignments);
+  const displayText = (value: string) => resolveAnalysisSpeakers(stripAnalysisRefs(value, refTitles), speakerAssignments);
   const scoreTone = (score: number | null) => score === null ? "neutral" : score >= 75 ? "good" : score >= 50 ? "warning" : "danger";
   const cardStatusLabels: Record<string, string> = { met: "выполнено", mostly_met: "в основном", partially_met: "частично", minimally_met: "минимально", missed: "пропущено", not_applicable: "не применимо", unclear: "мало данных", conflict: "конфликт требований", not_assessed: "не оценено" };
   useLayoutEffect(() => {
@@ -264,7 +272,20 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
       {result.coverage.status !== "complete" && <p className="analysis-empty">Разбор неполный. Итоговая оценка не должна считаться окончательной.</p>}
       {result.coverage.limitations.length > 0 && <><strong>Ограничения анализа</strong><AnalysisStringList items={result.coverage.limitations} emptyLabel="" /></>}
     </AnalysisSection>}
-    {topRecommendations.length > 0 && <AnalysisSection title="Приоритетные рекомендации"><div className="analysis-recommendations">{topRecommendations.map((item,index)=><article className={`priority-${item.priority}`} key={item.id}><div className="analysis-recommendation-rank"><span>{String(index+1).padStart(2,"0")}</span><small>приоритет</small></div><div><div className="analysis-question-heading"><strong>{displayText(item.title)}</strong><span className={`analysis-status ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warning" : "neutral"}`}>{item.priority_score === null ? "Нужно уточнить" : `${formatScore(item.priority_score)} балла`}</span></div><p className="analysis-recommendation-action">{displayText(item.action)}</p>{item.reason && <small>{displayText(item.reason)}</small>}{item.expected_result && <div className="analysis-expected-result"><CheckCircle2 size={15}/><span>{displayText(item.expected_result)}</span></div>}</div></article>)}</div></AnalysisSection>}
+    {/* priority_score ranks the advice; printed next to the call's scores it
+        read as one more score, so only its level is shown. */}
+    {topRecommendations.length > 0 && <AnalysisSection title="Что сделать в первую очередь"><ol className="analysis-recommendations">{topRecommendations.map((item,index)=><li className="analysis-recommendation" key={item.id}>
+      <span className="analysis-recommendation-index" aria-hidden="true">{index + 1}</span>
+      <div className="analysis-recommendation-body">
+        <div className="analysis-recommendation-head">
+          <strong>{displayText(item.title)}</strong>
+          <span className={`analysis-recommendation-priority ${item.priority}`}>{recommendationPriorityLabels[item.priority] ?? "приоритет не определён"}</span>
+        </div>
+        <p className="analysis-recommendation-action">{displayText(item.action)}</p>
+        {item.reason && <p className="analysis-recommendation-note"><span>Почему</span>{displayText(item.reason)}</p>}
+        {item.expected_result && <p className="analysis-recommendation-note is-effect"><span>Что даст</span>{displayText(item.expected_result)}</p>}
+      </div>
+    </li>)}</ol></AnalysisSection>}
     <AnalysisSection title="Подробный разбор">
       {result.items.some(item => item.kind === "requirement") && (result.scorecard_mode === "adhoc" || result.scorecard_mode === "partial") && <p className="analysis-scorecard-note"><Info size={16}/>{result.scorecard_mode === "adhoc" ? "Критерии для этого звонка подобраны разово и не попадут в аналитику." : "Часть требований подобрана разово: они не попадут в аналитику."}</p>}
       {speakers.length > 1 && <div ref={filterRef} className="analysis-speaker-filter" role="group" aria-label="Фильтр вопросов по спикеру"><i className="analysis-filter-indicator" aria-hidden="true"/><button className={speakerFilter === "all" ? "active" : ""} onClick={()=>setSpeakerFilter("all")}>Все <b>{result.items.filter(item=>item.kind==="question").length}</b></button>{speakers.map(speaker=><button key={speaker} className={speakerFilter === speaker ? "active" : ""} onClick={()=>setSpeakerFilter(speaker)}>{transcriptionSpeakerLabel(speaker, speakerAssignments)} <b>{result.items.filter(item=>item.kind==="question" && itemSpeaker(item)===speaker).length}</b></button>)}</div>}
@@ -280,21 +301,47 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
           </span>
           <ChevronDown className="analysis-item-chevron" size={18}/>
         </summary>
-        <div className="analysis-v3-item-body">
-          {item.kind === "question" && (item.question_parts?.length ?? 0) > 1 && <div className="analysis-detail-box neutral"><b>Части вопроса</b><AnalysisStringList items={item.question_parts!.map(displayText)} emptyLabel="" /></div>}
-          {item.processing_status !== "pending" && item.kind === "question" && <div className="analysis-detail-box neutral"><b>Покрытие вопроса</b><p>{item.asked === true ? "Вопрос задан явно" : item.asked === false ? "Отдельный вопрос не задавался" : "Нельзя однозначно определить, задавался ли вопрос"}{item.information_status ? ` · Ответ ${informationLabels[item.information_status] ?? item.information_status}` : ""}{item.fulfilled_earlier ? " · Нужная информация прозвучала раньше и засчитана без штрафа" : ""}.</p></div>}
-          {item.answer_summary && <div className="analysis-detail-box answer"><MessageSquareText/><div><b>{item.kind === "question" ? "Ответ" : "Что произошло"}</b><p>{displayText(item.answer_summary)}</p></div></div>}
-          <div className="analysis-detail-box feedback"><Sparkles/><div><b>Разбор ответа</b><p>{displayText(item.explanation)}</p></div></div>
-          {item.strengths.length > 0 && <div className="analysis-detail-box good"><CheckCircle2/><div><b>Что сделано хорошо</b><AnalysisStringList items={item.strengths.map(displayText)} emptyLabel="" /></div></div>}
-          {item.gaps.length > 0 && <div className="analysis-detail-box warning"><TriangleAlert/><div><b>Что не раскрыто</b><ul className="analysis-list">{item.gaps.map((gap,index)=><li key={`${item.id}-gap-${index}`}><span>{displayText(gap.text)}</span>{gap.explanation && <small>{displayText(gap.explanation)}</small>}</li>)}</ul></div></div>}
-          {item.improvement_kind !== "not_needed" && <div className="analysis-detail-box reference"><BookOpen/><div><b>{improvementLabels[item.improvement_kind]}</b><p>{displayText(item.improvement ?? "Недостаточно фактов для готового варианта ответа.")}</p></div></div>}
-          {item.criterion_key && item.instruction_sources[0] ? <div className="analysis-detail-box neutral"><b>Основание в инструкции</b><p><button className="analysis-criterion-link" type="button" onClick={() => openInstructionCriterion(item.instruction_sources[0], item.criterion_key!)}><ListChecks size={15}/>Критерий в инструкции</button></p></div>
-            : item.instruction_sources.length > 0 && <div className="analysis-detail-box neutral"><b>Основание в инструкции</b><AnalysisStringList items={instructionNames(item)} emptyLabel="" /></div>}
-          {item.evidence.length > 0 && <div className="analysis-detail-box evidence"><Quote/><div><CriterionEvidence evidence={item.evidence} quote="" onActivate={onEvidenceActivate} /></div></div>}
+        {/* What was said and what it lacked on the left, the proof on the
+            right; only the ready-made wording keeps a panel of its own. */}
+        <div className="analysis-v3-item-body criterion-detail">
+          <div className="criterion-detail-main">
+            {item.processing_status !== "pending" && item.kind === "question" && <p className="criterion-detail-coverage">
+              {[item.asked === true ? "Вопрос задан явно" : item.asked === false ? "Отдельного вопроса не было" : "Задавался ли вопрос, не ясно", item.information_status ? `ответ ${informationLabels[item.information_status] ?? "не определён"}` : "", item.fulfilled_earlier ? "информация прозвучала раньше и засчитана" : ""].filter(Boolean).join(" · ")}
+            </p>}
+            {item.kind === "question" && (item.question_parts?.length ?? 0) > 1 && <CriterionSection label="Части вопроса"><CriterionList items={item.question_parts!.map(displayText)} /></CriterionSection>}
+            {item.answer_summary && <CriterionSection label={item.kind === "question" ? "Что ответили" : "Что произошло"}><p>{displayText(item.answer_summary)}</p></CriterionSection>}
+            {item.explanation && <CriterionSection label="Разбор"><p>{displayText(item.explanation)}</p></CriterionSection>}
+            {item.strengths.length > 0 && <CriterionSection label="Что получилось"><CriterionList items={item.strengths.map(displayText)} tone="good" /></CriterionSection>}
+            {item.gaps.length > 0 && <CriterionSection label="Чего не хватило"><CriterionList tone={scoreTone(item.score)} items={item.gaps.map((gap) => displayText(gap.text))} notes={item.gaps.map((gap) => gap.explanation ? displayText(gap.explanation) : "")} /></CriterionSection>}
+            {/* The model sometimes writes the kind's code instead of the text;
+                cleaned of it, nothing is left to show. */}
+            {item.improvement_kind !== "not_needed" && displayText(item.improvement ?? "Недостаточно фактов для готового варианта ответа.") && <div className="criterion-detail-improvement"><span>{improvementLabels[item.improvement_kind]}</span><p>{displayText(item.improvement ?? "Недостаточно фактов для готового варианта ответа.")}</p></div>}
+          </div>
+          <div className="criterion-detail-side">
+            <span className="criterion-detail-label">{item.evidence.length > 1 ? "Цитаты" : "Цитата"}</span>
+            {item.evidence.length > 0
+              ? <div className="criterion-detail-quotes"><EvidenceItems evidence={item.evidence} fallbackQuotes={[]} onActivate={onEvidenceActivate} /></div>
+              : <p className="criterion-detail-empty">{item.processing_status === "pending" ? "Появится после разбора." : "В разговоре этого не прозвучало."}</p>}
+            {item.criterion_key && item.instruction_sources[0]
+              ? <button className="criterion-detail-basis" type="button" onClick={() => openInstructionCriterion(item.instruction_sources[0], item.criterion_key!)}><ListChecks size={15} aria-hidden="true" />Критерий в инструкции</button>
+              : item.instruction_sources.length > 0 && <p className="criterion-detail-basis">Основание: {instructionNames(item).map((name) => `«${name}»`).join(", ")}</p>}
+          </div>
         </div>
       </details>)}</div>{visibleItems.length === 0 && <p className="analysis-empty">У выбранного спикера вопросы не найдены.</p>}
     </AnalysisSection>
   </div>;
+}
+
+function CriterionSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return <section className="criterion-detail-section"><span className="criterion-detail-label">{label}</span>{children}</section>;
+}
+
+// A dot in the tone of the verdict marks each line; a note, when there is
+// one, explains the line under it.
+function CriterionList({ items, notes = [], tone = "neutral" }: { items: string[]; notes?: string[]; tone?: string }) {
+  return <ul className={`criterion-detail-list ${tone}`}>
+    {items.map((text, index) => <li key={`${text}-${index}`}><span>{text}</span>{notes[index] && <small>{notes[index]}</small>}</li>)}
+  </ul>;
 }
 
 // The five-step scale 0/25/50/75/100 as four divisions: the status reads at a
@@ -545,6 +592,7 @@ export function AnalysisQuestionList({ questions, onEvidenceActivate }: { questi
 
 function EvidenceItems({ evidence, fallbackQuotes, onActivate }: { evidence: AnalysisEvidence[]; fallbackQuotes: string[]; onActivate?: (target: MediaSeekTarget) => void; }) {
   const speakerAssignments = useContext(AnalysisSpeakerAssignmentsContext);
+  const speakerKeys = useContext(AnalysisSpeakerKeysContext);
   const rawItems: AnalysisEvidence[] = evidence.length > 0
     ? evidence
     : fallbackQuotes.filter(Boolean).map((quote) => ({ quote, match_status: "legacy" } satisfies AnalysisEvidence));
@@ -553,7 +601,9 @@ function EvidenceItems({ evidence, fallbackQuotes, onActivate }: { evidence: Ana
     const matched = item.match_status === "matched" && typeof item.start_seconds === "number";
     const time = matched ? formatEvidenceTime(item.start_seconds!) : "";
     const speaker = item.speaker ? transcriptionSpeakerLabel(item.speaker, speakerAssignments) : "";
-    if (!matched) return <blockquote key={`${item.quote}-${index}`}>{speaker && <small className="evidence-speaker">{speaker}</small>}<span>{maskProfanity(item.quote)}</span><small>Точное место не определено</small></blockquote>;
+    const speakerStyle = item.speaker && speakerKeys.length > 0 ? { "--speaker-color": speakerColor(item.speaker, speakerKeys) } as CSSProperties : undefined;
+    const speakerTag = speaker ? <small className={`evidence-speaker${speakerStyle ? " has-color" : ""}`} style={speakerStyle}>{speaker}</small> : null;
+    if (!matched) return <blockquote key={`${item.quote}-${index}`}>{speakerTag}<span>{maskProfanity(item.quote)}</span><small>Точное место не определено</small></blockquote>;
     return (
       <button
         className="evidence-link"
@@ -567,7 +617,7 @@ function EvidenceItems({ evidence, fallbackQuotes, onActivate }: { evidence: Ana
           wordEndIndex: item.word_end_index
         })}
       >
-        <span>{speaker && <small className="evidence-speaker">{speaker}</small>}{maskProfanity(item.quote)}</span><time>{time}</time>
+        <span>{speakerTag}{maskProfanity(item.quote)}</span><time>{time}</time>
       </button>
     );
   })}</>;
@@ -601,14 +651,6 @@ function compactEvidenceItems(items: AnalysisEvidence[]) {
   });
 }
 
-function cleanAnalysisText(value: string) {
-  return value
-    .replace(/\s*\([sS]\d+(?:\.\d+)?\)/g, "")
-    .replace(/\b[sS]\d+(?:\.\d+)?\b/g, "")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
-
 function resolveAnalysisSpeakers(value: string, assignments: TranscriptionSpeakerAssignment[]) {
   const resolved = assignments.reduce((text, assignment) => {
     const key = assignment.speaker_key.trim();
@@ -630,11 +672,18 @@ function resolveAnalysisSpeakers(value: string, assignments: TranscriptionSpeake
   return resolved.replace(/\{\{speaker:([^}]+)\}\}/gi, (_, key: string) => fallbackSpeakerName(key));
 }
 
+// The same "Спикер A" the transcript and the player show for an unnamed voice.
 function fallbackSpeakerName(key: string) {
   const normalized = key.trim();
-  if (/^[A-Z]$/i.test(normalized)) return `Участник ${normalized.toUpperCase().charCodeAt(0) - 64}`;
+  if (/^[A-Z]$/i.test(normalized)) return `Спикер ${normalized.toUpperCase()}`;
   return "Участник разговора";
 }
+
+const recommendationPriorityLabels: Record<string, string> = {
+  high: "высокий приоритет",
+  medium: "средний приоритет",
+  low: "низкий приоритет"
+};
 
 function evidenceKey(item: AnalysisEvidence) {
   return [

@@ -1,18 +1,26 @@
 import {
   Ban,
+  Building2,
+  CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   ChevronRight,
+  Clock3,
   CloudUpload,
   FolderMinus,
   FolderPlus,
   FileText,
+  GitCompareArrows,
   Headphones,
+  History,
   MessageSquareWarning,
+  PenLine,
   PhoneCall,
   RotateCcw,
   Trash2,
+  UserRound,
   Users,
+  Video,
   WandSparkles
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -43,8 +51,8 @@ import { stripAnalysisRefs } from "../../shared/lib/analysis-refs";
 import { contextLabel, formatDate, formatDuration } from "../../shared/lib/formatters";
 import { AnalysisPreview } from "../../shared/ui/analysis";
 import { CallMediaPlayer, type PlayerSpeaker } from "../../shared/ui/audio";
+import { gaugeTone } from "../../shared/ui/score-gauge";
 import { isVideoCall } from "../../shared/lib/media";
-import { playerMoments } from "./player-moments";
 import { isCallBeingProcessed } from "../../shared/lib/call-status";
 import { InfoCard, StatusChip, StatusTimeline, TranscriptPreview } from "../../shared/ui/call";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
@@ -186,6 +194,9 @@ export function CallDetailPanel({
   const playerSpeakers: PlayerSpeaker[] | undefined = call?.speech?.speakers.length
     ? call.speech.speakers.map((speaker) => ({ key: speaker.speaker_key, name: speakerNameOf(speaker.speaker_key), share: speaker.talk_share }))
     : speakerAssignments.length ? speakerAssignments.map((assignment) => ({ key: assignment.speaker_key, name: assignment.display_name || `Спикер ${assignment.speaker_key}`, share: null })) : undefined;
+  // The keys the player colours by, so a speaker keeps one colour on the page.
+  const speakerKeys = playerSpeakers?.map((speaker) => speaker.key)
+    ?? Array.from(new Set((localTranscription?.words ?? []).map((word) => word.speaker?.trim() ?? "").filter(Boolean)));
   const canEditAnalysis = !call?.is_test && reviewContext?.capabilities.can_edit_analysis === true;
   const canDisputeAnalysis = !call?.is_test && reviewContext?.capabilities.can_dispute_analysis === true;
 
@@ -512,7 +523,7 @@ export function CallDetailPanel({
         <h2>Обзор звонка</h2>
         {drawerTrigger}
         <div className="panel-actions">
-          <button className="primary-button small" onClick={() => onNavigate("upload")}>
+          <button className="ghost-button small" onClick={() => onNavigate("upload")}>
             <CloudUpload size={16} />
             Загрузить звонок
           </button>
@@ -625,21 +636,27 @@ export function CallDetailPanel({
       {deleteError && <div className="form-error">{deleteError}</div>}
       {call.is_test && <div className="call-test-notice" role="note"><strong>Тестовый звонок</strong><span>Он хранится отдельно и доступен только для проверки загрузки и удаления. Анализ, редактирование и перенос в другие папки отключены.</span></div>}
       <div className="selected-call-card">
-        <div className="play-large">
-          <PhoneCall size={22} />
-        </div>
+        <span className="page-emblem" aria-hidden="true">
+          {isVideoCall(call) ? <Video size={20} /> : <PhoneCall size={20} />}
+        </span>
         <div className="selected-call-main">
-          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
-          <strong>{call.title}</strong>
-          <small>
-            {formatDate(call.created_at)} · {formatDuration(call.duration_seconds)} ·{" "}
-            {contextLabel(call, companies, departments)}
-          </small>
+          <div className="selected-call-title">
+            <strong>{call.title}</strong>
+            <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
+          </div>
+          <div className="selected-call-meta">
+            <span><CalendarDays size={14} aria-hidden="true" />{formatDate(call.created_at)}</span>
+            <span><Clock3 size={14} aria-hidden="true" />{formatDuration(call.duration_seconds)}</span>
+            <span>{call.visibility_scope === "personal" ? <UserRound size={14} aria-hidden="true" /> : call.visibility_scope === "department" ? <Users size={14} aria-hidden="true" /> : <Building2 size={14} aria-hidden="true" />}{contextLabel(call, companies, departments)}</span>
+          </div>
           <CallSubjectMarks call={call} onChanged={(changes) => onCallUpdated?.({ ...call, ...changes })} />
-          {!call.is_test && score.score !== null && (
-            <span className="call-score-chip">Оценка {formatScore(score.percent)} / 100</span>
-          )}
         </div>
+        {!call.is_test && score.score !== null && score.percent !== null && (
+          <div className={`selected-call-score is-${gaugeTone(score.percent)}`} aria-label={`Оценка ${formatScore(score.percent)} из 100`}>
+            <strong>{formatScore(score.percent)}</strong>
+            <small>из 100</small>
+          </div>
+        )}
       </div>
       <CallMediaPlayer
         call={call}
@@ -647,8 +664,6 @@ export function CallDetailPanel({
         seekTarget={seekTarget}
         onActiveWordChange={setActiveWordIndex}
         speakers={playerSpeakers}
-        moments={call.is_test ? undefined : playerMoments(displayedAnalysis, speakerNameOf)}
-        onMomentOpen={openAnalysisItem}
         longestMonologue={longestMonologue(call.speech, speakerNameOf)}
       />
       {!call.is_test && <StatusTimeline
@@ -677,16 +692,16 @@ export function CallDetailPanel({
           onAction={() => toggleExpandedCard(showFullTranscript, setShowFullTranscript, transcriptCardRef)}
           actionVariant="analysis"
           expanded={showFullTranscript}
+          headerActions={localTranscription?.editable && canEditCall && !call.is_test ? <>
+            {onOpenTranscriptionEditor && <button type="button" className="card-tool-button" onClick={() => onOpenTranscriptionEditor(call.id)}><PenLine size={15} aria-hidden="true" />Исправить</button>}
+            <button type="button" className={`card-tool-button${showRevisionHistory ? " is-active" : ""}`} disabled={historyLoading} aria-expanded={showRevisionHistory} onClick={() => void toggleRevisionHistory()}>
+              <History size={15} aria-hidden="true" />{historyLoading ? "Загружаю…" : "История"}
+            </button>
+            {(localTranscription.revision ?? 1) > 1 && onOpenRevisionComparison && <button type="button" className="card-tool-button" onClick={() => onOpenRevisionComparison(call.id)}><GitCompareArrows size={15} aria-hidden="true" />Сравнить</button>}
+          </> : undefined}
         >
-          {localTranscription?.editable && canEditCall && !call.is_test && (
+          {localTranscription?.editable && canEditCall && !call.is_test && (historyError || showRevisionHistory) && (
             <div className="transcript-history-actions">
-              <div className="transcript-history-toolbar">
-                {onOpenTranscriptionEditor && !call.is_test && <button type="button" className="primary-button small" onClick={() => onOpenTranscriptionEditor(call.id)}>Исправить транскрипцию</button>}
-                <button type="button" className="ghost-button small" disabled={historyLoading} aria-expanded={showRevisionHistory} onClick={() => void toggleRevisionHistory()}>
-                  {historyLoading ? "Загружаю историю…" : showRevisionHistory ? "Свернуть историю" : "История исправлений"}
-                </button>
-                {(localTranscription.revision ?? 1) > 1 && onOpenRevisionComparison && <button type="button" className="ghost-button small" onClick={() => onOpenRevisionComparison(call.id)}>Сравнить версии</button>}
-              </div>
               {historyError && <div className="form-error">{historyError}</div>}
               {showRevisionHistory && <div className="transcript-history-list">
                 {revisions.length === 0 ? <small>Версий пока нет.</small> : revisions.map((revision) => <div className={`transcript-history-row${revision.is_current ? " is-current" : ""}`} key={revision.id}>
@@ -712,12 +727,13 @@ export function CallDetailPanel({
             activeWordIndex={activeWordIndex}
             selectedEvidence={seekTarget}
             speakerAssignments={speakerAssignments}
+            speakerKeys={speakerKeys}
             onOverflowChange={setTranscriptExpandable}
           />
         </InfoCard>
         {!call.is_test && <CallSpeechBlock speech={call.speech} hideShare={!isVideoCall(call) && (localTranscription?.words?.length ?? 0) > 0} />}
         {!call.is_test && !transcriptionOnly && <div className="analysis-card-stack">
-          {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="primary-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}>{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
+          {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}><PenLine size={16} aria-hidden="true" />{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
           {qualityReviewError && <div className="form-error is-dismissible" role="alert">{qualityReviewError}</div>}
           <CallWorkOnMistakes callId={call.id} personal={!call.company_uuid} analysisId={isAnalysisDone(analysis) ? analysis?.id : undefined} onOpenItem={openAnalysisItem} />
           <InfoCard
@@ -745,6 +761,7 @@ export function CallDetailPanel({
               pendingMessage={analysisState.thinking ? "Производится анализ транскрипции. Результат появится после завершения обработки." : undefined}
               onEvidenceActivate={openEvidence}
               speakerAssignments={speakerAssignments}
+              speakerKeys={speakerKeys}
             />
           </InfoCard>
           {analysis && isAnalysisDone(analysis) && (

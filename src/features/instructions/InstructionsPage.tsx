@@ -1,11 +1,14 @@
 import {
   ArrowLeft,
+  Building2,
   Download,
   FileText,
   Lightbulb,
   Plus,
   Trash2,
-  Upload
+  Upload,
+  UserRound,
+  Users
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api";
@@ -225,7 +228,7 @@ export function InstructionSection({
 }) {
   return (
     <section className="instructions-group">
-      <h3>{title}<b>{instructions.length}</b></h3>
+      <h3>{title === "Личные" ? <UserRound size={14} aria-hidden="true" /> : title === "Отделы" ? <Users size={14} aria-hidden="true" /> : <Building2 size={14} aria-hidden="true" />}{title}<b>{instructions.length}</b></h3>
       {instructions.map((instruction) => (
         <InstructionRow
           key={instruction.id}
@@ -261,6 +264,7 @@ export function InstructionRow({
   // name built from an identifier tells the reader nothing.
   const machineName = /[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}/i.test(instruction.original_filename ?? "");
   const fileName = instruction.original_filename && !machineName && ![instruction.title, `${instruction.title}.md`].includes(instruction.original_filename) ? instruction.original_filename : "";
+  const format = instructionFormat(instruction);
 
   async function run(action: () => Promise<void>, failure: string) {
     setBusy(true); setError("");
@@ -284,7 +288,7 @@ export function InstructionRow({
   return (
     <div className={`instruction-item${instruction.is_active ? "" : " is-off"}`}>
       <button className="instruction-item-link" type="button" onClick={() => { window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(instruction.id)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>
-        <span className="instruction-item-icon" aria-hidden="true"><FileText size={18} /></span>
+        <span className={`instruction-item-format is-${format.key}`} aria-hidden="true">{format.label}</span>
         {/* The name the owner gave comes first; the file it came from is a detail. */}
         <span className="instruction-item-name">
           <strong>{name}</strong>
@@ -348,6 +352,17 @@ export function InstructionRow({
       />
     </div>
   );
+}
+
+// The document's format tells the owner which file this is before its name
+// does, so each format keeps one colour across the list.
+function instructionFormat(instruction: AnalysisInstruction): { key: string; label: string } {
+  const extension = instruction.original_filename.split(".").pop()?.toLowerCase() ?? "";
+  const mime = instruction.mime_type.toLowerCase();
+  if (extension === "docx" || mime.includes("wordprocessingml")) return { key: "docx", label: "DOCX" };
+  if (extension === "pdf" || mime === "application/pdf") return { key: "pdf", label: "PDF" };
+  if (extension === "xlsx" || mime.includes("spreadsheetml")) return { key: "xlsx", label: "XLSX" };
+  return { key: "md", label: "MD" };
 }
 
 function formatUpdated(value: string) {

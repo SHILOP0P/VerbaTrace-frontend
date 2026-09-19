@@ -7,7 +7,6 @@ import { activeTranscriptWordIndex } from "../lib/transcript";
 import { formatDuration } from "../lib/formatters";
 import { isVideoCall, mediaDownloadName } from "../lib/media";
 import { speakerColor } from "../lib/speaker-colors";
-import { HoverHint } from "./hover-hint";
 
 const playbackRates = [0.75, 1, 1.25, 1.5, 2];
 const emptyTranscriptWords: TranscriptionWordResponse[] = [];
@@ -18,17 +17,6 @@ const fallbackWaveform = Array.from({ length: waveformBars }, (_, index) => {
   return Math.max(0.2, Math.min(0.9, 0.54 + wave));
 });
 
-/** A place in the recording where an analysis card found its quote. */
-export type PlayerMoment = {
-  id: string;
-  seconds: number;
-  tone: "good" | "warn" | "bad";
-  title: string;
-  status: string;
-  quote: string;
-  speakerKey?: string;
-};
-
 export type PlayerSpeaker = { key: string; name: string; share: number | null };
 
 type MediaPlayerProps = {
@@ -38,8 +26,6 @@ type MediaPlayerProps = {
   onActiveWordChange?: (index: number) => void;
   /** Speakers in the order and with the names of the speech block. */
   speakers?: PlayerSpeaker[];
-  moments?: PlayerMoment[];
-  onMomentOpen?: (id: string) => void;
   longestMonologue?: { seconds: number; name: string } | null;
 };
 
@@ -60,11 +46,6 @@ function speakerRuns(words: TranscriptionWordResponse[]): SpeakerRun[] {
     }
   }
   return runs;
-}
-
-function momentClock(seconds: number) {
-  const total = Math.max(0, Math.floor(seconds));
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 type ResolvedMediaPlayerProps = MediaPlayerProps & {
@@ -251,13 +232,10 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
   );
 }
 
-export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords, onActiveWordChange, speakers, moments, onMomentOpen, longestMonologue, mediaVariant = "original", accessSession = "" }: MediaPlayerProps & Partial<ResolvedMediaPlayerProps>) {
+export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords, onActiveWordChange, speakers, longestMonologue, mediaVariant = "original", accessSession = "" }: MediaPlayerProps & Partial<ResolvedMediaPlayerProps>) {
   const runs = useMemo(() => speakerRuns(words), [words]);
   const speakerKeys = useMemo(() => speakers?.length ? speakers.map((speaker) => speaker.key) : Array.from(new Set(runs.map((run) => run.speaker))), [runs, speakers]);
   const hasLane = runs.length > 0;
-  const [momentFilter, setMomentFilter] = useState<"weak" | "all">("weak");
-  const [momentsExpanded, setMomentsExpanded] = useState(false);
-  const [activeMoment, setActiveMoment] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLDivElement | null>(null);
   const speedControlRef = useRef<HTMLDivElement | null>(null);
@@ -553,17 +531,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const currentTimeLabel = formatDuration(Math.round(currentTime));
   const audioDisabled = !audioUrl || loadingAudio || Boolean(audioError);
   const timelinePercent = (seconds: number) => `${effectiveDuration > 0 ? Math.min(100, Math.max(0, (seconds / effectiveDuration) * 100)) : 0}%`;
-  const speakerName = (key: string) => speakers?.find((speaker) => speaker.key === key)?.name || `Спикер ${key}`;
-  const allMoments = moments ?? [];
-  const hasGoodMoments = allMoments.some((moment) => moment.tone === "good");
-  const visibleMoments = momentFilter === "all" ? allMoments : allMoments.filter((moment) => moment.tone !== "good");
-  const shownMoments = momentsExpanded ? visibleMoments : visibleMoments.slice(0, 5);
   const legendSpeakers = speakers?.length ? speakers : speakerKeys.map((key) => ({ key, name: `Спикер ${key}`, share: null }));
-
-  function openMoment(moment: PlayerMoment) {
-    setActiveMoment(moment.id);
-    seek(String(moment.seconds));
-  }
 
   return (
     <div
@@ -581,22 +549,6 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
       </button>
       <div className="audio-player-main">
         <div className="audio-player-track-row">
-          {hasLane && visibleMoments.length > 0 && (
-            <div className="audio-moment-pins" aria-label="Места цитат из разбора">
-              {visibleMoments.map((moment) => (
-                <button
-                  key={moment.id}
-                  type="button"
-                  className={`audio-moment-pin is-${moment.tone}${activeMoment === moment.id ? " is-active" : ""}`}
-                  style={{ left: timelinePercent(moment.seconds) }}
-                  aria-label={`${moment.title}, ${momentClock(moment.seconds)}`}
-                  onClick={() => openMoment(moment)}
-                >
-                  <HoverHint focusable={false} label={moment.title} detail={[`${moment.status} · ${momentClock(moment.seconds)}`, `«${moment.quote}»`]}><i /></HoverHint>
-                </button>
-              ))}
-            </div>
-          )}
           <div
             ref={waveformRef}
             className={hasLane ? "audio-conversation-lane" : `audio-waveform ${waveformReady ? "ready" : "empty"}`}
@@ -725,46 +677,6 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
           onTimeUpdate={(event) => updateCurrentTime(event.currentTarget.currentTime)}
         />
       </div>
-      {hasLane && allMoments.length > 0 && (
-        <section className="audio-moments" aria-label="Моменты, которые стоит послушать">
-          <header>
-            <strong>Моменты, которые стоит послушать</strong>
-            <span className="audio-moments-count">{visibleMoments.length}</span>
-            {hasGoodMoments && (
-              <div className="audio-moments-filter" role="group" aria-label="Какие моменты показать">
-                <button type="button" className={momentFilter === "weak" ? "active" : ""} aria-pressed={momentFilter === "weak"} onClick={() => setMomentFilter("weak")}>Слабые и частичные</button>
-                <button type="button" className={momentFilter === "all" ? "active" : ""} aria-pressed={momentFilter === "all"} onClick={() => setMomentFilter("all")}>Все</button>
-              </div>
-            )}
-          </header>
-          {visibleMoments.length === 0 ? (
-            <p className="audio-moments-empty">Слабых и частичных мест нет: все найденные пункты выполнены.</p>
-          ) : (
-            <ul>
-              {shownMoments.map((moment) => (
-                <li key={moment.id} className={activeMoment === moment.id ? "is-active" : undefined}>
-                  <button type="button" className="audio-moment-time" aria-label={`Слушать с ${momentClock(moment.seconds)}`} onClick={() => openMoment(moment)}>
-                    <Play size={10} />{momentClock(moment.seconds)}
-                  </button>
-                  <span className={`audio-moment-status is-${moment.tone}`}><i />{moment.status}</span>
-                  <button type="button" className="audio-moment-text" onClick={() => onMomentOpen ? onMomentOpen(moment.id) : openMoment(moment)}>
-                    <strong>{moment.title}</strong>
-                    <span>«{moment.quote}»</span>
-                  </button>
-                  {moment.speakerKey ? (
-                    <span className="audio-moment-speaker" style={{ "--run-color": speakerColor(moment.speakerKey, speakerKeys) } as React.CSSProperties}><i />{speakerName(moment.speakerKey)}</span>
-                  ) : <span />}
-                </li>
-              ))}
-            </ul>
-          )}
-          {visibleMoments.length > 5 && (
-            <button type="button" className="text-link audio-moments-more" onClick={() => setMomentsExpanded((value) => !value)}>
-              {momentsExpanded ? "Свернуть" : `Показать все ${visibleMoments.length}`}
-            </button>
-          )}
-        </section>
-      )}
     </div>
   );
 }

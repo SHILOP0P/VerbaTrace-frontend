@@ -1,23 +1,32 @@
 import {
+  Ban,
   Building2,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   ChevronRight,
+  CircleAlert,
+  Clock3,
   CloudUpload,
-  Filter,
+  FileText,
+  FlaskConical,
+  Folder,
+  FolderOpen,
   MoreHorizontal,
   MoreVertical,
   PanelLeftClose,
   Pencil,
-  Play,
   Plus,
+  Search,
+  SlidersHorizontal,
   Star,
   Trash2,
   UserRound,
   UsersRound,
   X
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../../api";
@@ -40,6 +49,8 @@ import type {
 } from "../../types";
 
 import { formatDate, formatDuration } from "../../shared/lib/formatters";
+import { callStatusTone } from "../../shared/lib/call-status";
+import { pluralizeRu } from "../../shared/lib/plans";
 import { activeDepartmentLeaderIds, isCompanyManager } from "../../shared/lib/access";
 import { enterOverlayMode } from "../../shared/lib/page-scroll";
 import { useDrawerLayout } from "../../shared/lib/drawer-layout";
@@ -1041,6 +1052,7 @@ export function CallsPage({
     const selected = selectedCallId === call.id;
     const open = openCallMenuId === call.id;
     const isFavorite = favoriteCallIds.includes(call.id);
+    const rowState = callRowState(call, analyses[call.id]?.status);
     const selectCallFromRow = () => {
       if (folderId) {
         selectFolderCall(call.id, folderId);
@@ -1063,16 +1075,16 @@ export function CallsPage({
           selectCallFromRow();
         }}
       >
-        <span className="play-dot">
-          <Play size={14} fill="currentColor" />
-        </span>
+        <span className={`call-row-icon is-${rowState.tone}`} aria-hidden="true">{rowState.icon}</span>
         <span className="call-row-main">
-          <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
           <strong>{call.title}</strong>
-          <small>
-            {formatDate(call.display_time || call.occurred_at || call.created_at)} · {formatDuration(call.duration_seconds)}
-            {call.time_source === "upload_fallback" ? " · время загрузки" : ""}
-          </small>
+          <span className="call-row-meta">
+            <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
+            <small>
+              {formatDate(call.display_time || call.occurred_at || call.created_at)} · {formatDuration(call.duration_seconds)}
+              {call.time_source === "upload_fallback" ? " · время загрузки" : ""}
+            </small>
+          </span>
           {call.source_provider && <small className="call-source-line">{call.source_provider === "bitrix24" ? "Bitrix24" : "API"}{call.external_call_id ? ` · #${call.external_call_id}` : ""}</small>}
         </span>
         <span
@@ -1152,10 +1164,9 @@ export function CallsPage({
         >
           <PanelLeftClose size={19} />
         </button>
-        <div className="panel-heading">
+        <div className="panel-heading calls-sidebar-head">
           <div>
             <h2>Звонки</h2>
-            <p>Фильтры и детали выбранного звонка.</p>
           </div>
           <div className="mobile-call-drawer-heading-actions">
             <button className="primary-button small" onClick={() => onNavigate("upload")}>
@@ -1173,12 +1184,15 @@ export function CallsPage({
           </div>
         </div>
         <div className="calls-filter-bar">
-          <input
-            aria-label="Поиск звонка"
-            placeholder="Поиск по названию"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
+          <label className="calls-search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              aria-label="Поиск звонка"
+              placeholder="Поиск по названию"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </label>
           <button
             className={`ghost-button call-filter-toggle ${filtersExpanded ? "active" : ""}`}
             type="button"
@@ -1186,8 +1200,8 @@ export function CallsPage({
             aria-controls="call-advanced-filters"
             onClick={() => setFiltersExpanded((value) => !value)}
           >
-            <Filter size={16} />
-            Фильтры{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ""}
+            <SlidersHorizontal size={16} />
+            Фильтры{activeFilterCount > 0 && <b className="call-filter-count">{activeFilterCount}</b>}
           </button>
         </div>
         {activeFilterChips.length > 0 && <div className="call-filter-chips" aria-label="Активные фильтры">
@@ -1233,9 +1247,7 @@ export function CallsPage({
             checked={favoriteOnly}
             onChange={(event) => setFavoriteOnly(event.target.checked)}
           />
-          <span className="call-favorite-filter-box" aria-hidden="true">
-            {favoriteOnly && <Check size={12} strokeWidth={3} />}
-          </span>
+          <Star size={14} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden="true" />
           <span>Только избранные</span>
         </label>
         {hasScopes && (
@@ -1283,16 +1295,17 @@ export function CallsPage({
                       aria-expanded={expanded}
                       onClick={() => toggleFolder(folder.id)}
                     >
-                      {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                      <ChevronRight className="call-folder-chevron" size={15} aria-hidden="true" />
                       <span
-                        className="folder-color-dot"
+                        className="call-folder-icon"
+                        aria-hidden="true"
                         style={{ "--folder-color": folder.color || "#ff7a43" } as React.CSSProperties}
-                      />
+                      >
+                        {expanded ? <FolderOpen size={17} /> : <Folder size={17} />}
+                      </span>
                       <span>
                         <strong title={folder.name}>{folder.name}</strong>
-                        <small>
-                          {folderScopeLabel(folder)} · {folder.calls_count} звонков · {folder.instructions?.length ?? 0} инструкций
-                        </small>
+                        <small>{folderMeta(folder)}</small>
                       </span>
                     </button>
                     {canManageFolder(folder) && <div
@@ -1729,6 +1742,27 @@ const folderPalette = [
 type FolderPayloadResult =
   | { ok: true; value: CreateCallFolderRequest | UpdateCallFolderRequest }
   | { ok: false; error: string };
+
+// The row's icon says where the call stands, so the list reads at a glance
+// without an orange circle on every line.
+function callRowState(call: CallResponse, analysisStatus?: AnalysisResponse["status"]): { tone: string; icon: ReactNode } {
+  if (call.is_test) return { tone: "test", icon: <FlaskConical size={16} /> };
+  if (call.status === "cancelled") return { tone: "neutral", icon: <Ban size={16} /> };
+  if (call.transcription_only && call.status === "transcribed" && !analysisStatus) return { tone: "ok", icon: <FileText size={16} /> };
+  const tone = callStatusTone(call.status, analysisStatus);
+  if (tone === "bad") return { tone, icon: <CircleAlert size={16} /> };
+  if (tone === "warn") return { tone, icon: <Clock3 size={16} /> };
+  return { tone, icon: <CheckCircle2 size={16} /> };
+}
+
+function folderMeta(folder: CallFolderResponse) {
+  const instructions = folder.instructions?.length ?? 0;
+  return [
+    folderScopeLabel(folder),
+    `${folder.calls_count} ${pluralizeRu(folder.calls_count, "звонок", "звонка", "звонков")}`,
+    instructions > 0 ? `${instructions} ${pluralizeRu(instructions, "инструкция", "инструкции", "инструкций")}` : ""
+  ].filter(Boolean).join(" · ");
+}
 
 function emptyFolderForm(): FolderFormState {
   return {

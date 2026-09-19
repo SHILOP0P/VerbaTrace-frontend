@@ -136,9 +136,10 @@ export function OverviewPage({
   return (
     <section className="dashboard-page app-page">
       <div className="dashboard-kpi-grid">
-        <MetricCard loading={!loaded} icon={<BarChart3 size={18} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
+        <MetricCard loading={!loaded} series="blue" icon={<BarChart3 size={18} />} title="Всего звонков" value={metricCount(analyticsOverview?.calls_total)} points={chartSeries.totalCalls} note="в выбранной области" />
         <MetricCard
           loading={!loaded}
+          series="violet"
           icon={<Phone size={18} />}
           title="Новые сегодня"
           value={metricCount(analyticsOverview?.calls_created_today)}
@@ -153,8 +154,8 @@ export function OverviewPage({
           live={(analyticsOverview?.calls_processing ?? 0) > 0}
           note={runningTasksNote(processingMonitoring?.queue.running ?? 0)}
         />
-        <MetricCard loading={!loaded} icon={<CheckCircle2 size={18} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} points={chartSeries.analyzedCalls} note="готовый результат анализа" />
-        <MetricCard loading={!loaded} icon={<Clock3 size={18} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} note="по звонкам в выбранной области" />
+        <MetricCard loading={!loaded} series="green" icon={<CheckCircle2 size={18} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} points={chartSeries.analyzedCalls} note="готовый результат анализа" />
+        <MetricCard loading={!loaded} series="teal" icon={<Clock3 size={18} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} note="по звонкам в выбранной области" />
         <ScoreKpiCard loading={!loaded} score={analyticsScore.score === null ? null : (analyticsScore.score / analyticsScore.scale) * 100} summary={teamSummary} />
       </div>
 
@@ -333,7 +334,8 @@ function MetricCard({
   points,
   note,
   live = false,
-  loading = false
+  loading = false,
+  series
 }: {
   icon: React.ReactNode;
   title: string;
@@ -344,12 +346,15 @@ function MetricCard({
   /** Something is running right now: a quiet amber pulse next to the number. */
   live?: boolean;
   loading?: boolean;
+  /** The metric's own colour, shared by its icon and its line. */
+  series?: "blue" | "violet" | "green" | "teal";
 }) {
   const hasChart = Boolean(points && points.length > 0);
+  const seriesClass = series ? ` kpi-series-${series}` : "";
 
   if (loading) {
     return (
-      <article className={`dashboard-kpi-card glass-panel ${tone}`} aria-busy="true">
+      <article className={`dashboard-kpi-card glass-panel ${tone}${seriesClass}`} aria-busy="true">
         <div className="kpi-head">
           <span>{title}</span>
           <span className="metric-icon">{icon}</span>
@@ -361,7 +366,7 @@ function MetricCard({
   }
 
   return (
-    <article className={`dashboard-kpi-card glass-panel ${tone}${hasChart ? "" : " is-plain"}`}>
+    <article className={`dashboard-kpi-card glass-panel ${tone}${seriesClass}${hasChart ? "" : " is-plain"}`}>
       <div className="kpi-head">
         <span>{title}</span>
         <span className="metric-icon">{icon}</span>
@@ -417,7 +422,8 @@ type ChartPoint = {
 
 export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "neutral" | "accent" | "success" | "warning"; }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const gradientId = useId();
+  // useId returns characters a url(#…) reference does not accept everywhere.
+  const gradientId = `spark-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const prepared = points.length > 0 ? points : [{ label: "Нет данных", value: 0, display: "0" }];
   const animationKey = prepared.map((point) => `${point.label}:${point.value}:${point.display}`).join("|");
   const coordinates = sparklineCoordinates(prepared);
@@ -435,7 +441,8 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "n
             <stop offset="1" className="mini-sparkline-stop-bottom" />
           </linearGradient>
         </defs>
-        {area && <path className="mini-sparkline-area" d={area} fill={`url(#${gradientId})`} />}
+        {/* Inline, because the older stylesheet sets fill: none on every path. */}
+        {area && <path className="mini-sparkline-area" d={area} style={{ fill: `url(#${gradientId})` }} />}
         <path
           className="mini-sparkline-line"
           d={path}

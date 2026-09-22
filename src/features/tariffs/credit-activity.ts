@@ -26,7 +26,12 @@ export function creditActivityLevel(credits: number) {
   return 1 + CREDIT_COLOUR_BOUNDS.filter(threshold => credits > threshold).length;
 }
 
-export function buildCreditActivity(source: readonly ActivityValue[], period: CreditActivityPeriod, now = new Date()) {
+/**
+ * Builds the calendar. `maxColumns` is how many weeks the block has room for:
+ * a narrow screen shows fewer weeks, ending today, instead of hiding the rest
+ * behind a sideways scroll nobody notices.
+ */
+export function buildCreditActivity(source: readonly ActivityValue[], period: CreditActivityPeriod, now = new Date(), maxColumns = Number.POSITIVE_INFINITY) {
   const range = creditActivityRange(now);
   const start = Date.parse(`${range.from}T00:00:00Z`);
   const leading = (new Date(start).getUTCDay() + 6) % 7;
@@ -73,5 +78,26 @@ export function buildCreditActivity(source: readonly ActivityValue[], period: Cr
     if (months.length && column - months.at(-1)!.column < 3) months.pop();
     months.push({ label, column });
   }
-  return { cells, months, columns, maximum, range };
+
+  const visibleColumns = Math.max(1, Math.min(columns, Math.floor(maxColumns)));
+  if (visibleColumns === columns) return { cells, months, columns, maximum, range };
+
+  // The oldest weeks go first; the calendar always ends on today.
+  const dropped = columns - visibleColumns;
+  const visibleCells = cells.slice(dropped * 7);
+  const visibleMonths = months.filter(month => month.column > dropped).map(month => ({ ...month, column: month.column - dropped }));
+  // The first visible column starts inside a month whose label was cut away;
+  // it is named again only when the next label is far enough not to collide.
+  const firstDay = daily[dropped * 7];
+  if (firstDay && (visibleMonths[0]?.column ?? Number.POSITIVE_INFINITY) >= 3) {
+    const label = new Intl.DateTimeFormat("ru-RU", { month: "short", timeZone: "UTC" }).format(new Date(`${firstDay.date}T00:00:00Z`));
+    visibleMonths.unshift({ label, column: 1 });
+  }
+  return {
+    cells: visibleCells,
+    months: visibleMonths,
+    columns: visibleColumns,
+    maximum,
+    range: { from: visibleCells[0]?.date ?? range.from, to: range.to },
+  };
 }

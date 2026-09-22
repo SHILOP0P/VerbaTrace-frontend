@@ -1,4 +1,4 @@
-import { ShieldCheck, UserMinus, UserRoundCog } from "lucide-react";
+import { ShieldCheck, UserRoundCog, UserRoundX } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type {
@@ -189,6 +189,16 @@ export function CompanyMembersPanel({
             const self = member.user_uuid === session.user.id;
             const isDeputy = member.company_role === "company_deputy";
             const isCompanyOwner = member.company_role === "company_manager";
+            // Four roles, four colours: the list is read to find out who runs
+            // what, and one green chip on everyone answered nothing.
+            const leads = member.departments.filter((department) => department.role === "department_leader");
+            const role = isCompanyOwner
+              ? { tone: "role-owner", label: "Владелец" }
+              : isDeputy
+                ? { tone: "role-deputy", label: "Заместитель" }
+                : leads.length > 0
+                  ? { tone: "role-leader", label: leads.length > 1 ? `Руководитель · ${leads.length} отдела` : "Руководитель отдела" }
+                  : { tone: "role-member", label: "Сотрудник" };
             return (
               <article className="department-member-row company-member-row" key={member.user_uuid}>
                 <div className="department-member-main">
@@ -200,9 +210,7 @@ export function CompanyMembersPanel({
                       : "Без отдела"}
                   </small>
                 </div>
-                <span className={`status-chip ${isCompanyOwner || isDeputy ? "ok" : "warn"}`}>
-                  {isCompanyOwner ? "Владелец" : isDeputy ? "Заместитель" : "Сотрудник"}
-                </span>
+                <span className={`status-chip ${role.tone}`}>{role.label}</span>
                 {!self && !isCompanyOwner && (
                   <div className="panel-actions">
                     {isOwner && !isDeputy && (
@@ -238,13 +246,16 @@ export function CompanyMembersPanel({
                         Передать компанию
                       </button>
                     )}
+                    {/* Removing someone is the last thing on the row and the
+                        only one that turns red, and then only under the
+                        pointer: at rest it is as quiet as its neighbours. */}
                     <button
-                      className="ghost-button small danger"
+                      className="ghost-button small danger member-remove-button"
                       type="button"
                       disabled={busyUser === member.user_uuid}
                       onClick={() => setPending({ kind: "remove", member })}
                     >
-                      <UserMinus size={16} />
+                      <UserRoundX size={16} />
                       Исключить
                     </button>
                   </div>

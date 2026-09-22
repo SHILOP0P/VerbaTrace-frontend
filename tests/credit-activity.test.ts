@@ -56,6 +56,31 @@ test("empty data stays empty in every mode, duplicates sum, future data is exclu
   assert.equal(chart.cells.find(c => c.date === "2026-09-02")?.credits, 25);
   assert.equal(chart.maximum, 25);
 });
+test("a narrow block shows fewer weeks, ending today, instead of scrolling", () => {
+  const source = [{ date: "2026-09-02", credits: 5000 }, { date: "2025-10-06", credits: 7000 }];
+  const full = buildCreditActivity(source, "day", now);
+  const narrow = buildCreditActivity(source, "day", now, 18);
+  assert.equal(narrow.columns, 18);
+  assert.equal(narrow.cells.length, 18 * 7);
+  // The last day is the same in both: the calendar is cut from the old end.
+  assert.equal(narrow.cells.at(-1)?.date, full.cells.at(-1)?.date);
+  assert.equal(narrow.cells.find(cell => cell.date === "2026-09-02")?.credits, 5000);
+  assert.equal(narrow.cells.some(cell => cell.date === "2025-10-06"), false);
+  assert.ok(narrow.months.length > 0 && narrow.months.every(month => month.column >= 1 && month.column <= 18));
+  for (let index = 1; index < narrow.months.length; index++) {
+    assert.ok(narrow.months[index].column > narrow.months[index - 1].column);
+  }
+  // A limit wider than the year changes nothing.
+  assert.equal(buildCreditActivity(source, "day", now, 999).columns, full.columns);
+});
+test("weekly and total modes keep whole columns when the block is narrow", () => {
+  const source = [{ date: "2026-08-23", credits: 20 }, { date: "2026-08-26", credits: 30 }];
+  for (const mode of ["week", "total"] as const) {
+    const narrow = buildCreditActivity(source, mode, now, 10);
+    assert.equal(narrow.cells.length, 70);
+    assert.equal(narrow.cells.length % 7, 0);
+  }
+});
 test("UTC date boundaries, leap years and month labels remain stable", () => {
   assert.equal(creditActivityRange(new Date("2026-09-03T00:30:00+03:00")).to, "2026-09-02");
   const chart = buildCreditActivity([], "day", new Date("2024-03-01T00:00:00Z"));

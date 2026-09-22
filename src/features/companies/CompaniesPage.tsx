@@ -193,12 +193,13 @@ export function CompaniesPage({
               </button>
             ) : companies.length > 0 ? (
               <SelectControl
+                aria-label="Активная компания"
                 value={activeCompany?.id ?? ""}
                 onChange={(event) => setActiveCompanyId(event.target.value)}
               >
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
-                    Активная: {company.name}
+                    {company.name}
                   </option>
                 ))}
               </SelectControl>
@@ -479,6 +480,8 @@ export function CompanyWorkspace({
           <ProfileField label="Отделов" value={departments.length.toString()} />
         </div>
         <CompanySubscriptionStatus company={company} isManager={isManager} onNavigate={onNavigate} />
+        {/* The state of the company belongs to the company's own card. */}
+        <CompanyLifecyclePanel companyId={company.id} isOwner={isManager} />
         {!isManager && <div className="company-workspace-leave"><button className="ghost-button danger" type="button" onClick={() => setLeaveOpen(true)}>Покинуть компанию</button>{leaveError && <p className="form-error">{leaveError}</p>}</div>}
       </div>
 
@@ -536,14 +539,8 @@ export function CompanyWorkspace({
           isOwner={isManager}
           ownedCompanyCount={ownedCompanies.length}
         />
-        {isManager && ownedCompanies.length > 1 && (
-          <CompanyDataTransferPanel companies={ownedCompanies} sourceCompanyId={company.id} />
-        )}
-        {/* Hidden from members who do not run the company or a department. */}
-        <CompanyLifecyclePanel companyId={company.id} isOwner={isManager} />
-        <CreditLimitsPanel companyId={company.id} isOwner={isManager} />
-        <SupportJournalPanel companyId={company.id} />
-
+        {/* Inviting belongs next to the people it adds, not at the bottom of the
+            page behind the journals and the limits. */}
         {canInvite ? (
           <InvitationCreatePanel
             companies={[company]}
@@ -561,6 +558,11 @@ export function CompanyWorkspace({
             </div>
           </section>
         )}
+        {isManager && ownedCompanies.length > 1 && (
+          <CompanyDataTransferPanel companies={ownedCompanies} sourceCompanyId={company.id} />
+        )}
+        <CreditLimitsPanel companyId={company.id} isOwner={isManager} />
+        <SupportJournalPanel companyId={company.id} />
       </div>
       <ConfirmDialog open={leaveOpen} title="Покинуть компанию?" message="Вы потеряете доступ к звонкам, отделам и инструкциям этой компании. Вернуться можно будет только по новому приглашению." confirmLabel="Покинуть компанию" busy={leaving} variant="danger" onCancel={() => setLeaveOpen(false)} onConfirm={() => void leaveCompany()} />
     </section>

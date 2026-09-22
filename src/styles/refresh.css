@@ -40,6 +40,10 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   --vt-bad-soft: rgba(232, 105, 91, 0.15);
   --vt-info: #7ea8da;
   --vt-info-soft: rgba(126, 168, 218, 0.15);
+  /* A fourth tone, for the role that is neither the owner nor an ordinary
+     member: a department leader. Same rules as the others — 4.5:1 on its tint. */
+  --vt-lead: #b79ae8;
+  --vt-lead-soft: rgba(168, 139, 236, 0.16);
   /* Marks (arcs, bars, dots, icons) may be as bright as the theme allows; on
      a dark page the text tones already are. */
   --vt-scroll-thumb: rgba(255, 244, 235, 0.2);
@@ -94,6 +98,8 @@ html[data-theme="light"] :is(.app-shell, .vt-portal) {
   --vt-bad-soft: rgba(229, 72, 77, 0.11);
   --vt-info: #2563c4;
   --vt-info-soft: rgba(59, 130, 246, 0.11);
+  --vt-lead: #6d3fc4;
+  --vt-lead-soft: rgba(139, 92, 246, 0.12);
   --vt-scroll-thumb: rgba(84, 56, 38, 0.24);
   --vt-scroll-thumb-hover: rgba(84, 56, 38, 0.42);
   --vt-good-mark: #2e9f63;
@@ -3036,7 +3042,7 @@ html[data-theme] .app-shell .workspace-options button small {
   display: none;
 }
 
-@media (min-width: 761px) and (max-width: 1120px) {
+@media (min-width: 1025px) and (max-width: 1120px) {
   html[data-theme] .app-shell .app-header .team-switcher {
     display: inline-flex;
     gap: 6px;
@@ -3367,7 +3373,11 @@ html[data-theme] .app-shell .date-range-control > svg {
   }
 }
 
-@media (min-width: 761px) and (max-width: 1240px) {
+/* Only the one-row header is tight enough to make the switcher give up its
+   text. In the two-row header (761–1024) the brand row holds the logo, the
+   switcher and four icons and still has ~360 px to spare, so hiding the name
+   there left an initials tile beside a half-empty row. */
+@media (min-width: 1025px) and (max-width: 1240px) {
   html[data-theme] .app-shell .app-header .team-switcher {
     display: inline-flex;
     gap: 6px;
@@ -5029,6 +5039,218 @@ html[data-theme] .app-shell .quality-review-entry small {
   ) {
     font-size: var(--mobile-text-small, 14px);
   }
+}
+
+/* ---------------------------------------------------------------------------
+ * The bottom island: the number of sections follows the width (the shell sets
+ * --nav-columns), so on a tablet it carries six and on a phone three, and the
+ * rest wait in «Ещё». A section fades in when it arrives and out in its place
+ * when it leaves; only opacity and transform animate, so a window drag stays
+ * as cheap as the arithmetic behind it.
+ * ------------------------------------------------------------------------- */
+.app-shell .mobile-bottom-nav {
+  grid-template-columns: repeat(var(--nav-columns, 5), minmax(0, 1fr));
+}
+
+.app-shell .mobile-bottom-nav button {
+  animation: vt-nav-item-in 200ms ease-out both;
+}
+
+.app-shell .mobile-bottom-nav button.is-leaving {
+  pointer-events: none;
+  animation: vt-nav-item-out 200ms ease-in both;
+}
+
+@keyframes vt-nav-item-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes vt-nav-item-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px) scale(0.94); }
+}
+
+/* ---------------------------------------------------------------------------
+ * Companies: the card says what the company is and how it is doing, the list
+ * of people says who runs what, and the limits sit in fields that match their
+ * buttons. Every role has its own colour — one green chip on everybody told
+ * the reader nothing.
+ * ------------------------------------------------------------------------- */
+html[data-theme] .app-shell .status-chip.role-owner {
+  color: var(--vt-good);
+  background: var(--vt-good-soft);
+}
+
+html[data-theme] .app-shell .status-chip.role-deputy {
+  color: var(--vt-info);
+  background: var(--vt-info-soft);
+}
+
+html[data-theme] .app-shell .status-chip.role-leader {
+  color: var(--vt-lead);
+  background: var(--vt-lead-soft);
+}
+
+html[data-theme] .app-shell .status-chip.role-member {
+  color: var(--vt-text-2);
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .status-chip.role-member::before {
+  background: var(--vt-text-3);
+}
+
+/* The state of the company lives in its card, under the subscription line. */
+html[data-theme] .app-shell .company-state-row {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vt-line);
+}
+
+html[data-theme] .app-shell .company-state-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+html[data-theme] .app-shell .company-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Removing a person is the quiet last action until the pointer is on it. */
+html[data-theme] .app-shell .member-remove-button:hover:not(:disabled) {
+  color: var(--vt-bad);
+  background: var(--vt-bad-soft);
+  border-color: color-mix(in srgb, var(--vt-bad-mark) 36%, transparent);
+}
+
+html[data-theme] .app-shell .member-remove-button:hover:not(:disabled) svg {
+  color: var(--vt-bad);
+}
+
+/* The limit field sits in a row with its button: same height, and the number
+   reads from the middle, where the placeholder sat off to one side before. */
+html[data-theme] .app-shell .credit-limit-input {
+  width: 132px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+html[data-theme] .app-shell .credit-limit-input::placeholder {
+  color: var(--vt-text-3);
+}
+
+html[data-theme] .app-shell .credit-limit-input:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: 2px;
+}
+
+/* The icon of a note is a tile at the start of the row, not a glyph floating
+   in the middle of the wrapped sentence beside it. */
+html[data-theme] .app-shell .company-lock-note {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+html[data-theme] .app-shell .company-lock-note > svg {
+  box-sizing: border-box;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 9px;
+  border-radius: 10px;
+  color: var(--vt-text-2);
+  background: var(--vt-s3);
+  box-shadow: inset 0 0 0 1px var(--vt-line);
+}
+
+html[data-theme] .app-shell .company-lock-note > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .company-lock-note p {
+  margin: 0;
+}
+
+/* A note with an emblem is a row, not a glyph dropped on a line of text. */
+html[data-theme] .app-shell .company-empty-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+html[data-theme] .app-shell .company-empty-note .page-emblem {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--vt-s3);
+}
+
+html[data-theme] .app-shell .company-empty-note .page-emblem svg {
+  width: 17px;
+  height: 17px;
+}
+
+html[data-theme] .app-shell .company-empty-note p {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* The two panels sat side by side down to 640 px each, where the company
+   picker was squeezed to «А…». They wrap by their own width instead. */
+html[data-theme] .app-shell .company-limits-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+}
+
+html[data-theme] .app-shell .company-list-panel .panel-heading {
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+html[data-theme] .app-shell .company-list-panel .panel-heading .select-control {
+  flex: 0 1 260px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The second line of a mini card is a sentence — the date a department was
+   created, what a limit has spent — and it wraps instead of being cut off. */
+html[data-theme] .app-shell .company-mini-card small {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+/* The year of activity fits the block: CreditActivityChart shows as many weeks
+   as the width holds, ending today, so no week hides behind a sideways scroll. */
+html[data-theme] .app-shell .credit-heatmap-scroll {
+  overflow: visible;
+  min-width: 0;
+}
+
+html[data-theme] .app-shell .credit-activity-block {
+  min-width: 0;
 }
 
 /* ---------------------------------------------------------------------------

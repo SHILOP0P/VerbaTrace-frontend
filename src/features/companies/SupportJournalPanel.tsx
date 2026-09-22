@@ -43,9 +43,11 @@ export function SupportJournalPanel({ companyId }: { companyId: string }) {
       </div>
       {error && <div className="form-error">{error}</div>}
       {entries.length === 0 ? (
-        <div className="instruction-empty standalone">
-          <ShieldQuestion size={18} />
-          Поддержка не запрашивала доступ к данным компании.
+        /* The icon is a tile beside the sentence, not a glyph dropped on its
+           baseline, so the note reads as one line at any width. */
+        <div className="instruction-empty standalone company-empty-note">
+          <span className="page-emblem" aria-hidden="true"><ShieldQuestion /></span>
+          <p>Поддержка не запрашивала доступ к данным компании.</p>
         </div>
       ) : (
         <div className="company-mini-list">

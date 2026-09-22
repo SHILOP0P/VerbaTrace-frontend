@@ -5,6 +5,9 @@ import { buildCreditActivity, creditActivityLegend, formatActivityCredits } from
 import type { ActivityValue, CreditActivityPeriod } from "./credit-activity";
 
 const modes = { day: "За день", week: "За неделю", total: "Суммарно" };
+// Matches the square and the gap in auth-app.css; a phone shows at least a
+// quarter of a year, which is still a calendar and not a stripe.
+const CELL_SIZE = 13, CELL_GAP = 4, WEEKS_IN_YEAR = 53, MIN_WEEKS = 13;
 const descriptions = {
   day: "Каждый квадрат — расход за день. Даты списаний в UTC, не даты загрузки звонков.",
   week: "Каждый столбец — расход за календарную неделю, с понедельника. Даты в UTC.",
@@ -19,18 +22,30 @@ export const CreditActivityChart = memo(function CreditActivityChart({ activity,
   const gridRef = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
   const descriptionId = useId();
-  const chart = useMemo(() => buildCreditActivity(activity, period, new Date(`${today}T00:00:00Z`)), [activity, period, today]);
+  const [columnsFit, setColumnsFit] = useState(WEEKS_IN_YEAR);
+  const chart = useMemo(() => buildCreditActivity(activity, period, new Date(`${today}T00:00:00Z`), columnsFit), [activity, period, today, columnsFit]);
   const lastIndex = chart.cells.reduce((last, cell, index) => cell.placeholder ? last : index, 0);
 
+  // The calendar fits the block instead of scrolling sideways: as the block
+  // narrows it shows fewer weeks, always the most recent ones, and the month
+  // labels under it say which ones are on screen.
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
-    const showLatest = () => { container.scrollLeft = container.scrollWidth; };
-    showLatest();
-    const observer = new ResizeObserver(showLatest);
+    const fit = () => {
+      const width = container.clientWidth;
+      if (!width) return;
+      setColumnsFit(Math.max(MIN_WEEKS, Math.min(WEEKS_IN_YEAR, Math.floor((width + CELL_GAP) / (CELL_SIZE + CELL_GAP)))));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
     observer.observe(container);
-    return () => observer.disconnect();
-  }, [today]);
+    window.addEventListener("resize", fit);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", fit);
+    };
+  }, []);
   useEffect(() => {
     if (!tooltip) return;
     const hide = () => setTooltip(null);

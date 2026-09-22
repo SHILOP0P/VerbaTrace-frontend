@@ -1,14 +1,19 @@
 import { PauseCircle, PlayCircle, Undo2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type { CompanyLifecycle } from "../../types";
 import { formatDate } from "../../shared/lib/formatters";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
+import { HoverHint } from "../../shared/ui/hover-hint";
 
 /**
  * CompanyLifecyclePanel shows whether a company works and lets the owner choose
  * which ones keep working when the plan covers fewer than they own. A frozen
  * company stays readable; only what changes data or spends credits stops.
+ *
+ * It is a row inside the company card, not a card of its own: the state of the
+ * company belongs with its name, not in a panel further down the page.
  */
 export function CompanyLifecyclePanel({
   companyId,
@@ -68,59 +73,48 @@ export function CompanyLifecyclePanel({
   }
 
   return (
-    <section className="company-card glass">
-      <div className="panel-heading">
-        <div>
-          <h2>Состояние компании</h2>
-          <p>{stateDescription(lifecycle)}</p>
-        </div>
-        <span className={`status-chip ${lifecycle.state === "active" ? "ok" : "warn"}`}>{stateLabel(lifecycle)}</span>
-      </div>
+    <div className="company-state-row">
+      <p className="company-state-text">
+        <span className={`status-chip ${stateTone(lifecycle)}`}>{stateLabel(lifecycle)}</span>
+        {stateDescription(lifecycle)}
+      </p>
       {error && <div className="form-error">{error}</div>}
       {isOwner && (
-        /* Every action the state knows about stays on screen and the ones that do
-           not apply are pale and inert, with a title that says why. Hiding them
-           left the panel looking different on every visit and gave no hint that
-           the company could be switched on again at all. */
-        <div className="panel-actions">
-          <button
-            className="ghost-button small"
-            type="button"
-            disabled={busy || lifecycle.state !== "active"}
-            title={lifecycle.state === "active" ? undefined : "Заморозить можно только работающую компанию"}
+        /* Every action the state knows about stays on screen and the ones that
+           do not apply are pale and inert, with a hint that says why. Hiding
+           them left the card looking different on every visit and gave no hint
+           that the company could be switched on again at all. Only the action
+           that applies right now is the bright one. */
+        <div className="company-state-actions">
+          <StateAction
+            icon={<PauseCircle size={16} />}
+            label="Заморозить"
+            enabled={!busy && lifecycle.state === "active"}
+            hint="Заморозить можно только работающую компанию"
             onClick={() => setFreezeOpen(true)}
-          >
-            <PauseCircle size={16} />
-            Заморозить
-          </button>
-          <button
-            className="primary-button small"
-            type="button"
-            disabled={busy || !beingDeleted}
-            title={beingDeleted ? undefined : "Отменять нечего: удаление не начато"}
+          />
+          <StateAction
+            icon={<Undo2 size={16} />}
+            label={busy && beingDeleted ? "Отменяю…" : "Отменить удаление"}
+            enabled={!busy && beingDeleted}
+            primary
+            hint="Отменять нечего: удаление не начато"
             onClick={() => void change("cancel-deletion")}
-          >
-            <Undo2 size={16} />
-            {busy && beingDeleted ? "Отменяю…" : "Отменить удаление"}
-          </button>
-          <button
-            className="primary-button small"
-            type="button"
-            disabled={busy || lifecycle.state !== "frozen" || beingDeleted}
-            title={
+          />
+          <StateAction
+            icon={<PlayCircle size={16} />}
+            label="Включить компанию"
+            enabled={!busy && lifecycle.state === "frozen" && !beingDeleted}
+            primary
+            hint={
               lifecycle.state === "active"
                 ? "Компания и так работает"
                 : beingDeleted
                   ? "Сначала отмените удаление"
-                  : lifecycle.state === "soft_deleted"
-                    ? "Компания удалена: вернуть её может только суперадмин"
-                    : undefined
+                  : "Компания удалена: вернуть её может только суперадмин"
             }
             onClick={() => void change("activate")}
-          >
-            <PlayCircle size={16} />
-            Включить компанию
-          </button>
+          />
         </div>
       )}
       <ConfirmDialog
@@ -132,7 +126,39 @@ export function CompanyLifecyclePanel({
         onCancel={() => setFreezeOpen(false)}
         onConfirm={() => void change("freeze")}
       />
-    </section>
+    </div>
+  );
+}
+
+// Green while the company works, amber while it is parked and can come back,
+// red once it is on its way out.
+function stateTone(lifecycle: CompanyLifecycle) {
+  if (lifecycle.state === "active") return "ok";
+  return lifecycle.state === "frozen" && lifecycle.freeze_reason !== "deletion" ? "warn" : "bad";
+}
+
+// A disabled button cannot carry its own hover hint, so the inert ones are
+// wrapped: the explanation still appears, in the app's own tooltip.
+function StateAction({ icon, label, enabled, hint, primary = false, onClick }: {
+  icon: ReactNode;
+  label: string;
+  enabled: boolean;
+  hint: string;
+  primary?: boolean;
+  onClick: () => void;
+}) {
+  if (!enabled) {
+    return (
+      <HoverHint label={hint} focusable={false}>
+        <button className="ghost-button small" type="button" disabled>{icon}{label}</button>
+      </HoverHint>
+    );
+  }
+  return (
+    <button className={primary ? "primary-button small" : "ghost-button small"} type="button" onClick={onClick}>
+      {icon}
+      {label}
+    </button>
   );
 }
 

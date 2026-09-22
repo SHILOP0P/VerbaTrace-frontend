@@ -17,6 +17,7 @@ import {
   UserRound,
   X
 } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, openAuthorizedEventStream } from "../../api";
 import type {
@@ -43,7 +44,22 @@ import { notificationPresentation } from "../../shared/ui/notification-presentat
 import { ToolButton } from "../assistant/AssistantControls";
 import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
 
-const MOBILE_NAV_PAGES: AppPage[] = ["overview", "teamAnalytics", "calls", "qualityReviews"];
+/* The bottom island holds as many sections as its width fits and the rest wait
+   in «Ещё» — it does not stretch four buttons across a tablet. The numbers are
+   the island's own: 680 px at most, 24 px of screen margin on each side, 6 px
+   of padding and a 4 px gap, and a column of 92 px, which is the longest label
+   («QA-проверка») plus air. It is arithmetic on resize, not a measurement of
+   the DOM, so a window drag costs nothing. */
+const BAR_MAX_WIDTH = 680, BAR_SCREEN_MARGIN = 48, BAR_PADDING = 12, BAR_GAP = 4, BAR_COLUMN = 92;
+const BAR_MIN_SECTIONS = 3, BAR_MAX_SECTIONS = 6;
+const BAR_LEAVE_MS = 200;
+
+function barSectionsFor(width: number) {
+  const inner = Math.min(BAR_MAX_WIDTH, width - BAR_SCREEN_MARGIN) - BAR_PADDING;
+  const columns = Math.floor((inner + BAR_GAP) / (BAR_COLUMN + BAR_GAP));
+  // One column always belongs to «Ещё».
+  return Math.max(BAR_MIN_SECTIONS, Math.min(BAR_MAX_SECTIONS, columns - 1));
+}
 
 export function AuthenticatedShell({
   activePage,
@@ -107,6 +123,9 @@ export function AuthenticatedShell({
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [mobileTransitionDirection, setMobileTransitionDirection] = useState<"forward" | "backward" | null>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [barSections, setBarSections] = useState(BAR_MIN_SECTIONS);
+  const [leavingSections, setLeavingSections] = useState(0);
+  const previousBarSections = useRef(BAR_MIN_SECTIONS);
   const mobileMoreRef = useRef<HTMLDivElement>(null);
   const teamPopoverRef = useRef<HTMLDivElement>(null);
   const searchPopoverRef = useRef<HTMLLabelElement>(null);
@@ -131,19 +150,44 @@ export function AuthenticatedShell({
   useEffect(() => { setAssistantOpen(false); }, [activePage]);
   useEffect(() => { setMobileMoreOpen(false); }, [activePage]);
 
-  // The bar holds four pages; everything else lives behind "Ещё". The sidebar is
-  // hidden on a phone, so before this the remaining sections — the admin panel
-  // among them — had no route on a phone at all.
+  // The bar holds as many pages as it fits; everything else lives behind "Ещё".
+  // The sidebar is hidden on a phone, so before this the remaining sections —
+  // the admin panel among them — had no route on a phone at all.
   const mobileMoreItems = useMemo(() => [
-    ...sidebarItems.slice(4),
+    ...sidebarItems.slice(barSections),
     ...(adminCapabilities ? [adminSidebarItem] : []),
     { page: "settings" as AppPage, label: "Настройки", icon: <Settings size={19} /> }
-  ], [adminCapabilities]);
+  ], [adminCapabilities, barSections]);
+  const mobileNavPages = useMemo(() => sidebarItems.slice(0, barSections).map((item) => item.page), [barSections]);
+
+  useEffect(() => {
+    const fit = () => setBarSections((current) => {
+      const next = barSectionsFor(window.innerWidth);
+      return next === current ? current : next;
+    });
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
+  // A section that no longer fits fades out in its place before the row closes
+  // over it, instead of blinking away mid-drag. Only opacity and transform move.
+  useEffect(() => {
+    const previous = previousBarSections.current;
+    previousBarSections.current = barSections;
+    if (previous <= barSections) {
+      setLeavingSections(0);
+      return;
+    }
+    setLeavingSections(previous - barSections);
+    const timer = window.setTimeout(() => setLeavingSections(0), BAR_LEAVE_MS);
+    return () => window.clearTimeout(timer);
+  }, [barSections]);
 
   function navigateFromMobileBar(nextPage: AppPage) {
     const currentMobilePage = isSettingsPage(activePage) ? "settings" : activePage === "teamAnalyticsEmployee" ? "teamAnalytics" : activePage;
-    const currentIndex = MOBILE_NAV_PAGES.indexOf(currentMobilePage);
-    const nextIndex = MOBILE_NAV_PAGES.indexOf(nextPage);
+    const currentIndex = mobileNavPages.indexOf(currentMobilePage);
+    const nextIndex = mobileNavPages.indexOf(nextPage);
 
     setMobileTransitionDirection(
       currentIndex >= 0 && nextIndex >= 0 && currentIndex !== nextIndex
@@ -733,12 +777,18 @@ export function AuthenticatedShell({
           in the bar, and a tap on it while the sheet is open has to close it
           rather than count as a click outside and immediately reopen it. */}
       <div className="mobile-nav-layer" ref={mobileMoreRef}>
-        <nav className="mobile-bottom-nav" aria-label="Основная навигация">
-          {sidebarItems.slice(0, 4).map((item) => (
+        <nav
+          className="mobile-bottom-nav"
+          aria-label="Основная навигация"
+          style={{ "--nav-columns": barSections + leavingSections + 1 } as CSSProperties}
+        >
+          {sidebarItems.slice(0, barSections + leavingSections).map((item, index) => (
             <button
               key={item.page}
-              className={activeSidebarPage === item.page ? "active" : ""}
+              className={`${activeSidebarPage === item.page ? "active" : ""}${index >= barSections ? " is-leaving" : ""}`.trim()}
               type="button"
+              aria-hidden={index >= barSections}
+              tabIndex={index >= barSections ? -1 : undefined}
               onClick={() => { setMobileMoreOpen(false); navigateFromMobileBar(item.page); }}
             >
               {item.icon}

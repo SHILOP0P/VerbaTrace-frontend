@@ -118,7 +118,7 @@
 
   .landing {
     --landing-header-offset: 10px;
-    --landing-header-space: 88px;
+    --landing-header-space: 80px;
   }
 
   .landing-bg { position: absolute; background-attachment: scroll; background-position: 38% center; }
@@ -130,7 +130,7 @@
     width: calc(100% - 20px);
     min-height: 62px;
     height: auto;
-    padding: 12px 14px;
+    padding: 7px 14px;
     border-radius: 20px;
   }
 
@@ -1263,6 +1263,8 @@ html[data-theme="light"] .app-shell .mobile-more-sheet button.active {
     left: auto;
     z-index: 2;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
     gap: 2px;
     width: min(290px, calc(100vw - 32px));
     padding: 8px;
@@ -1289,7 +1291,7 @@ html[data-theme="light"] .app-shell .mobile-more-sheet button.active {
     pointer-events: auto;
   }
 
-  .landing-header nav a {
+  .landing-header nav :is(a, .landing-jump) {
     display: flex;
     align-items: center;
     width: 100%;
@@ -1307,20 +1309,20 @@ html[data-theme="light"] .app-shell .mobile-more-sheet button.active {
 
   /* The rows arrive one after another rather than all at once: four short delays
      read as the menu unfolding instead of appearing. */
-  .landing-header nav.mobile-open a {
+  .landing-header nav.mobile-open :is(a, .landing-jump) {
     opacity: 1;
     transform: translateY(0);
   }
 
-  .landing-header nav.mobile-open a:nth-child(1) { transition-delay: 40ms; }
-  .landing-header nav.mobile-open a:nth-child(2) { transition-delay: 75ms; }
-  .landing-header nav.mobile-open a:nth-child(3) { transition-delay: 110ms; }
-  .landing-header nav.mobile-open a:nth-child(4) { transition-delay: 145ms; }
+  .landing-header nav.mobile-open :is(a, .landing-jump):nth-child(1) { transition-delay: 40ms; }
+  .landing-header nav.mobile-open :is(a, .landing-jump):nth-child(2) { transition-delay: 75ms; }
+  .landing-header nav.mobile-open :is(a, .landing-jump):nth-child(3) { transition-delay: 110ms; }
+  .landing-header nav.mobile-open :is(a, .landing-jump):nth-child(4) { transition-delay: 145ms; }
 
   /* The links keep the accent colour of the desktop header on hover and gain a
      row highlight, so a touch on a full-width row is visibly a target. */
-  .landing-header nav a:hover,
-  .landing-header nav a:focus-visible {
+  .landing-header nav :is(a, .landing-jump):hover,
+  .landing-header nav :is(a, .landing-jump):focus-visible {
     background: rgba(255, 255, 255, .08);
     backdrop-filter: none;
   }
@@ -1343,15 +1345,15 @@ html[data-theme="light"] .app-shell .mobile-more-sheet button.active {
     box-shadow: 0 24px 48px rgba(81, 45, 25, .2);
   }
 
-  html[data-theme="light"] .landing-header nav a:hover,
-  html[data-theme="light"] .landing-header nav a:focus-visible {
+  html[data-theme="light"] .landing-header nav :is(a, .landing-jump):hover,
+  html[data-theme="light"] .landing-header nav :is(a, .landing-jump):focus-visible {
     background: rgba(97, 72, 58, .08);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .landing-header nav,
-  .landing-header nav a {
+  .landing-header nav :is(a, .landing-jump) {
     transition: none;
   }
 }

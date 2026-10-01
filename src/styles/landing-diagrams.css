@@ -1,0 +1,468 @@
+/*
+ * The diagram that closes an act, and the margins of the page.
+ *
+ * A diagram draws the route a person takes through that part of the product,
+ * built from the same emblems and tones as everything else. The margins carry
+ * small pieces of the same interface, dimmed and drifting, so the story is not
+ * a column of text in an empty room.
+ */
+
+/* --- the flow --------------------------------------------------------- */
+
+.diagram-flow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagram-flow > li {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 480ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--i, 0) * 110ms);
+}
+
+.story-stage.is-shown .diagram-flow > li,
+.story-diagram.is-shown .diagram-flow > li {
+  opacity: 1;
+  transform: none;
+}
+
+.diagram-node {
+  display: grid;
+  gap: 5px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 18px;
+}
+
+.diagram-node strong {
+  color: var(--vt-text);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.diagram-note {
+  color: var(--vt-text-3);
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.diagram-node .integration-icon {
+  margin-bottom: 5px;
+  color: var(--vt-info-mark);
+  background: var(--vt-info-soft);
+}
+
+.diagram-flow > li.tone-warn .integration-icon { color: var(--vt-warn-mark); background: var(--vt-warn-soft); }
+.diagram-flow > li.tone-good .integration-icon { color: var(--vt-good-mark); background: var(--vt-good-soft); }
+.diagram-flow > li.tone-lead .integration-icon { color: var(--vt-lead); background: var(--vt-lead-soft); }
+
+/* The line between two stops draws itself once the act arrives. */
+.diagram-link {
+  position: absolute;
+  top: 18px;
+  right: 8px;
+  left: calc(100% - 18px);
+  height: 1px;
+  background: var(--vt-line-strong);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--i, 0) * 110ms + 220ms);
+}
+
+.story-diagram.is-shown .diagram-link {
+  transform: scaleX(1);
+}
+
+/* --- the branch of outcomes -------------------------------------------- */
+
+.diagram-branching {
+  display: grid;
+  gap: 28px;
+}
+
+.diagram-outcomes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--vt-line);
+  list-style: none;
+}
+
+.diagram-outcomes li {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--vt-text-3);
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+
+.diagram-outcomes .status-chip {
+  flex: 0 0 auto;
+}
+
+/* --- one source, several branches -------------------------------------- */
+
+.diagram-split {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: 40px;
+  align-items: center;
+}
+
+.diagram-source {
+  display: grid;
+  gap: 6px;
+  padding: 20px;
+  background: var(--vt-s2);
+  border-radius: 18px;
+}
+
+.diagram-source strong {
+  color: var(--vt-text);
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+
+.diagram-source .integration-icon {
+  margin-bottom: 4px;
+  color: var(--vt-lead);
+  background: var(--vt-lead-soft);
+}
+
+.diagram-branches {
+  display: grid;
+  gap: 12px;
+}
+
+.diagram-branches article {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 4px 14px;
+  align-items: start;
+  padding: 14px 16px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition:
+    opacity 460ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.diagram-branches article:nth-child(2) { transition-delay: 110ms; }
+.diagram-branches article:nth-child(3) { transition-delay: 220ms; }
+
+.story-diagram.is-shown .diagram-branches article {
+  opacity: 1;
+  transform: none;
+}
+
+.diagram-branches .integration-icon {
+  grid-row: span 2;
+  color: var(--vt-info-mark);
+  background: var(--vt-info-soft);
+}
+
+.diagram-branches strong {
+  color: var(--vt-text);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.diagram-branch-line {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 40px;
+  height: 1px;
+  background: var(--vt-line-strong);
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 460ms cubic-bezier(0.22, 1, 0.36, 1) 160ms;
+}
+
+.story-diagram.is-shown .diagram-branch-line {
+  transform: scaleX(1);
+}
+
+/* --- three columns ------------------------------------------------------ */
+
+.diagram-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 14px;
+}
+
+.diagram-columns article {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  background: var(--vt-s2);
+  border-radius: 18px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 480ms ease,
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.diagram-columns article:nth-child(2) { transition-delay: 110ms; }
+.diagram-columns article:nth-child(3) { transition-delay: 220ms; }
+
+.story-diagram.is-shown .diagram-columns article {
+  opacity: 1;
+  transform: none;
+}
+
+.diagram-columns strong {
+  color: var(--vt-text);
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+
+.diagram-columns .integration-icon {
+  margin-bottom: 4px;
+  color: var(--vt-good-mark);
+  background: var(--vt-good-soft);
+}
+
+.diagram-columns article:nth-child(2) .integration-icon { color: var(--vt-info-mark); background: var(--vt-info-soft); }
+.diagram-columns article:nth-child(3) .integration-icon { color: var(--vt-lead); background: var(--vt-lead-soft); }
+
+.diagram-columns ul {
+  display: grid;
+  gap: 7px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.diagram-columns li {
+  position: relative;
+  padding-left: 15px;
+  color: var(--vt-text-3);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.diagram-columns li::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  background: var(--vt-line-strong);
+  border-radius: 50%;
+}
+
+/* --- the margins -------------------------------------------------------- */
+
+.story-ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.story-ambient-column {
+  position: sticky;
+  top: 120px;
+  display: grid;
+  gap: 26px;
+  width: 132px;
+  height: calc(100vh - 200px);
+  align-content: space-evenly;
+}
+
+.story-ambient-column.is-right {
+  margin-left: auto;
+  margin-right: max(16px, calc(50% - 700px));
+}
+
+.story-ambient figure {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 13px 14px;
+  background: var(--vt-s1);
+  border: 1px solid var(--vt-line);
+  border-radius: 14px;
+  opacity: 0.5;
+  /* Drifts against the scroll, each piece at its own rate. */
+  transform: translateY(calc(var(--rail-progress, 0) * var(--k, 1) * -46px));
+}
+
+.ambient-title {
+  color: var(--vt-text-3);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ambient-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+}
+
+.ambient-ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.ambient-ring circle {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.ambient-ring-track { stroke: var(--vt-track); }
+
+.ambient-ring-value {
+  stroke: var(--vt-good-mark);
+  stroke-dasharray: 119;
+  stroke-dashoffset: 19;
+}
+
+.ambient-ring em {
+  color: var(--vt-text);
+  font-weight: 640;
+  font-style: normal;
+  font-size: 0.86rem;
+}
+
+.ambient-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ambient-chips.is-stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ambient-format {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 8px;
+  color: var(--vt-text-2);
+  font-size: 0.72rem;
+  font-style: normal;
+  background: var(--vt-s2);
+  border-radius: 7px;
+}
+
+.ambient-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.ambient-bars i {
+  display: block;
+  width: var(--w, 60%);
+  height: 5px;
+  background: var(--c, var(--vt-info-mark));
+  border-radius: 3px;
+}
+
+.ambient-spark {
+  width: 100%;
+  height: 32px;
+}
+
+.ambient-spark path {
+  fill: none;
+  stroke: var(--vt-chart-blue);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* --- narrowing ---------------------------------------------------------- */
+
+/* The margins need a gutter of their own; below this there is none, and half a
+   column of dimmed cards over the text is worse than none. */
+@media (max-width: 1560px) {
+  .story-ambient {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .diagram-flow {
+    grid-auto-flow: row;
+    gap: 18px;
+  }
+
+  .diagram-link {
+    top: auto;
+    right: auto;
+    bottom: -13px;
+    left: 18px;
+    width: 1px;
+    height: 14px;
+    transform: scaleY(0);
+    transform-origin: top center;
+  }
+
+  .story-diagram.is-shown .diagram-link {
+    transform: scaleY(1);
+  }
+
+  .diagram-node {
+    padding-right: 0;
+  }
+
+  .diagram-split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .diagram-branch-line {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagram-flow > li,
+  .diagram-branches article,
+  .diagram-columns article {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .diagram-link,
+  .diagram-branch-line {
+    transform: none;
+    transition: none;
+  }
+
+  .story-ambient figure {
+    transform: none;
+  }
+}

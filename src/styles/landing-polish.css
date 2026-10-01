@@ -1,0 +1,214 @@
+.landing-jump { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; box-shadow: none; }
+.landing-jump:focus-visible { outline: 2px solid var(--vt-accent-text); outline-offset: 4px; }
+/* Compact call overview and shared pricing surfaces, on the product's scale. */
+.landing .landing-eyebrow { display: block; color: var(--vt-accent-text); font-size: 11px; line-height: 1.5; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; }
+.landing > .landing-hero { --intro-image-opacity: 1; width: min(1440px, calc(100% - 96px)); min-height: 100svh; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(28px, 4vw, 72px); margin: 0 auto; padding: 112px 0 32px; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; isolation: auto; }
+html[data-theme] .landing > .landing-hero::before, .landing > .landing-hero::after { content: none; }
+.landing-intro-image { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: var(--intro-image-opacity); background: linear-gradient(90deg, rgba(17,14,11,.94), rgba(17,14,11,.55) 58%, rgba(17,14,11,.6)), url('/assets/verbatrace-hero-background.png') center / cover; mask-image: linear-gradient(#000 70%, transparent); }
+html[data-theme="light"] .landing-intro-image { background-image: linear-gradient(90deg, rgba(244,239,234,.94), rgba(244,239,234,.68) 58%, rgba(244,239,234,.65)), url('/assets/verbatrace-hero-background.png'); }
+.landing .hero-copy { max-width: 640px; width: 100%; min-width: 0; }
+.landing .hero-copy h1 { margin: 20px 0 0; font-size: clamp(34px, 3.55vw, 60px); line-height: 1.07; letter-spacing: -.045em; text-wrap: balance; }
+.landing .hero-copy h1 .headline-main { color: var(--vt-text); white-space: normal; }
+.landing .hero-copy h1 span:last-child { color: var(--vt-accent-text); }
+.landing .hero-copy p { margin: 24px 0 28px; max-width: 43ch; color: var(--vt-text-2); font-size: clamp(15px, 1.15vw, 18px); line-height: 1.65; }
+.landing-hero .hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 24px; }
+.landing-hero .hero-actions .primary-button { padding: 16px 22px; font-size: 14px; }
+.hero-explore { display: inline-flex; align-items: center; gap: 4px; color: var(--vt-text-2); font-size: 13px; }
+.hero-explore:hover { color: var(--vt-accent-text); }
+.hero-call { min-width: 0; width: 100%; padding: 20px; color: var(--vt-text); background: var(--vt-s1); border: 1px solid var(--vt-line-strong); border-radius: 20px; box-shadow: 0 32px 90px rgba(0,0,0,.24), 0 0 0 6px color-mix(in srgb, var(--vt-s1) 30%, transparent); }
+.hero-call-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 16px; font-size: 14px; font-weight: 650; }
+.hero-call-demo { font-size: 10px; font-weight: 450; color: var(--vt-text-3); }
+.hero-call .hero-call-selected { display: grid; grid-template-columns: 36px minmax(0,1fr) auto; gap: 12px; padding: 14px; border: 0; border-radius: 12px; background: var(--vt-s2); box-shadow: none; }
+.hero-call-emblem { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--vt-s3); color: var(--vt-accent-text); }
+.hero-call-main > strong { display: block; margin: 0; color: var(--vt-text); font-size: 14px; line-height: 1.4; font-weight: 620; }
+.hero-call .hero-call-status { display: inline-block; margin-top: 5px; padding: 3px 6px; font-size: 10px; color: var(--vt-good); background: var(--vt-good-soft); border-radius: 5px; }
+.hero-call-meta { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 7px; font-size: 10px; color: var(--vt-text-3); }
+.hero-call-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.hero-call-score { padding-left: 12px; border-left: 1px solid var(--vt-line-strong); text-align: right; }
+.hero-call-score strong { display: block; font-size: 28px; font-weight: 600; line-height: 1; color: var(--vt-good); }
+.hero-call-score small { display: block; margin-top: 4px; font-size: 10px; color: var(--vt-text-3); }
+.hero-call-recording { display: flex; align-items: center; gap: 16px; padding: 14px 2px; }
+.hero-call-file { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; color: var(--vt-text-2); }
+.hero-call-file > svg { color: var(--vt-accent-text); flex: none; }
+.hero-call-file small { display: block; font-size: 9px; margin-top: 3px; color: var(--vt-text-3); }
+.hero-call-wave { min-width: 0; flex: 1; height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 2px; overflow: hidden; }
+.hero-call-wave i { width: 3px; flex: 1; max-width: 4px; border-radius: 2px; background: var(--vt-accent-text); opacity: .75; }
+.hero-call-recording > .landing-jump { display: grid; place-items: center; width: 32px; height: 32px; color: var(--vt-text-2); background: var(--vt-s2); border-radius: 8px; flex: none; }
+.hero-call-stages { display: flex; justify-content: space-between; gap: 8px; list-style: none; margin: 0 0 16px; padding: 10px 0 14px; border-bottom: 1px solid var(--vt-line); }
+.hero-call-stages li { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: var(--vt-text-2); }
+.hero-call-stages svg { color: var(--vt-good); }
+.hero-call-results { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr); gap: 16px; }
+.hero-call-results > section { display: flex; flex-direction: column; min-width: 0; padding: 14px; border-radius: 12px; background: var(--vt-s2); }
+.hero-call-section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; justify-content: space-between; margin-bottom: 14px; }
+.hero-call-section-head h2 { margin: 0; font-size: 12px; font-weight: 650; }
+.hero-call-section-head > span { padding: 3px 6px; border-radius: 4px; font-size: 9px; color: var(--vt-good); background: var(--vt-good-soft); }
+.hero-call-lines { display: grid; gap: 12px; }
+.hero-call-line > div { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; }
+.hero-call-line strong { font-weight: 600; }
+.hero-call-line time { color: var(--vt-text-3); font-size: 9px; }
+.hero-call-line p, .hero-call-summary p, .hero-call-action p { margin: 5px 0 0; color: var(--vt-text-2); font-size: 12px; line-height: 1.55; }
+.hero-call-summary > small { font-size: 9px; color: var(--vt-text-3); }
+.hero-call-criterion { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; font-size: 10px; border-bottom: 1px solid var(--vt-line); }
+.hero-call-criterion > span { display: flex; align-items: center; gap: 5px; color: var(--vt-text-2); }
+.hero-call-criterion i { width: 4px; height: 4px; border-radius: 50%; background: var(--vt-good); flex: none; }
+.hero-call-criterion strong { color: var(--vt-good); font-weight: 600; }
+.hero-call-criterion.is-warning i { background: var(--vt-warn); }
+.hero-call-criterion.is-warning strong { color: var(--vt-warn); }
+.hero-call-action { margin-top: 12px; padding-left: 9px; border-left: 2px solid var(--vt-accent-text); }
+.hero-call-action > span { font-size: 9px; color: var(--vt-accent-text); }
+.hero-call-detail { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 16px; margin-top: auto; font-size: 10px; color: var(--vt-text-2); }
+.hero-call-detail:hover { color: var(--vt-accent-text); }
+
+.landing .tariff-preview-section { width: min(1320px, calc(100% - 96px)); padding: 96px 0 0; gap: 36px; }
+.landing .tariff-preview-section > .section-heading { max-width: none; width: 100%; align-items: flex-start; padding: 0 0 32px; text-align: left; border: 0; border-bottom: 1px solid var(--vt-line-strong); border-radius: 0; background: none; box-shadow: none; }
+.landing .tariff-preview-section > .section-heading > span { color: var(--vt-accent-text); font-size: 11px; font-weight: 650; letter-spacing: .12em; }
+.landing .tariff-preview-section > .section-heading h2 { color: var(--vt-text); margin: 14px 0; font-size: clamp(28px, 3vw, 42px); font-weight: 600; letter-spacing: -.035em; }
+.landing .tariff-preview-section > .section-heading p { max-width: 60ch; margin: 0; color: var(--vt-text-2); font-size: 15px; line-height: 1.6; }
+.landing .tariff-preview-section > .section-heading > :is(span,h2,p) { align-self: flex-start; text-align: left; }
+.tariff-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
+.tariff-section-heading p { margin: 0; color: var(--vt-text-3); font-size: 12px; line-height: 1.5; }
+.tariff-section-heading h2 { font-size: 19px; font-weight: 600; letter-spacing: -.02em; }
+.tariff-section .tariff-grid { gap: 16px; }
+.tariff-card-refined { --tariff-tone: #ff8058; --tariff-glint: #e6b85c; }
+/* The exact five colours used by both version comparison screens. The sixth
+   card blends their blue and green rather than adding another palette. */
+.tariff-card-refined[data-plan="personal_start"] { --tariff-tone: #66a8ff; --tariff-glint: #b58cff; }
+.tariff-card-refined[data-plan="personal_plus"] { --tariff-tone: #b58cff; --tariff-glint: #66a8ff; }
+.tariff-card-refined[data-plan="personal_pro"] { --tariff-tone: #ff8058; --tariff-glint: #e6b85c; }
+.tariff-card-refined[data-plan="business_start"] { --tariff-tone: #57c7a1; --tariff-glint: #66a8ff; }
+.tariff-card-refined[data-plan="business_plus"] { --tariff-tone: #e6b85c; --tariff-glint: #ff8058; }
+.tariff-card-refined[data-plan="business_pro"] { --tariff-tone: color-mix(in srgb, #66a8ff 50%, #57c7a1); --tariff-glint: #57c7a1; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; gap: 0; padding: 26px; border: 1px solid var(--vt-line-strong); border-radius: 16px; background: radial-gradient(ellipse at 100% 0, color-mix(in srgb, var(--tariff-tone) 18%, transparent), transparent 60%), var(--vt-s1); color: var(--vt-text); box-shadow: none; backdrop-filter: none; transition: border-color .25s; }
+/* The light stays at the edge; the centre remains a calm surface for reading. */
+html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined::before { content: ""; position: absolute; inset: 0 0 auto; height: 1px; background: linear-gradient(100deg, transparent 5%, var(--tariff-glint), var(--tariff-tone), transparent 95%); opacity: .7; pointer-events: none; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: radial-gradient(ellipse at 90% 0, color-mix(in srgb, var(--tariff-tone) 42%, transparent), transparent 70%), radial-gradient(ellipse at 15% 0, color-mix(in srgb, var(--tariff-glint) 22%, transparent), transparent 50%), radial-gradient(ellipse at 0 100%, color-mix(in srgb, var(--tariff-tone) 18%, transparent), transparent 45%); opacity: 0; transform: translateY(10px); transition: opacity .35s ease, transform .5s ease; pointer-events: none; }
+@media (hover: hover) {
+  html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined:hover::after { opacity: 1; transform: none; }
+}
+html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined:focus-within::after { opacity: 1; transform: none; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined:hover { transform: none; border-color: color-mix(in srgb, var(--tariff-tone) 70%, var(--vt-line-strong)); box-shadow: none; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined.is-pro { border-top: 2px solid var(--tariff-tone); }
+.tariff-card-refined .tariff-card-head { gap: 16px; }
+.tariff-card-label { display: flex; width: 100%; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; color: var(--vt-text-3); font-size: 10px; }
+.tariff-card-label span:last-child { padding: 4px 7px; color: var(--vt-text); background: color-mix(in srgb, var(--tariff-tone) 16%, transparent); border-radius: 4px; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card-refined h3 { color: var(--vt-text); font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.tariff-card-refined .tariff-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 0; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card-refined .tariff-price strong { color: var(--vt-text); font-size: clamp(28px, 2.6vw, 38px); font-weight: 600; letter-spacing: -.045em; line-height: 1.2; white-space: nowrap; }
+.tariff-card-refined .tariff-price > span { font-size: 11px; color: var(--vt-text-3); }
+.tariff-volume { display: grid; gap: 3px; margin: 22px 0; padding: 16px 0; border-block: 1px solid var(--vt-line); }
+.tariff-volume > strong { font-size: 24px; font-weight: 550; letter-spacing: -.02em; color: var(--vt-text); }
+.tariff-volume > strong span { font-size: 16px; color: var(--vt-text-3); }
+.tariff-volume > span { font-size: 12px; color: var(--vt-text-2); }
+.tariff-volume small { margin-top: 6px; color: var(--vt-text-3); font-size: 10px; }
+.tariff-card-refined .tariff-feature-list { gap: 12px; margin: 0 0 24px; padding: 0; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card-refined .tariff-feature-list li { color: var(--vt-text-2); font-size: 12px; line-height: 1.5; align-items: start; gap: 9px; }
+html[data-theme] :is(.landing,.app-shell) .tariff-card-refined .tariff-feature-list svg { color: var(--vt-accent-text); width: 13px; height: 13px; margin-top: 2px; filter: none; }
+.tariff-card-refined .tariff-card-activation { display: flex; align-items: center; gap: 7px; margin: auto 0 0; padding-top: 16px; border-top: 1px solid var(--vt-line); font-size: 10px; color: var(--vt-text-3); }
+.tariffs-layout .tariff-heading { padding-bottom: 24px; border-bottom: 1px solid var(--vt-line); }
+html[data-theme] .app-shell .tariffs-layout .subscription-panel { padding: 22px; gap: 16px; background: var(--vt-s1); border: 1px solid var(--vt-line); box-shadow: none; }
+.tariffs-layout .subscription-panel .panel-heading.large { margin: 0; padding: 0; gap: 16px; }
+.tariffs-layout .subscription-panel .panel-heading h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.tariffs-layout .subscription-panel .panel-heading p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; }
+html[data-theme] .app-shell .tariffs-layout .subscription-company { padding: 14px; background: var(--vt-s2); border: 0; border-radius: 10px; }
+.tariffs-layout .tariff-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--vt-text-3); }
+
+.landing .story-close { width: min(1320px, calc(100% - 96px)); padding: 100px 0 64px; }
+.landing .story-close-card { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 32px; align-items: center; padding: 40px 0; border: 0; border-block: 1px solid var(--vt-line-strong); border-radius: 0; background: none; text-align: left; }
+.landing .story-close-card h2 { margin: 12px 0; font-size: clamp(28px, 3vw, 40px); line-height: 1.15; font-weight: 580; letter-spacing: -.035em; }
+.landing .story-close-card p { max-width: 54ch; font-size: 14px; line-height: 1.6; }
+.landing .story-close-actions { flex-direction: column; align-items: stretch; margin: 0; gap: 14px; }
+.landing .story-close-actions .primary-button { padding: 16px 22px; font-size: 14px; box-shadow: none; }
+.landing .story-close-link { font-size: 12px; text-align: center; color: var(--vt-text-3); }
+.landing .landing-footer { grid-template-columns: minmax(0,1.3fr) repeat(3,minmax(0,1fr)); width: min(1320px,calc(100% - 96px)); gap: 40px; border-top: 0; padding: 0 0 28px; }
+.landing-footer .logo { font-size: 24px; }
+.landing-footer .landing-footer-brand p { font-size: 12px; line-height: 1.7; }
+.landing .landing-footer nav, .landing-footer-column { display: flex; flex-direction: column; align-items: start; gap: 13px; padding: 0; }
+.landing-footer nav > strong, .landing-footer-column > strong { margin-bottom: 5px; color: var(--vt-text); font-size: 12px; font-weight: 600; }
+.landing .landing-footer nav :is(a, button), .landing-footer-column > a, .landing-footer-column > button, .landing-footer-column > span { display: inline-flex; align-items: center; gap: 3px; padding: 0; background: none; font-size: 11px; line-height: 1.4; color: var(--vt-text-2); text-align: left; }
+.landing-footer-column > button:hover, .landing-footer-column > a:hover { color: var(--vt-accent-text); }
+.landing-footer-documents > strong { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.landing-footer-documents > strong small { color: var(--vt-text-3); font-weight: 400; font-size: 9px; }
+.landing-footer-documents > span { color: var(--vt-text-3); }
+.landing-footer-bottom { display: flex; justify-content: space-between; gap: 20px; grid-column: 1/-1; padding-top: 22px; border-top: 1px solid var(--vt-line); color: var(--vt-text-3); font-size: 10px; }
+
+@media (min-width: 1181px) {
+  .landing .tariff-preview-section, .landing .story-close, .landing .landing-footer { width: min(1320px, calc(100% - 192px)); }
+}
+
+@media (min-width: 901px) and (max-height: 760px) {
+  .landing > .landing-hero { padding-top: 100px; padding-bottom: 22px; gap: 32px; }
+  .landing .hero-copy h1 { font-size: clamp(32px, 3.2vw, 48px); }
+  .landing .hero-copy p { margin: 18px 0 22px; font-size: 15px; }
+  .hero-call { padding: 16px; }
+  .hero-call-heading { margin-bottom: 12px; }
+  .hero-call-results > section { padding: 12px; }
+  .hero-call-lines { gap: 9px; }
+}
+@media (min-width: 901px) and (max-height: 680px) {
+  .landing > .landing-hero { padding-top: 92px; padding-bottom: 16px; }
+  .hero-call { padding: 12px; }
+  .hero-call-heading { margin-bottom: 8px; }
+  .hero-call .hero-call-selected { padding: 10px; }
+  .hero-call-recording { padding-block: 8px; }
+  .hero-call-stages { padding: 6px 0 8px; margin-bottom: 10px; }
+  .hero-call-section-head { margin-bottom: 9px; }
+  .hero-call-criterion { padding-block: 7px; }
+  .hero-call-detail { padding-top: 10px; }
+}
+@media (max-width: 1180px) {
+  .landing > .landing-hero { width: calc(100% - 64px); gap: 28px; }
+  .landing .tariff-preview-section, .landing .story-close, .landing .landing-footer { width: calc(100% - 64px); }
+  .hero-call { padding: 16px; }
+  .hero-call-results { gap: 10px; }
+  .hero-call-results > section { padding: 12px; }
+  html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined { padding: 22px; }
+}
+@media (max-width: 900px) {
+  .landing > .landing-hero { grid-template-columns: minmax(0,1fr); min-height: auto; padding: 112px 0 48px; gap: 32px; }
+  .landing .hero-copy { max-width: 680px; }
+  .landing .hero-copy h1 { font-size: clamp(38px, 6vw, 56px); max-width: 20ch; }
+  .hero-call { max-width: 700px; justify-self: center; }
+  .hero-call-main > strong { font-size: 16px; }
+  .hero-call-line p, .hero-call-summary p, .hero-call-action p { font-size: 12px; }
+  .tariff-section-heading { display: grid; gap: 8px; }
+  .tariff-section .tariff-grid { grid-template-columns: minmax(0,1fr); }
+  .landing .story-close-card { grid-template-columns: minmax(0,1fr); }
+  .landing .story-close-actions { align-items: start; }
+  .landing .landing-footer { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .landing > .landing-hero { width: calc(100% - 36px); margin: 0 auto; padding: 104px 0 32px; }
+  .landing .hero-copy h1 { font-size: clamp(32px, 8.7vw, 44px); letter-spacing: -.035em; }
+  .landing .hero-copy p { font-size: 15px; margin: 20px 0 24px; }
+  .landing-hero .hero-actions { gap: 18px; }
+  .hero-call { padding: 14px; border-radius: 16px; box-shadow: var(--vt-shadow-soft); }
+  .hero-call .hero-call-selected { grid-template-columns: minmax(0,1fr) auto; padding: 12px; gap: 10px; }
+  .hero-call-emblem { display: none; }
+  .hero-call-main > strong { font-size: 14px; }
+  .hero-call-meta { font-size: 11px; }
+  .hero-call-results { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .hero-call-results > section { padding: 14px; }
+  .hero-call-section-head h2 { font-size: 14px; }
+  .hero-call-section-head > span { font-size: 11px; }
+  .hero-call-line > div, .hero-call-criterion, .hero-call-detail { font-size: 12px; }
+  .hero-call-line p, .hero-call-summary p, .hero-call-action p { font-size: 13px; }
+  .hero-call-stages li { font-size: 10px; gap: 4px; }
+  .hero-call-stages { gap: 4px; }
+  .hero-call-summary > small, .hero-call-action > span { font-size: 11px; }
+  .landing .tariff-preview-section, .landing .story-close, .landing .landing-footer { width: calc(100% - 36px); }
+  .landing .tariff-preview-section { padding-top: 64px; gap: 28px; }
+  .tariff-card-refined .tariff-card-label, .tariff-card-refined .tariff-volume small, .tariff-card-refined .tariff-card-activation { font-size: 12px; }
+  html[data-theme] :is(.landing,.app-shell) .tariff-card-refined .tariff-feature-list li { font-size: 14px; }
+  .tariff-volume > span, .tariff-card-refined .tariff-price > span { font-size: 13px; }
+  .landing .story-close { padding: 64px 0 40px; }
+  .landing .story-close-card { gap: 24px; padding: 28px 0; }
+  .landing .landing-footer { gap: 32px 20px; }
+  .landing-footer-brand { grid-column: 1/-1; }
+  .landing-footer-documents { grid-column: 1/-1; }
+  .landing .landing-footer nav :is(a, button), .landing-footer-column > a, .landing-footer-column > button, .landing-footer-column > span { font-size: 13px; }
+  .landing-footer-bottom { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined { transition: none; }
+  html[data-theme] :is(.landing,.app-shell) .tariff-card.tariff-card-refined::after { transition: none; transform: none; }
+}

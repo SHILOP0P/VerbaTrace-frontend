@@ -1,0 +1,962 @@
+/*
+ * The exhibits: a working piece of the product per chapter of the landing.
+ *
+ * Built from the same tokens and the same components as the workspace, so the
+ * page cannot drift away from the product. Nothing blurs and nothing paints a
+ * large gradient: the theme switch snapshots this page whole.
+ */
+
+.story-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Everything the story brings in itself: the exhibits, the act headings and the
+   diagrams. The page-wide reveal fired for some and silently skipped others. */
+.landing-story [data-stage] {
+  opacity: 0;
+  transform: translateY(22px) scale(0.995);
+  transition:
+    opacity 560ms ease,
+    transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.landing-story [data-stage].is-shown {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-story [data-stage] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* One soft light behind the panel, tinted by the chapter. Flat colour on a
+   radial stop — cheap to raster, and it keeps the panel from floating on
+   nothing. */
+.story-stage-glow {
+  position: absolute;
+  inset: -8% -6%;
+  background: radial-gradient(60% 60% at 50% 40%, var(--story-tone-soft), transparent 72%);
+  border-radius: 40px;
+  pointer-events: none;
+}
+
+.exhibit {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  padding: 22px;
+  background: var(--vt-s1);
+  border: 1px solid var(--vt-line-mid);
+  border-radius: 22px;
+  box-shadow: var(--vt-shadow);
+}
+
+.exhibit-note {
+  margin: 2px 0 0;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.exhibit-eyebrow {
+  display: block;
+  color: var(--vt-text-3);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.exhibit-meta {
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+.exhibit-bar {
+  display: block;
+  height: 6px;
+  background: var(--vt-track);
+  border-radius: 3px;
+}
+
+.exhibit-bar i {
+  display: block;
+  height: 100%;
+  background: var(--vt-info-mark);
+  border-radius: 3px;
+  transition: width var(--vt-dur-slow) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.exhibit-bar.tone-good i { background: var(--vt-good-mark); }
+.exhibit-bar.tone-warn i { background: var(--vt-warn-mark); }
+.exhibit-bar.tone-bad i { background: var(--vt-bad-mark); }
+
+.exhibit-total {
+  display: flex;
+  flex-direction: column;
+  color: var(--vt-text);
+  font-weight: 640;
+  font-size: 1.9rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.exhibit-total small {
+  margin-top: 5px;
+  color: var(--vt-text-3);
+  font-weight: 500;
+  font-size: 0.74rem;
+}
+
+.exhibit-total.tone-good { color: var(--vt-good); }
+.exhibit-total.tone-warn { color: var(--vt-warn); }
+.exhibit-total.tone-bad { color: var(--vt-bad); }
+
+/* The project's own segmented switch, at the size an exhibit needs. */
+.exhibit-segmented {
+  flex: 0 0 auto;
+}
+
+.exhibit-segmented button {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+html[data-theme] .landing .exhibit-segmented button[aria-selected="true"] {
+  color: var(--vt-accent-text);
+  background: var(--vt-accent-soft);
+  box-shadow: inset 0 -2px var(--vt-accent);
+  font-weight: 700;
+}
+
+html[data-theme] .landing .exhibit-segmented button:focus-visible {
+  outline: 2px solid var(--vt-accent-text);
+  outline-offset: -3px;
+}
+
+/* --- 1. the queue ------------------------------------------------------ */
+
+.exhibit-drop {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 16px;
+  color: var(--vt-text-3);
+  font-size: 0.85rem;
+  border: 1px dashed var(--vt-line-strong);
+  border-radius: 14px;
+}
+
+.exhibit-calls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exhibit-calls li {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 12px 14px 14px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+}
+
+.exhibit-call-title {
+  color: var(--vt-text);
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exhibit-calls .status-chip {
+  grid-row: 1;
+  grid-column: 2;
+  justify-self: end;
+}
+
+.exhibit-call-hint {
+  grid-column: 1 / -1;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+.exhibit-call-track {
+  position: absolute;
+  right: 14px;
+  bottom: 0;
+  left: 14px;
+  height: 2px;
+  background: var(--vt-track);
+  border-radius: 2px;
+}
+
+.exhibit-call-track i {
+  display: block;
+  height: 100%;
+  background: var(--vt-warn-mark);
+  border-radius: 2px;
+  transition: width var(--vt-dur-slow) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- 2. the player ----------------------------------------------------- */
+
+.exhibit-player {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.exhibit-play {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  color: var(--vt-text);
+  background: var(--vt-s2);
+  border: 1px solid var(--vt-line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.exhibit-play:hover {
+  border-color: var(--vt-line-strong);
+}
+
+.exhibit-wave {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 2px;
+  align-items: center;
+  height: 46px;
+  min-width: 0;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.exhibit-wave i {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--vt-line-strong);
+  border-radius: 1px;
+}
+
+/* Played bars take the accent: this is a position, the same thing the rail
+   shows, and position is navigation. */
+.exhibit-wave i:nth-child(-n + 1) { background: var(--vt-line-strong); }
+
+.exhibit-wave-head {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--at, 0) * 100%);
+  width: 2px;
+  background: var(--vt-accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 3px var(--vt-accent-soft);
+}
+
+.exhibit-time {
+  flex: 0 0 auto;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.exhibit-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exhibit-lines button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 11px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+.exhibit-lines button:hover {
+  background: var(--vt-hover);
+}
+
+.exhibit-lines li.is-active button {
+  background: var(--vt-s2);
+}
+
+.exhibit-speaker {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 0.76rem;
+}
+
+.exhibit-speaker i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.exhibit-line-text {
+  color: var(--vt-text-2);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.exhibit-lines li.is-active .exhibit-line-text {
+  color: var(--vt-text);
+}
+
+/* --- 3. the analysis --------------------------------------------------- */
+
+.exhibit-analysis-top {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.exhibit-analysis-summary {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.exhibit-analysis-summary p {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.exhibit-next {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--vt-good);
+  font-size: 0.8rem;
+}
+
+.exhibit-criteria,
+.exhibit-criteria-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exhibit-criteria button,
+.exhibit-criteria-mini li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px 34px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 11px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 11px;
+}
+
+.exhibit-criteria button {
+  cursor: pointer;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+.exhibit-criteria button:hover {
+  background: var(--vt-hover);
+}
+
+.exhibit-criteria li.is-picked button {
+  background: var(--vt-s2);
+}
+
+.exhibit-criterion-name {
+  color: var(--vt-text-2);
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exhibit-criteria li.is-picked .exhibit-criterion-name {
+  color: var(--vt-text);
+}
+
+.exhibit-criterion-score {
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.exhibit-quote {
+  display: flex;
+  gap: 10px;
+  padding: 13px 15px;
+  color: var(--story-tone);
+  background: var(--story-tone-soft);
+  border-radius: 13px;
+}
+
+.exhibit-quote p {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  animation: exhibit-swap var(--vt-dur) ease;
+}
+
+@keyframes exhibit-swap {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- 4. the scorecard -------------------------------------------------- */
+
+.exhibit-scorecard-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.exhibit-card-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exhibit-card-rows button {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 11px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+.exhibit-card-rows button:hover {
+  background: var(--vt-hover);
+}
+
+.exhibit-card-rows .exhibit-criterion-name {
+  flex: 1 1 auto;
+}
+
+.exhibit-weight {
+  flex: 0 0 auto;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+.exhibit-card-rows li.is-off button {
+  opacity: 0.42;
+}
+
+/* The switch of the product, at exhibit size. */
+.exhibit-switch {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 18px;
+  padding: 2px;
+  background: var(--vt-track);
+  border-radius: 999px;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+.exhibit-switch i {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background: var(--vt-text-3);
+  border-radius: 50%;
+  transition: transform var(--vt-dur-fast) cubic-bezier(0.22, 1, 0.36, 1), background var(--vt-dur-fast) ease;
+}
+
+[aria-checked="true"] .exhibit-switch {
+  background: var(--vt-accent-soft);
+}
+
+[aria-checked="true"] .exhibit-switch i {
+  background: var(--vt-accent);
+  transform: translateX(14px);
+}
+
+/* --- 5. the review ----------------------------------------------------- */
+
+.exhibit-review-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+}
+
+.exhibit-review-body p {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  animation: exhibit-swap var(--vt-dur) ease;
+}
+
+.exhibit-review-body mark {
+  color: var(--vt-text);
+  background: var(--vt-good-soft);
+  border-radius: 4px;
+  box-decoration-break: clone;
+  padding: 1px 3px;
+}
+
+.exhibit-review-body footer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* --- 6. the action ----------------------------------------------------- */
+
+.exhibit-action {
+  align-items: stretch;
+}
+
+.exhibit-action-quote {
+  display: flex;
+  gap: 10px;
+  padding: 14px 15px;
+  color: var(--story-tone);
+  background: var(--story-tone-soft);
+  border-radius: 13px;
+}
+
+.exhibit-action-quote p {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.exhibit-action-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--vt-text-3);
+  transform: rotate(90deg);
+}
+
+.exhibit-action-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+}
+
+.exhibit-action-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
+}
+
+.exhibit-action-reveal .exhibit-action-card {
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 0;
+  padding-bottom: 0;
+  transition: padding 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.exhibit-action.is-made .exhibit-action-reveal {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.exhibit-action.is-made .exhibit-action-card {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.exhibit-action-card strong {
+  color: var(--vt-text);
+  font-size: 0.95rem;
+}
+
+.exhibit-action-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+.exhibit-action-meta span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.exhibit-action-button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  align-self: flex-start;
+  padding: 9px 14px;
+  color: var(--vt-text);
+  font-size: 0.84rem;
+  background: var(--vt-s2);
+  border: 1px solid var(--vt-line);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: border-color var(--vt-dur-fast) ease;
+}
+
+.exhibit-action-button:hover {
+  border-color: var(--vt-line-strong);
+}
+
+/* --- 7. the analytics -------------------------------------------------- */
+
+.exhibit-analytics-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.exhibit-chart {
+  width: 100%;
+  height: 120px;
+}
+
+.exhibit-chart-line {
+  fill: none;
+  stroke: var(--vt-chart-blue);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  animation: exhibit-chart-appear 300ms ease both;
+}
+
+@keyframes exhibit-chart-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.exhibit-criteria-mini li {
+  grid-template-columns: minmax(0, 1fr) 96px 34px;
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+}
+
+/* --- 8. the team ------------------------------------------------------- */
+
+.exhibit-company {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 15px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+}
+
+.exhibit-company strong {
+  display: block;
+  color: var(--vt-text);
+  font-size: 0.92rem;
+}
+
+.exhibit-people {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exhibit-people button {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 11px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 11px;
+  cursor: default;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+.exhibit-people li.is-hovered button {
+  background: var(--vt-s2);
+}
+
+.exhibit-people button:focus-visible {
+  outline: 2px solid var(--vt-accent);
+  outline-offset: -2px;
+}
+
+.exhibit-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  color: var(--vt-text-2);
+  font-size: 0.82rem;
+  background: var(--vt-s3);
+  border-radius: 50%;
+}
+
+.exhibit-person-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exhibit-sees {
+  padding: 12px 15px;
+  color: var(--vt-text-3);
+  font-size: 0.84rem;
+  background: var(--story-tone-soft);
+  border-radius: 13px;
+}
+
+.exhibit-sees strong {
+  color: var(--vt-text);
+}
+
+/* --- 9. the credits ---------------------------------------------------- */
+
+.exhibit-credits-top {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.exhibit-credits-top strong {
+  display: block;
+  margin: 4px 0 3px;
+  color: var(--vt-text);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.exhibit-days {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 64px;
+}
+
+.exhibit-days button {
+  flex: 1 1 0;
+  height: var(--h, 40%);
+  min-width: 0;
+  background: var(--vt-track);
+  border: 0;
+  border-radius: 3px;
+  cursor: default;
+  transition: background var(--vt-dur-fast) ease;
+}
+
+.exhibit-days button:hover,
+.exhibit-days button.is-picked {
+  background: var(--vt-chart-teal);
+}
+
+.exhibit-days-note {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 10. the masking --------------------------------------------------- */
+
+.exhibit-privacy-switch {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0;
+  color: var(--vt-text);
+  font-size: 0.86rem;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.exhibit-privacy-line {
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+}
+
+.exhibit-privacy-line p {
+  margin: 0;
+  color: var(--vt-text-2);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  animation: exhibit-swap var(--vt-dur) ease;
+}
+
+.exhibit-mask {
+  padding: 1px 6px;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+  background: var(--vt-s3);
+  border-radius: 5px;
+}
+
+.exhibit-privacy-note {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--vt-text-3);
+  font-size: 0.8rem;
+}
+
+/* --- 11. the exchange -------------------------------------------------- */
+
+.exhibit-integration {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 15px;
+  background: var(--vt-s2);
+  border-radius: 14px;
+}
+
+.exhibit-integration > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.exhibit-integration strong {
+  display: block;
+  color: var(--vt-text);
+  font-size: 0.92rem;
+}
+
+.exhibit-formats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 128px), 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.exhibit-formats li {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  background: var(--vt-s2);
+  border-radius: 13px;
+  transition: transform var(--vt-dur-fast) ease;
+}
+
+.exhibit-formats li:hover {
+  transform: translateY(-2px);
+}
+
+.exhibit-formats strong {
+  color: var(--vt-text);
+  font-size: 0.88rem;
+}
+
+.exhibit-formats .integration-icon {
+  margin-bottom: 4px;
+  color: var(--story-tone-mark);
+  background: var(--story-tone-soft);
+}
+
+/* --- narrowing --------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .exhibit {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .exhibit-analysis-top,
+  .exhibit-credits-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .exhibit-criteria button,
+  .exhibit-criteria-mini li {
+    grid-template-columns: minmax(0, 1fr) 56px 30px;
+    gap: 8px;
+  }
+
+  .exhibit-scorecard-head,
+  .exhibit-analytics-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .exhibit-card-rows .status-chip {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exhibit-chart-line {
+    animation: none;
+  }
+
+  .exhibit-action-reveal,
+  .exhibit-action-reveal .exhibit-action-card { transition: none; }
+
+  .exhibit-quote p,
+  .exhibit-review-body p,
+  .exhibit-privacy-line p {
+    animation: none;
+  }
+}

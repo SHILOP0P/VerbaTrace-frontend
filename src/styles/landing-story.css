@@ -1,0 +1,538 @@
+/*
+ * The landing's story: everything the product does, in the order a call travels
+ * through it, with a waveform down the side that fills as the visitor reads.
+ *
+ * Deliberately cheap to paint. The theme switch animates the whole page as one
+ * circular reveal, which snapshots every pixel of it; a blurred backdrop or a
+ * stack of large gradients here costs a stutter there.
+ *
+ * Colour follows the house rule: the orange accent is only navigation and
+ * action, so the rail (where the visitor is) and the closing button use it, and
+ * every chapter takes one of the meaning tones for its heading and its icons.
+ */
+
+.landing-story {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 96px;
+  padding: 104px 0 24px;
+}
+
+@property --rail-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* --- the rail --------------------------------------------------------- */
+
+/*
+ * The rail is the track of the whole story: it runs the height of the window,
+ * from under the floating header to the foot of the page, and fills to where
+ * the visitor has read. It lives in the left gutter and never eats into the
+ * text; once the gutter is too narrow to hold it, it goes.
+ */
+.story-rail {
+  position: fixed;
+  top: 112px;
+  bottom: 40px;
+  left: 16px;
+  z-index: 30;
+  width: 56px;
+  opacity: 0;
+  transform: translateX(-14px);
+  transition:
+    opacity var(--vt-dur) ease,
+    transform var(--vt-dur) ease,
+    --rail-progress 160ms linear;
+  pointer-events: none;
+}
+
+.story-rail.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.story-rail-wave {
+  position: relative;
+  height: 100%;
+}
+
+.story-rail-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Each bar owns a slot of the same height. The fill edge can cross a bar
+   gradually instead of switching the whole bar on in one frame. */
+.story-rail-bars i {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-height: 0;
+  background: none;
+}
+
+.story-rail-bars i::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: var(--vt-line-strong);
+  border-radius: 2px;
+}
+
+/* The played part of the track. One continuous clip, driven by the same
+   interpolated progress as the marker, avoids per-bar updates. */
+.story-rail-bars.is-fill {
+  clip-path: inset(0 0 calc((1 - var(--rail-progress, 0)) * 100%) 0);
+}
+
+.story-rail-bars.is-fill i::before {
+  background: var(--vt-accent);
+}
+
+/* Where the track has got to, and which act that is. */
+.story-rail-head {
+  position: absolute;
+  top: calc(var(--rail-progress, 0) * 100%);
+  left: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--vt-text);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  background: var(--vt-s3);
+  border: 1px solid var(--vt-line-strong);
+  border-radius: 50%;
+  transform: translateY(-50%);
+}
+
+.story-rail-head em {
+  color: var(--vt-accent-text);
+  font-weight: 640;
+  font-style: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+/* --- an act ----------------------------------------------------------- */
+
+.story-act {
+  display: flex;
+  flex-direction: column;
+  gap: 84px;
+}
+
+.story-act-head {
+  width: min(1120px, calc(100% - 232px));
+  margin: 0 auto;
+  text-align: center;
+}
+
+.story-act-number {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 18px;
+  color: var(--vt-accent-text);
+  font-weight: 640;
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  background: var(--vt-accent-soft);
+  border-radius: 50%;
+}
+
+.story-act-head h2 {
+  margin: 0;
+  color: var(--vt-text);
+  font-weight: 640;
+  font-size: clamp(2rem, 3.1vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.story-act-head p {
+  margin: 16px auto 0;
+  max-width: 62ch;
+  color: var(--vt-text-2);
+  font-size: 1.06rem;
+  line-height: 1.6;
+}
+
+/* --- the diagram that closes an act ------------------------------------ */
+
+.story-diagram {
+  /* Wider than the chapters on purpose: the act ends on a full breath. */
+  width: min(1320px, calc(100% - 176px));
+  margin: 0 auto;
+  padding: 34px 32px 36px;
+  background: var(--vt-s1);
+  border: 1px solid var(--vt-line);
+  border-radius: 26px;
+}
+
+.story-diagram figcaption {
+  margin-bottom: 26px;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* --- a chapter -------------------------------------------------------- */
+
+.story-chapter {
+  position: relative;
+  scroll-margin-top: calc(var(--landing-header-space) + 32px);
+  --story-tone: var(--vt-info);
+  --story-tone-soft: var(--vt-info-soft);
+  --story-tone-mark: var(--vt-info-mark);
+  display: block;
+  /* The gutter is wide enough for the rail at every width where the rail is
+     shown: 232 px of margin against a footprint of about 90 px. */
+  width: min(1120px, calc(100% - 232px));
+  margin: 0 auto;
+}
+
+/* The chapter owns the geometry of one list and its fixed exhibit. */
+.story-chapter > .story-stage { position: absolute; margin: 0; }
+.story-chapter > .story-feature-list { position: absolute; inset: 0; margin: 0; pointer-events: none; }
+.story-chapter > .story-feature-list > li { position: absolute; top: 0; left: 0; box-sizing: border-box; pointer-events: auto; }
+.story-chapter > .story-feature-list > li[data-row-start="true"] { border-top-color: transparent; }
+.story-chapter > .story-feature-more-toggle { position: absolute; border-top: 1px solid var(--vt-line); text-align: left; }
+
+.story-chapter.tone-lead {
+  --story-tone: var(--vt-lead);
+  --story-tone-soft: var(--vt-lead-soft);
+  --story-tone-mark: var(--vt-lead);
+}
+
+.story-chapter.tone-good {
+  --story-tone: var(--vt-good);
+  --story-tone-soft: var(--vt-good-soft);
+  --story-tone-mark: var(--vt-good-mark);
+}
+
+.story-chapter.tone-warn {
+  --story-tone: var(--vt-warn);
+  --story-tone-soft: var(--vt-warn-soft);
+  --story-tone-mark: var(--vt-warn-mark);
+}
+
+.story-chapter-head {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+
+/* The tone is carried by the plate and by the chapter's icons. The word itself
+   is ordinary text: a tone colour at this size sat at 4.2:1 on its own tint,
+   which is under the floor the rest of the product holds. */
+.story-kicker {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  color: var(--vt-text);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--story-tone-soft);
+  border-radius: 999px;
+}
+
+.story-chapter-head h3 {
+  margin: 18px 0 0;
+  color: var(--vt-text);
+  font-weight: 640;
+  font-size: clamp(1.7rem, 2.4vw, 2.35rem);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.story-chapter-head p {
+  margin: 14px 0 0;
+  max-width: 44ch;
+  color: var(--vt-text-2);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+/* --- the features ----------------------------------------------------- */
+
+/* Beside the exhibit the rest of the chapter is a list, not a second wall of
+   cards: the exhibit is what the eye stops on, these are what it reads after. */
+.story-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.story-feature-list li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid transparent;
+}
+
+.story-feature-list li + li {
+  border-top: 1px solid var(--vt-line);
+}
+
+.story-feature-list li > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.story-feature-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  color: var(--story-tone-mark);
+}
+
+.story-feature-mark svg {
+  width: 17px;
+  height: 17px;
+}
+
+.story-feature-list strong {
+  color: var(--vt-text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.story-feature-text {
+  color: var(--vt-text-3);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.story-feature-more-toggle {
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 0;
+  color: var(--vt-text-2);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.story-feature-more-toggle:hover,
+.story-feature-more-toggle:focus-visible { color: var(--vt-text); }
+
+.story-feature-more-toggle span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--vt-text-3);
+  font-size: 0.75rem;
+  background: var(--vt-s2);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-feature-more-toggle { transition: none; }
+}
+
+/* --- the closing card ------------------------------------------------- */
+
+.story-close {
+  width: min(1120px, calc(100% - 232px));
+  margin: 0 auto;
+  padding: 96px 0 118px;
+}
+
+.story-close-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 56px 32px 60px;
+  text-align: center;
+  background: var(--vt-s1);
+  border: 1px solid var(--vt-line);
+  border-radius: 26px;
+}
+
+.story-close-card h2 {
+  margin: 0;
+  color: var(--vt-text);
+  font-weight: 640;
+  font-size: clamp(1.7rem, 2.4vw, 2.35rem);
+  line-height: 1.2;
+}
+
+.story-close-card p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--vt-text-2);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.story-close-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.story-close-link {
+  color: var(--vt-accent-text);
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.story-close-link:hover {
+  text-decoration: underline;
+}
+
+.landing-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px 48px;
+  align-items: start;
+  width: min(1320px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 38px 0 42px;
+  border-top: 1px solid var(--vt-line);
+}
+
+.landing-footer-brand p {
+  margin: 14px 0 0;
+  color: var(--vt-text-3);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.landing-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  padding-top: 8px;
+}
+
+.landing-footer nav a {
+  color: var(--vt-text-2);
+  font-size: 0.88rem;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.landing-footer nav a:hover,
+.landing-footer nav a:focus-visible { color: var(--vt-accent-text); }
+
+.landing-footer-copy {
+  grid-column: 1 / -1;
+  color: var(--vt-text-3);
+  font-size: 0.78rem;
+}
+
+/* --- narrowing -------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .story-chapter,
+  .story-act-head {
+    gap: 28px;
+    width: min(1120px, calc(100% - 64px));
+  }
+
+  .story-diagram {
+    width: min(1120px, calc(100% - 64px));
+    padding: 26px 22px 28px;
+  }
+
+  .story-close {
+    width: min(1120px, calc(100% - 64px));
+  }
+
+  .story-rail { display: none; }
+}
+
+@media (max-width: 1100px) {
+  .story-act-head { grid-template-columns: minmax(0, 1fr); }
+  .story-chapter > .story-feature-more-toggle { display: none; }
+}
+
+@media (max-width: 720px) {
+  .landing-story {
+    gap: 64px;
+    padding-top: 72px;
+  }
+
+  .story-act {
+    gap: 56px;
+  }
+
+  .story-chapter,
+  .story-close,
+  .story-act-head,
+  .story-diagram {
+    width: calc(100% - 36px);
+  }
+
+  .story-diagram {
+    padding: 22px 16px 24px;
+  }
+
+  .story-close {
+    padding: 64px 0 80px;
+  }
+
+  .story-close-card {
+    padding: 36px 20px 40px;
+  }
+
+  .landing-footer {
+    grid-template-columns: 1fr;
+    width: calc(100% - 36px);
+    padding: 30px 0 36px;
+  }
+
+  .landing-footer-copy { grid-column: 1; }
+
+  /* The mobile floor: nothing here drops below it. */
+  .story-feature-list strong {
+    font-size: var(--mobile-text, 1rem);
+  }
+
+  .story-feature-text,
+  .story-chapter-head p {
+    font-size: var(--mobile-text-small, 0.88rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-rail {
+    transition: none;
+  }
+}

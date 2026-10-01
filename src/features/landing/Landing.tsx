@@ -16,7 +16,7 @@ import {
   WandSparkles,
   X
 } from "lucide-react";
-import { FormEvent, useEffect, useId, useRef, useState } from "react";
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { api, ApiError } from "../../api";
 import type {
   Plan,
@@ -30,6 +30,20 @@ import { comparePlans } from "../../shared/lib/plans";
 import { Logo } from "../../shared/ui/primitives";
 import { TariffSection, TariffSkeleton } from "../tariffs/TariffsPage";
 import { BrainIcon } from "./BrainIcon";
+import { LandingLoader } from "./LandingLoader";
+import { LandingStory } from "./LandingStory";
+import { LandingCallPreview } from "./LandingCallPreview";
+import { LandingJump } from "./LandingJump";
+import { SceneErrorBoundary } from "./scene/ErrorBoundary";
+
+// The office and everything it needs — three.js and the rest — is a separate
+// chunk, fetched after the page is already on screen. A browser that cannot
+// run it, or a network that cannot fetch it, still gets the whole landing.
+const LandingScene = lazy(() =>
+  import("./scene/LandingScene").then((module) => ({ default: module.LandingScene }))
+);
+
+const LANDING_SCROLL_KEY = "verbatrace.landing.scroll-y";
 
 export function Landing({
   session,
@@ -47,10 +61,16 @@ export function Landing({
   // A link from the reset letter opens the dialog on the new password.
   const [showAuth, setShowAuth] = useState<AuthMode | null>(() => window.location.pathname === "/reset-password" && new URLSearchParams(window.location.search).get("token") ? "reset" : null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
+  /** The curtain stays up for a moment even on a cached visit, so it never blinks. */
+  const [curtainHeld, setCurtainHeld] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<"room" | "screens">("room");
   const benefitsRef = useRef<HTMLElement | null>(null);
   const workflowRef = useRef<HTMLElement | null>(null);
   const securityRef = useRef<HTMLElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
+  const reloadY = useRef(0);
+  const scrollRestored = useRef(false);
   useRevealOnScroll<HTMLElement>();
   const themeLabel = theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему";
   // The menu dismisses like every other layer in the application: a click
@@ -58,6 +78,49 @@ export function Landing({
   // because the burger lives in it and a click on the burger must toggle
   // rather than close and reopen.
   useDismissibleLayer(mobileMenuOpen, headerRef, () => setMobileMenuOpen(false));
+
+  useLayoutEffect(() => {
+    const previousRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    const reloading = navigation?.type === "reload";
+    try {
+      const savedY = reloading ? Number(window.sessionStorage.getItem(LANDING_SCROLL_KEY)) || 0 : 0;
+      // A saved position inside the full-screen office is not a reading
+      // position: restoring it would expose the story below the canvas.
+      reloadY.current = savedY < Math.max(window.innerHeight, 640) ? 0 : savedY;
+    } catch { /* storage may be unavailable */ }
+    scrollRestored.current = reloadY.current <= 0;
+    let frame = 0;
+    const save = () => {
+      frame = 0;
+      if (!scrollRestored.current) return;
+      try { window.sessionStorage.setItem(LANDING_SCROLL_KEY, String(window.scrollY)); } catch { /* storage may be unavailable */ }
+    };
+    const scheduleSave = () => { if (!frame) frame = window.requestAnimationFrame(save); };
+    window.addEventListener("scroll", scheduleSave, { passive: true });
+    window.addEventListener("pagehide", save);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleSave);
+      window.removeEventListener("pagehide", save);
+      window.history.scrollRestoration = previousRestoration;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sceneReady || !curtainHeld || scrollRestored.current) return;
+    let cancelled = false;
+    void document.fonts.ready.then(() => {
+      if (cancelled) return;
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        window.scrollTo({ top: reloadY.current, behavior: "instant" });
+        scrollRestored.current = true;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [sceneReady, curtainHeld]);
 
   useEffect(() => {
     const sections = [benefitsRef.current, workflowRef.current].filter(Boolean) as HTMLElement[];
@@ -156,6 +219,19 @@ export function Landing({
     };
   }, []);
 
+  // The curtain lifts when the office is ready, and in any case after a few
+  // seconds: a slow model must not keep the whole landing behind it.
+  const markSceneReady = useCallback(() => setSceneReady(true), []);
+
+  useEffect(() => {
+    const cap = window.setTimeout(() => setSceneReady(true), 9000);
+    const floor = window.setTimeout(() => setCurtainHeld(true), 600);
+    return () => {
+      window.clearTimeout(cap);
+      window.clearTimeout(floor);
+    };
+  }, []);
+
   function handleStart() {
     if (session) {
       onGetStarted();
@@ -166,15 +242,15 @@ export function Landing({
   }
 
   return (
-    <main className="landing">
+    <main className="landing" id="landing-top">
       <div className="landing-bg" />
       <header className="landing-header" ref={headerRef}>
         <Logo />
         <nav className={mobileMenuOpen ? "mobile-open" : ""}>
-          <a href="#features" onClick={() => setMobileMenuOpen(false)}>Возможности</a>
-          <a href="#workflow" onClick={() => setMobileMenuOpen(false)}>Как это работает</a>
-          <a href="#security" onClick={() => setMobileMenuOpen(false)}>Безопасность</a>
-          <a href="#tariffs" onClick={() => setMobileMenuOpen(false)}>Тарифы</a>
+          <LandingJump target="chapter-call" onClick={() => setMobileMenuOpen(false)}>Возможности</LandingJump>
+          <LandingJump target="chapter-analytics" onClick={() => setMobileMenuOpen(false)}>Аналитика</LandingJump>
+          <LandingJump target="chapter-privacy" onClick={() => setMobileMenuOpen(false)}>Безопасность</LandingJump>
+          <LandingJump target="tariffs" onClick={() => setMobileMenuOpen(false)}>Тарифы</LandingJump>
         </nav>
         <div className="landing-actions">
           <button
@@ -198,126 +274,79 @@ export function Landing({
         </div>
       </header>
 
-      <section className="landing-hero" data-reveal>
-        <div className="hero-copy" data-reveal-item>
-          <h1>
-            <span className="headline-main">Аналитика звонков</span>
-            <span>без ручного прослушивания</span>
-          </h1>
-          <p>
-            Загружайте звонки, получайте расшифровку, AI-анализ и статусы обработки.
-            Управляйте командой, отделами и всей компанией в одном месте.
-          </p>
-          <div className="hero-actions">
-            <button className="primary-button large" onClick={handleStart}>
-              Приступить к работе
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </div>
-
-        <ProductPreview compact={false} />
-      </section>
-
-      <section className="benefits" id="features" ref={benefitsRef} data-reveal>
-        <div className="section-heading" data-reveal-item>
-          <span>Возможности</span>
-          <h2>Что можно делать в VerbaTrace</h2>
-          <p>
-            Рабочее пространство закрывает путь звонка от загрузки аудио до управленческого вывода:
-            статусы, расшифровка, AI-анализ, инструкции и командный доступ собраны в одном интерфейсе.
-          </p>
-        </div>
-        <div className="benefit-grid">
-          <Benefit emblem="upload" title="Загрузка звонков" text="Добавляйте аудиофайлы и отслеживайте обработку по статусам." />
-          <Benefit emblem="transcript" title="Расшифровка" text="Получайте текстовую расшифровку звонка после обработки." />
-          <Benefit emblem="analysis" title="AI-анализ" text="Смотрите резюме, вопросы клиента, качество менеджера и следующие шаги." />
-          <Benefit emblem="quality" title="Качество разговора" text="Находите риски, возражения, вопросы клиента и сильные места менеджера." />
-        </div>
-        <div className="landing-showcase-grid">
-          <FeatureShowcase
-            visual={<CompanyStructureEmblem />}
-            title="Понятная структура компании"
-            text="Компания, отделы и сотрудники связаны в одну схему: можно разделять звонки, инструкции и доступы по рабочему контексту."
+      {/* The office is the first screen, but it is never the only way in: a
+          browser without WebGL, a missing model or a bug in the scene falls
+          back to the flat hero instead of an empty page. */}
+      <LandingLoader done={sceneReady && curtainHeld} stage={loadingStage} />
+      <SceneErrorBoundary fallback={<LandingHero onStart={handleStart} />} onError={markSceneReady}>
+        <Suspense fallback={<LandingHero onStart={handleStart} />}>
+          <LandingScene
+            onStart={handleStart}
+            fallback={<LandingHero onStart={handleStart} />}
+            onReady={markSceneReady}
+            onStage={setLoadingStage}
           />
-          <FeatureShowcase
-            visual={<ExportReportEmblem />}
-            title="Экспорт готовых материалов"
-            text="После анализа можно выгружать отчеты с метаданными, расшифровкой и AI-выводами в удобный файл."
-          />
-        </div>
-      </section>
+        </Suspense>
+      </SceneErrorBoundary>
 
-      <section className="landing-section workflow-section" id="workflow" ref={workflowRef} data-reveal>
+      {/* Everything the product does, in the order a call travels through it. */}
+      <LandingStory />
+
+      <section className="landing-section tariff-preview-section" id="tariffs" data-rail-step="V" data-reveal>
         <div className="section-heading" data-reveal-item>
-          <span>Как это работает</span>
-          <h2>Понятный цикл обработки звонка</h2>
+          <span>V · Тарифы</span>
+          <h2>Ваш масштаб. Ваш тариф.</h2>
           <p>
-            Каждый звонок проходит одинаковый маршрут: файл принят, аудио обработано,
-            расшифровка готова, затем появляется AI-анализ с рекомендациями.
-          </p>
-        </div>
-        <div className="workflow-grid">
-          <WorkflowStep emblem="upload" title="1. Загрузите аудио" text="Выберите файл, область видимости и инструкцию анализа для нужного отдела или компании." />
-          <WorkflowStep emblem="process" title="2. Дождитесь обработки" text="Статусная линия показывает, где сейчас звонок: новый, в обработке, расшифрован или проанализирован." />
-          <WorkflowStep emblem="document" title="3. Проверьте разговор" text="Откройте расшифровку по репликам, чтобы быстро найти важные вопросы и ответы." />
-          <WorkflowStep emblem="brain" title="4. Используйте выводы" text="AI-анализ подсветит следующий шаг, риски, возражения и качество работы менеджера." />
-        </div>
-      </section>
-
-      <section className="landing-section security-section" id="security" ref={securityRef} data-reveal>
-        <article className="security-glass-card security-main-card" data-reveal-item>
-          <div className="security-main-top">
-            <SecurityShieldIllustration />
-            <div className="security-main-content">
-              <span className="security-kicker">
-                <span className="security-kicker-emblem security-scroll-shine">
-                  <ShieldCheck size={18} />
-                </span>
-                Безопасность
-              </span>
-              <h2>Доступы и данные под контролем команды</h2>
-              <p>
-                Интерфейс построен вокруг ролей, компаний, отделов и областей видимости звонков.
-                Это помогает показывать записи только тем пользователям, которым они нужны для работы.
-              </p>
-            </div>
-          </div>
-          <div className="security-feature-dock">
-            <SecurityItem icon={<LockKeyhole />} tone="coral" title="Авторизация" text="Доступ к кабинету после входа." />
-            <SecurityItem icon={<Building2 />} tone="amber" title="Контекст компании" text="Звонки и инструкции по уровням доступа." />
-            <SecurityItem icon={<ShieldCheck />} tone="violet" title="Тарифные ограничения" text="Доступ к экспорту, аналитике и API по тарифу." />
-          </div>
-        </article>
-        <article className="security-glass-card security-access-card" data-reveal-item>
-          <SalesGlassIllustration />
-          <div className="security-access-copy">
-            <span className="status-chip ok security-status-chip security-scroll-shine">
-              <Check size={15} />
-              Доступ настроен
-            </span>
-            <h3>Отдел продаж</h3>
-            <p>Руководитель видит командные звонки, менеджер работает со своими записями и инструкциями.</p>
-          </div>
-          <div className="access-list">
-            <AccessRow icon={<UsersRound size={22} />} label="Команда" value="Доступно" tone="green" />
-            <AccessRow icon={<FileText size={22} />} label="Экспорт" value="По тарифу" tone="orange" />
-            <AccessRow icon={<BriefcaseBusiness size={22} />} label="Компания" value="Подключена" tone="violet" />
-          </div>
-        </article>
-      </section>
-
-      <section className="landing-section tariff-preview-section" id="tariffs" data-reveal>
-        <div className="section-heading" data-reveal-item>
-          <span>Тарифы</span>
-          <h2>Выберите объем под свою работу</h2>
-          <p>
-            В кабинете доступны персональные и бизнес-тарифы. Карточки показывают лимиты,
-            срок действия, уровень анализа и доступность командных возможностей.
+            Для собственных разговоров или работы всей команды.
+            Сравните объём обработки, глубину анализа и доступные инструменты.
           </p>
         </div>
         <LandingTariffPreview />
       </section>
+
+      <section className="story-close" id="start-work" data-rail-step="VI" data-reveal>
+        <div className="story-close-card" data-reveal-item>
+          <div className="story-close-copy">
+            <span className="landing-eyebrow">VI · Начать работу</span>
+            <h2>Меньше прослушивания.<br />Больше ясности.</h2>
+            <p>Расшифровка, оценка по вашим правилам и следующий шаг — в одном рабочем пространстве.</p>
+          </div>
+          <div className="story-close-actions">
+            <button className="primary-button large" type="button" onClick={handleStart}>
+              Открыть VerbaTrace
+              <ChevronRight size={18} />
+            </button>
+            <LandingJump className="story-close-link" target="chapter-call">Вернуться к возможностям</LandingJump>
+          </div>
+        </div>
+      </section>
+
+      <footer className="landing-footer">
+        <div className="landing-footer-brand">
+          <Logo />
+          <p>Рабочее пространство для разговоров,<br />решений и команд.</p>
+        </div>
+        <nav aria-label="Навигация внизу страницы">
+          <strong>Продукт</strong>
+          <LandingJump target="chapter-call">Возможности</LandingJump>
+          <LandingJump target="chapter-analytics">Аналитика</LandingJump>
+          <LandingJump target="chapter-privacy">Безопасность</LandingJump>
+          <LandingJump target="tariffs">Тарифы</LandingJump>
+        </nav>
+        <div className="landing-footer-column">
+          <strong>Рабочее пространство</strong>
+          <button type="button" onClick={session ? onGetStarted : () => setShowAuth("login")}>{session ? "Перейти в кабинет" : "Войти в аккаунт"}</button>
+          <button type="button" onClick={handleStart}>Начать работу <ChevronRight size={14} /></button>
+          <LandingJump target="chapter-exchange">Интеграции и экспорт</LandingJump>
+        </div>
+        <div className="landing-footer-column landing-footer-documents">
+          <strong>Документы <small>Готовятся</small></strong>
+          <span>Политика конфиденциальности</span>
+          <span>Условия использования</span>
+          <span>Обработка персональных данных</span>
+        </div>
+        <div className="landing-footer-bottom"><span>© {new Date().getFullYear()} VerbaTrace</span><LandingJump target="landing-top">К началу страницы ↑</LandingJump></div>
+      </footer>
 
       {showAuth && (
         <AuthDialog
@@ -327,6 +356,51 @@ export function Landing({
         />
       )}
     </main>
+  );
+}
+
+/** The flat first screen: what the landing shows when the 3D office cannot run. */
+export function LandingHero({ onStart }: { onStart: () => void }) {
+  const heroRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const hero = heroRef.current;
+      if (!hero) return;
+      const { top, height } = hero.getBoundingClientRect();
+      hero.style.setProperty("--intro-image-opacity", String(Math.max(0, Math.min(1, 1 + top / (height * .7)))));
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); };
+  }, []);
+  return (
+    <section className="landing-hero" ref={heroRef}>
+      <div className="landing-intro-image" aria-hidden="true" />
+      <div className="hero-copy">
+        <span className="landing-eyebrow">Разговор → текст → решение</span>
+        <h1>
+          <span className="headline-main">Аналитика звонков</span>
+          <span>без ручного прослушивания</span>
+        </h1>
+        <p>
+          Загружайте звонки, получайте расшифровку, AI-анализ и статусы обработки.
+          Управляйте командой, отделами и всей компанией в одном месте.
+        </p>
+        <div className="hero-actions">
+          <button className="primary-button large" onClick={onStart}>
+            Приступить к работе
+            <ChevronRight size={18} />
+          </button>
+          <LandingJump target="chapter-call" className="hero-explore">Как это работает <ChevronRight size={16} /></LandingJump>
+        </div>
+      </div>
+
+      <LandingCallPreview />
+    </section>
   );
 }
 

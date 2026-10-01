@@ -5,7 +5,6 @@ import {
   ShieldCheck,
   X
 } from "lucide-react";
-import type { CSSProperties } from "react";
 import { useEffect, useLayoutEffect, useState } from "react";
 import { api, ApiError } from "../../api";
 import type {
@@ -15,7 +14,7 @@ import type {
   Subscription
 } from "../../types";
 
-import { analysisLevelLabel, comparePlans, formatHistoryDays, formatInstructionLimit, formatMinutesLimit, formatPendingQueueLimit, planGradients } from "../../shared/lib/plans";
+import { analysisLevelLabel, comparePlans, formatHistoryDays, formatInstructionLimit, formatPendingQueueLimit } from "../../shared/lib/plans";
 import { SkeletonLine, TextBlockSkeleton } from "../../shared/ui/loading";
 
 if (typeof window !== "undefined" && window.location.pathname === "/app/settings/tariffs" && "scrollRestoration" in window.history) {
@@ -324,7 +323,7 @@ export function TariffSection({
 
   return (
     <section className="tariff-section">
-      <h2>{title}</h2>
+      <div className="tariff-section-heading"><h2>{title}</h2><p>{business ? "Общий объём обработки и инструменты для компаний и отделов." : "Расшифровка и анализ для личного рабочего пространства."}</p></div>
       <div className="tariff-grid">
         {plans.map((plan) => (
           <TariffCard key={plan.id} plan={plan} business={business} />
@@ -335,14 +334,9 @@ export function TariffSection({
 }
 
 export function TariffCard({ plan, business }: { plan: Plan; business?: boolean; }) {
-  const cardStyle = {
-    "--tariff-card-gradient": planGradients[plan.code]
-  } as CSSProperties;
   const activeInstructionLimit =
     business ? plan.instructions_per_department_limit ?? plan.active_instruction_limit : plan.active_instruction_limit;
   const features = [
-		`Около ${plan.marketing_hours_hint.toLocaleString("ru-RU")} ч обработки за 30 дней`,
-		`Кредитов: ${plan.monthly_credit_allowance.toLocaleString("ru-RU")}`,
     `Звонков в очереди без кредитов: ${formatPendingQueueLimit(plan.pending_credit_calls_limit)}`,
     `Активных инструкций: ${formatInstructionLimit(activeInstructionLimit)}`,
     business && plan.company_limit !== null ? `Компаний: ${plan.company_limit}` : "",
@@ -350,7 +344,6 @@ export function TariffCard({ plan, business }: { plan: Plan; business?: boolean;
       ? `Отделов на компанию: ${plan.departments_per_company_limit}`
       : "",
 		business ? "Без ограничений по сотрудникам и пользователям" : "",
-    `Уровень анализа: ${analysisLevelLabel(plan.analysis_level)}`,
     `Хранение истории: ${formatHistoryDays(plan.history_retention_days)}`,
     plan.export_enabled ? "Экспорт отчетов" : "",
     business && plan.team_analytics_enabled ? "Командная аналитика" : "",
@@ -359,15 +352,16 @@ export function TariffCard({ plan, business }: { plan: Plan; business?: boolean;
   ].filter(Boolean);
 
   return (
-    <article className="tariff-card glass" style={cardStyle} data-reveal-item>
+    <article className={`tariff-card glass tariff-card-refined${plan.code.endsWith("_pro") ? " is-pro" : ""}`} data-plan={plan.code} data-reveal-item>
       <div className="tariff-card-head">
-        <span className="status-chip warn">{plan.type === "personal" ? "Персональный" : "Бизнес"}</span>
+        <div className="tariff-card-label"><span>{plan.type === "personal" ? "Личное пространство" : "Команда и компании"}</span><span>{analysisLevelLabel(plan.analysis_level)}</span></div>
         <h3>{plan.name}</h3>
 				<div className="tariff-price">
 					<strong>{(plan.monthly_price_minor / 100).toLocaleString("ru-RU")} ₽</strong>
 					<span>/ 30 дней</span>
 				</div>
       </div>
+      <div className="tariff-volume"><strong>≈ {plan.marketing_hours_hint.toLocaleString("ru-RU")} <span>ч</span></strong><span>обработки за 30 дней</span><small>{plan.monthly_credit_allowance.toLocaleString("ru-RU")} кредитов</small></div>
       <ul className="tariff-feature-list">
         {features.map((feature) => (
           <li key={feature}>
@@ -376,9 +370,7 @@ export function TariffCard({ plan, business }: { plan: Plan; business?: boolean;
           </li>
         ))}
       </ul>
-      <button className="ghost-button wide" disabled>
-        Скоро
-      </button>
+      <p className="tariff-card-activation"><ShieldCheck size={14} />Подключает администратор</p>
     </article>
   );
 }

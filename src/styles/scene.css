@@ -1,0 +1,392 @@
+/* The 3D office on the landing: a full-height block with the canvas behind and
+   the copy, captions, dots and hint layered over it. */
+
+/* The curtain over the whole landing until the office is ready. */
+.landing-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(70% 60% at 50% 38%, rgba(255, 122, 67, 0.12), transparent 70%),
+    linear-gradient(180deg, #1c130f 0%, #140e0b 100%);
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
+
+.landing-loader.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.landing-loader strong {
+  color: #fffaf5;
+  font-size: 26px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.landing-loader span {
+  color: rgba(255, 250, 245, 0.56);
+  font-size: 15px;
+}
+
+/* The logo's own wave, made to move: five bars running like a level meter. */
+.landing-loader-wave {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 46px;
+}
+
+.landing-loader-wave i {
+  display: block;
+  width: 5px;
+  height: 14px;
+  border-radius: 8px;
+  background: var(--accent, #ff7a43);
+  transform-origin: center;
+  animation: landing-loader-bar 1.05s ease-in-out infinite;
+}
+
+.landing-loader-wave i:nth-child(1) { animation-delay: 0s; }
+.landing-loader-wave i:nth-child(2) { animation-delay: 0.12s; }
+.landing-loader-wave i:nth-child(3) { animation-delay: 0.24s; }
+.landing-loader-wave i:nth-child(4) { animation-delay: 0.36s; }
+.landing-loader-wave i:nth-child(5) { animation-delay: 0.48s; }
+
+@keyframes landing-loader-bar {
+  0%,
+  100% {
+    transform: scaleY(1);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scaleY(3.1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-loader-wave i {
+    animation: none;
+    opacity: 0.8;
+  }
+
+  .landing-loader-wave i:nth-child(2) { height: 30px; }
+  .landing-loader-wave i:nth-child(3) { height: 40px; }
+  .landing-loader-wave i:nth-child(4) { height: 26px; }
+}
+
+/* No opaque colour of its own: until the room is drawn the landing's own warm
+   background shows through, which looks like a page still loading rather than
+   a page that failed. */
+.scene-block {
+  position: relative;
+  height: 100vh;
+  min-height: 640px;
+  /* Projected monitor layers can extend past the viewport. `hidden` makes this
+     block an internal scroll container, so scrollIntoView can move the canvas
+     away and leave a full screen of background before the story. */
+  overflow: clip;
+}
+
+.scene-loading {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 250, 245, 0.62);
+  font-size: 14px;
+  transform: translateX(-50%);
+}
+
+.scene-loading i {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 250, 245, 0.28);
+  border-top-color: #ff7a43;
+  border-radius: 50%;
+  animation: scene-spin 0.9s linear infinite;
+}
+
+@keyframes scene-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The canvas and the DOM screens behind it order themselves inside this layer;
+   isolating it keeps that order from climbing over the copy and the header. */
+.scene-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  isolation: isolate;
+}
+
+.scene-canvas canvas {
+  display: block;
+}
+
+/* The page on the monitor: a layer over the canvas, placed every frame on the
+   projected glass. Its own size is the document's; the scale does the rest. */
+.scene-screen-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  overflow: hidden;
+  transform: translate3d(-20000px, 0, 0);
+  transform-origin: 0 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+  /* Its own compositor layer: without this the browser re-rastered a page the
+     size of a desktop every frame the camera's approach changed its scale, and
+     the flight lost a third of a second at a time. */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+.scene-screen-frame {
+  display: block;
+  border: 0;
+}
+
+/* The headline sits over a bright room: a dark wash under it keeps the type
+   readable and fades away once the camera moves in. */
+.scene-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(90deg, rgba(20, 13, 10, 0.78) 0%, rgba(20, 13, 10, 0.42) 38%, rgba(20, 13, 10, 0) 68%),
+    linear-gradient(180deg, rgba(20, 13, 10, 0.35) 0%, rgba(20, 13, 10, 0) 30%);
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  pointer-events: none;
+}
+
+.scene-hero .scene-scrim {
+  opacity: 1;
+}
+
+.scene-hero-copy {
+  position: absolute;
+  left: clamp(24px, 6vw, 96px);
+  bottom: clamp(56px, 12vh, 140px);
+  z-index: 5;
+  max-width: 620px;
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  pointer-events: none;
+}
+
+.scene-hero-copy.is-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.scene-hero-copy h1 {
+  margin: 0;
+  color: #fffaf5;
+  font-size: clamp(38px, 4.4vw, 62px);
+  line-height: 1.04;
+  letter-spacing: 0;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.35);
+}
+
+.scene-hero-copy h1 span {
+  display: block;
+}
+
+.scene-hero-copy h1 span:last-child {
+  color: #ff7a43;
+}
+
+.scene-hero-copy p {
+  max-width: 560px;
+  margin: 22px 0 26px;
+  color: rgba(255, 250, 245, 0.84);
+  font-size: 19px;
+  line-height: 1.48;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* The note changes shape with the space left by the monitor. */
+.scene-caption {
+  --caption-shift: 0px;
+  position: absolute;
+  top: auto;
+  bottom: clamp(74px, 12vh, 132px);
+  z-index: 5;
+  width: min(300px, 26vw);
+  padding: 9px 10px;
+  color: #fffaf5;
+  background: rgba(28, 19, 15, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  opacity: 0;
+  transform: translateX(var(--caption-shift));
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+}
+
+.scene-caption.side-left {
+  --caption-shift: -18px;
+  left: clamp(24px, 5vw, 80px);
+}
+
+.scene-caption.side-right {
+  --caption-shift: 18px;
+  right: clamp(24px, 5vw, 80px);
+}
+
+.scene-caption.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.scene-caption strong {
+  display: block;
+  text-align: right;
+  margin-bottom: 6px;
+  font-size: 17px;
+}
+
+.scene-caption p {
+  margin: 0;
+  color: rgba(255, 250, 245, 0.8);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.scene-block[data-caption-layout="side"] .scene-caption {
+    top: 50%;
+    bottom: auto;
+    width: var(--scene-caption-width);
+    max-height: calc(100% - 150px);
+    padding: 14px 16px;
+    border-radius: 16px;
+    overflow-wrap: anywhere;
+    transform: translate(var(--caption-shift), -50%);
+}
+
+.scene-block[data-caption-layout="side"] .scene-caption.side-left { left: var(--scene-caption-left); }
+.scene-block[data-caption-layout="side"] .scene-caption.side-right { right: var(--scene-caption-right); }
+.scene-block[data-caption-layout="side"] .scene-caption.is-visible { transform: translate(0, -50%); }
+.scene-block[data-caption-layout="side"] .scene-caption strong { font-size: 15px; line-height: 1.3; }
+.scene-caption.side-left strong { text-align: left; }
+.scene-caption.side-right strong { text-align: right; }
+.scene-block[data-caption-layout="side"] .scene-caption p { font-size: 13px; line-height: 1.5; text-align: justify; hyphens: auto; }
+
+.scene-block[data-caption-layout="card"] .scene-caption {
+  --caption-shift: 0px;
+  top: 92px;
+  bottom: auto;
+  left: calc(50% - 16px);
+  right: auto;
+  width: var(--scene-caption-width);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(28, 19, 15, .88);
+  transform: translate(-50%, -8px);
+}
+.scene-block[data-caption-layout="card"] .scene-caption.is-visible { transform: translate(-50%, 0); }
+.scene-block[data-caption-layout="card"] .scene-caption strong { font-size: 15px; line-height: 1.3; }
+.scene-block[data-caption-layout="card"] .scene-caption p { font-size: 13px; line-height: 1.5; }
+.scene-block.has-caption .scene-hint { display: none; }
+
+.scene-dots {
+  position: absolute;
+  top: 50%;
+  right: 28px;
+  z-index: 6;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  transform: translateY(-50%);
+}
+
+.scene-dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+}
+
+.scene-dots .is-active button {
+  background: #ff7a43;
+  border-color: #ff7a43;
+  transform: scale(1.25);
+}
+
+.scene-hint {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 250, 245, 0.7);
+  font-size: 14px;
+  transform: translateX(-50%);
+  animation: scene-hint-bob 2.2s ease-in-out infinite;
+}
+
+@keyframes scene-hint-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+
+  50% {
+    transform: translate(-50%, 6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-hint {
+    animation: none;
+  }
+
+  .scene-hero-copy,
+  .scene-caption {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .scene-dots {
+    right: 12px;
+  }
+}
+
+html[data-theme="light"] .scene-block[data-caption-layout] .scene-caption {
+  color: #382c24;
+  background: rgba(255, 252, 248, .9);
+  border-color: rgba(97, 72, 58, .2);
+  box-shadow: 0 12px 30px rgba(81, 45, 25, .12);
+}
+html[data-theme="light"] .scene-caption p { color: #5c4a3c; }

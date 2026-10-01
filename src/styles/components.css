@@ -1098,7 +1098,7 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
 
 .landing {
   --landing-header-offset: 8px;
-  --landing-header-space: 108px;
+  --landing-header-space: 88px;
   position: relative;
   isolation: isolate;
   color: #fffaf5;
@@ -1147,13 +1147,14 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
   top: var(--landing-header-offset);
   left: 50%;
   z-index: 40;
+  height: 68px;
   width: min(1720px, calc(100% - 48px));
   transform: translateX(-50%);
   color: #fffaf5;
   background:
     linear-gradient(135deg, #171a1f 0%, #17120f 56%, #281810 100%);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 30px;
+  border-radius: 24px;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -1226,7 +1227,7 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
   font-weight: 650;
 }
 
-.landing-header nav a,
+.landing-header nav :is(a, .landing-jump),
 .app-header nav button {
   position: relative;
 }
@@ -1235,7 +1236,7 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
    shrinks them until a label such as "Как это работает" breaks into two lines and
    the nav grows to 60 px inside an 84 px header. Better to keep one line and let
    the burger take over at the width where the row stops fitting. */
-.landing-header nav a {
+.landing-header nav :is(a, .landing-jump) {
   flex: 0 0 auto;
   padding: 9px 12px;
   white-space: nowrap;
@@ -1246,7 +1247,7 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
     backdrop-filter 160ms ease;
 }
 
-.landing-header nav a::after,
+.landing-header nav :is(a, .landing-jump)::after,
 .app-header nav button::after {
   content: "";
   position: absolute;
@@ -1269,16 +1270,16 @@ html[data-theme="dark"] .notifications-popover .notification-content > small, ht
   transform: scaleX(1);
 }
 
-.landing-header nav a::after {
+.landing-header nav :is(a, .landing-jump)::after {
   display: none;
 }
 
-.landing-header nav a:hover,
+.landing-header nav :is(a, .landing-jump):hover,
 .app-header nav button:hover {
   color: #ff7a43;
 }
 
-.landing-header nav a:hover {
+.landing-header nav :is(a, .landing-jump):hover {
   background: rgba(255, 250, 245, 0.1);
   backdrop-filter: blur(10px);
 }

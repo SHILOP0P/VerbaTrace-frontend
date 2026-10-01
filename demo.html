@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>VerbaTrace — экран демонстрации</title>
+    <!-- The screen lives inside the landing's 3D monitors. Its theme starts as
+         the query string says and then follows the landing's own, which the
+         scene sends down as a message; the document is never reloaded for it,
+         so the recording carries on across the change. -->
+    <script>
+      (function () {
+        var theme = new URLSearchParams(window.location.search).get("theme") === "dark" ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        if (new URLSearchParams(window.location.search).get("monitor") === "portrait") {
+          document.documentElement.dataset.monitor = "portrait";
+        }
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+      }
+
+      /* No `overflow: hidden`, however much a monitor wants no scrollbars: any
+         overflow other than visible on the root makes this document its own
+         scroll container, and the app header stops sticking to the top — on the
+         taller screens it scrolled away with the page. The scrollbar is the
+         product's own, from refresh.css, and is left exactly as it is: this
+         document is a picture of the real application. */
+
+      /* This document is painted onto a monitor in the 3D office, a thousand
+         pixels wide and always in motion around it. A blur behind a panel is
+         the single most expensive thing a browser can rasterise, and at this
+         size nobody can tell it is gone; without this the page took a fifth of
+         a second to appear on the glass and the camera lost frames. */
+      * {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      html {
+        background: #f4efea;
+      }
+
+      html[data-theme="dark"] {
+        background: #110e0b;
+      }
+
+      /* The same responsive product page lives on the portrait monitor. Its
+         sticky header covers the edge where the document scrolls underneath. */
+      html[data-monitor="portrait"] .app-header {
+        top: 0;
+        margin: 0 0 8px;
+        border-radius: 0 0 14px 14px;
+      }
+
+      /* No transition here on purpose. The landing's switch is a circular
+         reveal that sweeps across the whole page, this document included, and
+         it is that sweep that shows the change. A transition of its own on
+         every element of a whole application is half a second of style work on
+         four documents at once, which is exactly what the sweep cannot afford. */
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/demo/main.tsx"></script>
+  </body>
+</html>

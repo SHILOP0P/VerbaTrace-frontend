@@ -6,10 +6,14 @@
  *
  * Surface scale: canvas → panel (--vt-s1) → nested block (--vt-s2) → overlay
  * (--vt-s3). Nested blocks separate by fill, not by another border.
+ *
+ * The landing is on the same scale. It keeps its own background, but the panels
+ * and tones of the story below the office are the product's, not a second set
+ * of colours invented for a marketing page.
  */
 
-html[data-theme="dark"] :is(.app-shell, .vt-portal),
-html:not([data-theme]) :is(.app-shell, .vt-portal) {
+html[data-theme="dark"] :is(.app-shell, .vt-portal, .landing),
+html:not([data-theme]) :is(.app-shell, .vt-portal, .landing) {
   --vt-canvas: #110e0b;
   --vt-s1: #1a1612;
   --vt-s2: #231e19;
@@ -63,7 +67,7 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
   --vt-skeleton-hi: rgba(255, 244, 235, 0.13);
 }
 
-html[data-theme="light"] :is(.app-shell, .vt-portal) {
+html[data-theme="light"] :is(.app-shell, .vt-portal, .landing) {
   /* A clean warm paper rather than beige: the nested fill is barely tinted,
      so tinted blocks and colour marks stay fresh on it. */
   --vt-canvas: #f4efea;
@@ -118,8 +122,8 @@ html[data-theme="light"] :is(.app-shell, .vt-portal) {
 
 /* Older tokens follow the scale, and the ones rules used without a definition
    finally exist, so cards, rows and failed states get their fill and border. */
-html[data-theme] :is(.app-shell, .vt-portal),
-html:not([data-theme]) :is(.app-shell, .vt-portal) {
+html[data-theme] :is(.app-shell, .vt-portal, .landing),
+html:not([data-theme]) :is(.app-shell, .vt-portal, .landing) {
   --vt-dur-fast: 120ms;
   --vt-dur: 200ms;
   --vt-dur-slow: 320ms;
@@ -165,13 +169,16 @@ html:not([data-theme]) :is(.app-shell, .vt-portal) {
    Only translate, transform, scale and opacity animate, so the compositor
    moves the light without repainting the page. They replace the photo layers
    of the old theme. */
-html[data-theme] .app-shell:not(.select-menu-portal-root) {
+html[data-theme] .app-shell:not(.select-menu-portal-root),
+html[data-theme] .landing {
   color: var(--vt-text);
   background: transparent;
 }
 
 html[data-theme] .app-shell:not(.select-menu-portal-root)::before,
-html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
+html[data-theme] .app-shell:not(.select-menu-portal-root)::after,
+html[data-theme] .landing > .landing-bg,
+html[data-theme] .landing::after {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -186,7 +193,8 @@ html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
    the animations carry that centre between 6% and 94% of the width and
    height. The negative delays start it near the top right, where the static
    version of the light used to be. */
-html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
+html[data-theme] .app-shell:not(.select-menu-portal-root)::before,
+html[data-theme] .landing > .landing-bg {
   inset: auto;
   top: -40vmax;
   left: -40vmax;
@@ -205,7 +213,8 @@ html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
 
 /* On paper an orange glow reads as a stain; a paler apricot light reads as
    warmth. */
-html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::before {
+html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::before,
+html[data-theme="light"] .landing > .landing-bg {
   background: radial-gradient(closest-side, rgba(255, 160, 110, 0.26) 0%, rgba(255, 196, 150, 0.1) 45%, transparent 100%);
 }
 
@@ -227,19 +236,77 @@ html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::before {
 /* Asked for less motion: the light stays where it starts. The general rule
    below covers the shell's descendants, not the shell's own layers. */
 @media (prefers-reduced-motion: reduce) {
-  html[data-theme] .app-shell:not(.select-menu-portal-root)::before {
+  html[data-theme] .app-shell:not(.select-menu-portal-root)::before,
+  html[data-theme] .landing > .landing-bg {
     animation: none;
   }
 }
 
-html[data-theme] .app-shell:not(.select-menu-portal-root)::after {
+html[data-theme] .app-shell:not(.select-menu-portal-root)::after,
+html[data-theme] .landing::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
   background-size: 220px 220px;
   opacity: 0.05;
 }
 
-html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::after {
+html[data-theme="light"] .app-shell:not(.select-menu-portal-root)::after,
+html[data-theme="light"] .landing::after {
   opacity: 0.035;
+}
+
+/* The landing uses the same moving light and grain as the workspace. The old
+   full-page photograph is reserved for the flat first screen when WebGL fails. */
+html[data-theme] .landing > .landing-bg {
+  z-index: 0;
+  background-size: auto;
+  background-position: initial;
+  background-attachment: scroll;
+  filter: none;
+}
+
+html[data-theme] .landing::after {
+  display: block;
+  z-index: 0;
+}
+
+html:has(.landing) {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing) { scroll-behavior: auto; }
+}
+
+.landing > :is(.scene-block, .landing-hero, .landing-story, .landing-section, .story-close, .landing-footer) {
+  position: relative;
+  z-index: 1;
+}
+
+.landing > .landing-hero {
+  isolation: isolate;
+}
+
+.landing > .landing-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(17, 14, 11, 0.92), rgba(17, 14, 11, 0.55) 65%, rgba(17, 14, 11, 0.76)),
+    url("/assets/verbatrace-hero-background.png") center / cover;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+html[data-theme="light"] .landing > .landing-hero::before {
+  background:
+    linear-gradient(90deg, rgba(244, 239, 234, 0.94), rgba(244, 239, 234, 0.62) 65%, rgba(244, 239, 234, 0.85)),
+    url("/assets/verbatrace-hero-background.png") center / cover;
+  opacity: 0.32;
+}
+
+.landing .tariff-preview-section {
+  scroll-margin-top: calc(var(--landing-header-space) + 32px);
 }
 
 /* The body lets the page's canvas (base.css, index.html) show through; a colour
@@ -763,52 +830,52 @@ html[data-theme] .app-shell .app-header.app-header {
 /* ---------------------------------------------------------------------------
  * Score gauge: one model for a 0–100 score across the overview and the call.
  * ------------------------------------------------------------------------- */
-.app-shell .score-gauge {
+:is(.app-shell, .landing) .score-gauge {
   position: relative;
   display: inline-grid;
   flex: 0 0 auto;
   place-items: center;
 }
 
-.app-shell .score-gauge svg {
+:is(.app-shell, .landing) .score-gauge svg {
   position: absolute;
   inset: 0;
   overflow: visible;
 }
 
-.app-shell .score-gauge circle {
+:is(.app-shell, .landing) .score-gauge circle {
   fill: none;
   stroke-width: 13;
   stroke-linecap: round;
 }
 
-.app-shell .score-gauge-track {
+:is(.app-shell, .landing) .score-gauge-track {
   stroke: var(--vt-track);
 }
 
-.app-shell .score-gauge.is-loading .score-gauge-track {
+:is(.app-shell, .landing) .score-gauge.is-loading .score-gauge-track {
   stroke: var(--vt-skeleton-hi);
   animation: app-shimmer 1.4s ease-in-out infinite;
 }
 
-.app-shell .score-gauge.tone-good .score-gauge-value { stroke: var(--vt-good-mark); }
-.app-shell .score-gauge.tone-warning .score-gauge-value { stroke: var(--vt-warn-mark); }
-.app-shell .score-gauge.tone-danger .score-gauge-value { stroke: var(--vt-bad-mark); }
+:is(.app-shell, .landing) .score-gauge.tone-good .score-gauge-value { stroke: var(--vt-good-mark); }
+:is(.app-shell, .landing) .score-gauge.tone-warning .score-gauge-value { stroke: var(--vt-warn-mark); }
+:is(.app-shell, .landing) .score-gauge.tone-danger .score-gauge-value { stroke: var(--vt-bad-mark); }
 
-.app-shell .score-gauge-tick {
+:is(.app-shell, .landing) .score-gauge-tick {
   stroke: var(--vt-line-strong);
   stroke-width: 2.5;
   stroke-linecap: round;
 }
 
-.app-shell .score-gauge-center {
+:is(.app-shell, .landing) .score-gauge-center {
   position: relative;
   display: grid;
   justify-items: center;
   gap: 2px;
 }
 
-.app-shell .score-gauge-center strong {
+:is(.app-shell, .landing) .score-gauge-center strong {
   color: var(--vt-text);
   font-size: calc(var(--gauge-size, 150px) * 0.24);
   font-weight: 650;
@@ -816,16 +883,16 @@ html[data-theme] .app-shell .app-header.app-header {
   line-height: 1;
 }
 
-.app-shell .score-gauge-center small {
+:is(.app-shell, .landing) .score-gauge-center small {
   color: var(--vt-text-3);
   font-size: 0.8rem;
 }
 
-.app-shell .score-gauge.tone-none .score-gauge-center strong {
+:is(.app-shell, .landing) .score-gauge.tone-none .score-gauge-center strong {
   color: var(--vt-text-3);
 }
 
-.app-shell .score-gauge-skeleton {
+:is(.app-shell, .landing) .score-gauge-skeleton {
   display: block;
   width: 56px;
   height: 22px;
@@ -5077,27 +5144,27 @@ html[data-theme] .app-shell .quality-review-entry small {
  * buttons. Every role has its own colour — one green chip on everybody told
  * the reader nothing.
  * ------------------------------------------------------------------------- */
-html[data-theme] .app-shell .status-chip.role-owner {
+html[data-theme] :is(.app-shell, .landing) .status-chip.role-owner {
   color: var(--vt-good);
   background: var(--vt-good-soft);
 }
 
-html[data-theme] .app-shell .status-chip.role-deputy {
+html[data-theme] :is(.app-shell, .landing) .status-chip.role-deputy {
   color: var(--vt-info);
   background: var(--vt-info-soft);
 }
 
-html[data-theme] .app-shell .status-chip.role-leader {
+html[data-theme] :is(.app-shell, .landing) .status-chip.role-leader {
   color: var(--vt-lead);
   background: var(--vt-lead-soft);
 }
 
-html[data-theme] .app-shell .status-chip.role-member {
+html[data-theme] :is(.app-shell, .landing) .status-chip.role-member {
   color: var(--vt-text-2);
   background: var(--vt-s3);
 }
 
-html[data-theme] .app-shell .status-chip.role-member::before {
+html[data-theme] :is(.app-shell, .landing) .status-chip.role-member::before {
   background: var(--vt-text-3);
 }
 

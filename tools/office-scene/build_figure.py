@@ -84,6 +84,8 @@ TROUSER_COLOR = (0.23, 0.25, 0.30)   # charcoal
 SHOE_COLOR = (0.11, 0.09, 0.08)
 BELT_COLOR = (0.13, 0.11, 0.10)
 HEADSET_COLOR = (0.15, 0.15, 0.16)   # dark grey
+HAIR_COLOR = (0.19, 0.105, 0.065)    # palette identity; runtime supplies individual tones
+COLLAR_COLOR = (0.92, 0.89, 0.81)
 HEADSET_MIC_SIDE = +1                # +1 = figure's left (+X), -1 = right
 
 # Mesh resolution. Triangle budget for the web is < 25k after subdivision.
@@ -397,18 +399,34 @@ def build_figure(mats):
         (1.06, 0.075, 0.065, 0.0),
     ], shirt, xform=lean)
     # Collar: a stand-up band around the neck plus two folded points on the chest.
-    band_z("collar_band", 1.04, 1.085, 0.064, 0.060, 0.052, 0.049, shirt, xform=lean)
+    band_z("collar_band", 1.04, 1.085, 0.064, 0.060, 0.052, 0.049, mats["Collar"], xform=lean)
     for s, sfx in ((1, ".L"), (-1, ".R")):
         prism(f"collar_flap{sfx}", [
             (s * 0.008, -0.060, 1.078),
             (s * 0.070, -0.112, 0.995),
             (s * 0.055, -0.048, 1.066),
-        ], 0.006, shirt, xform=lean)
+        ], 0.006, mats["Collar"], xform=lean)
 
     # --- neck and head ----------------------------------------------------
     capsule("neck", (0, 0.0, NECK_BASE_Z), (0, 0.0, NECK_TOP_Z + 0.01), 0.056, 0.053, skin, xform=lean)
     egg("head", (0, 0, HEAD_CENTER_Z), HEAD_HALF_W, HEAD_HALF_D, HEAD_HALF_H, skin,
         chin=HEAD_CHIN_TAPER, sides=HEAD_SIDES, lat=HEAD_LAT, xform=head_xf)
+
+    # A small shared cap follows the head bone; no strands or alpha overdraw.
+    # The front hairline is higher than the back, leaving the face uncovered.
+    hair_rings = []
+    for k in range(1, 7):
+        row = []
+        for i in range(16):
+            azimuth = 2 * pi * i / 16
+            front = max(0, -sin(azimuth))
+            latitude = (1.7 - .6 * front) * k / 6
+            row.append(Vector((HEAD_HALF_W * 1.035 * sin(latitude) * cos(azimuth),
+                               HEAD_HALF_D * 1.035 * sin(latitude) * sin(azimuth),
+                               HEAD_CENTER_Z + HEAD_HALF_H * 1.035 * cos(latitude))))
+        hair_rings.append(row)
+    hair_vertices, hair_faces = loft_mesh(hair_rings, cap_start=Vector((0, 0, HEAD_CENTER_Z + HEAD_HALF_H * 1.04)))
+    add_part("hair_cap", hair_vertices, hair_faces, mats["Hair"], subsurf=False, xform=head_xf)
 
     # --- headset ----------------------------------------------------------
     ear_y = 0.008
@@ -913,6 +931,8 @@ def main():
         "Shoes": make_material("Shoes", SHOE_COLOR, roughness=0.35, specular=0.5),
         "Belt": make_material("Belt", BELT_COLOR, roughness=0.45, specular=0.4),
         "Headset": make_material("Headset", HEADSET_COLOR, roughness=0.45, specular=0.4),
+        "Hair": make_material("Hair", HAIR_COLOR, roughness=0.9, specular=0.15),
+        "Collar": make_material("Collar", COLLAR_COLOR, roughness=0.8, specular=0.2),
     }
 
     joints = build_figure(mats)

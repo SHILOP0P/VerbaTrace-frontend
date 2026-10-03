@@ -206,6 +206,15 @@ export function createScenarioPlayer(steps: Step[], emit: (event: DemoEvent) => 
     // would be swallowed by its value tracker.
     Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(element, value);
     element.dispatchEvent(new Event("input", { bubbles: true }));
+    // Scripted input has no native keyboard action to reveal the caret. Apply
+    // selection after React's controlled value update, without scrolling the
+    // surrounding page or moving a real user's cursor in the product form.
+    queueMicrotask(() => {
+      if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) return;
+      if (element !== document.activeElement || element.value !== value) return;
+      if (element.selectionStart !== null) element.setSelectionRange(value.length, value.length);
+      element.scrollLeft = value ? element.scrollWidth : 0;
+    });
   }
 
   async function run(step: Step, signal: AbortSignal) {

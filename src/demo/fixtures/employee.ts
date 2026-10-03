@@ -29,7 +29,7 @@ import type {
   UserPreferencesResponse,
   UserResponse
 } from "../../types";
-import { buildConversationWav } from "./audio";
+import { buildConversationWav, demoWaveform } from "./audio";
 
 /**
  * The employee's monitor: one sales department, a handful of calls, and one
@@ -355,8 +355,11 @@ function call(input: Pick<CallResponse, "id" | "title" | "status" | "duration_se
 export function installEmployeeFixtures(): EmployeeFixture {
   const supplyDuration = 138;
   const tariffDuration = 43;
-  const supplyMedia = URL.createObjectURL(buildConversationWav(supplyCall, supplyDuration));
-  const tariffMedia = URL.createObjectURL(buildConversationWav(tariffCall, tariffDuration));
+  const supplyRecording = buildConversationWav(supplyCall, supplyDuration);
+  const tariffRecording = buildConversationWav(tariffCall, tariffDuration);
+  const supplyMedia = URL.createObjectURL(supplyRecording);
+  const tariffMedia = URL.createObjectURL(tariffRecording);
+  const waveforms: Record<string, Promise<{peaks: number[]}>> = {[FEATURED_CALL_ID]: demoWaveform(supplyRecording), [SECOND_CALL_ID]: demoWaveform(tariffRecording)};
   const supplyNames = { A: "Анна Смирнова", B: "Дмитрий, «Альфа-Логистик»" } as const;
   const tariffNames = { A: "Анна Смирнова", B: "Клиент" } as const;
 
@@ -480,6 +483,7 @@ export function installEmployeeFixtures(): EmployeeFixture {
     listCalls: async (filters) => listResponse(filters?.folder_uuid ? folderCalls : calls),
     getCall: async (callId) => byId.get(callId) ?? featured,
     createMediaAccessSession: async (_callId, variant) => ({ media_access_session_uuid: "demo-media-access", variant, expires_at: hoursAgo(-1) }),
+    getMediaWaveform: async (callId) => waveforms[callId] ?? {peaks: []},
     getTranscription: async (callId) => transcriptions[callId] ?? transcriptions[FEATURED_CALL_ID],
     getAnalysis: async (callId) => analyses[callId] ?? analyses[FEATURED_CALL_ID],
     listFavoriteCalls: async () => calls.filter((item) => item.is_favorite),

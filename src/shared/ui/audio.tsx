@@ -1,7 +1,7 @@
 import { Download, Pause, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { api, getCallMediaBlob, getCallMediaUrl } from "../../api";
+import { api, downloadCallMedia, getCallMediaUrl } from "../../api";
 import type { CallResponse, MediaSeekTarget, TranscriptionWordResponse } from "../../types";
 import { activeTranscriptWordIndex } from "../lib/transcript";
 import { formatDuration } from "../lib/formatters";
@@ -54,31 +54,41 @@ type ResolvedMediaPlayerProps = MediaPlayerProps & {
 };
 
 export function CallMediaPlayer(props: MediaPlayerProps) {
-  const [accessSession, setAccessSession] = useState("");
+  const [access, setAccess] = useState<{callId: string; session: string} | null>(null);
   const [variantError, setVariantError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
-    setAccessSession(""); setVariantError("");
+    let timer = 0;
+    setAccess(null); setVariantError("");
     async function prepare() {
       try {
         const session = await api.createMediaAccessSession(props.call.id, "original");
-        if (!cancelled) setAccessSession(session.media_access_session_uuid);
+        if (!cancelled) {
+          setAccess({callId: props.call.id, session: session.media_access_session_uuid});
+          setVariantError("");
+          // Refresh before the 15-minute media session expires. The backend
+          // rechecks current permissions on every range and download request.
+          const expires = Date.parse(session.expires_at);
+          timer = window.setTimeout(() => void prepare(), Math.max(30_000, Number.isFinite(expires) ? expires - Date.now() - 60_000 : 14*60_000));
+        }
       } catch (cause) { if (!cancelled) setVariantError(cause instanceof Error ? cause.message : "Запись недоступна"); }
     }
     void prepare();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [props.call.id]);
 
+  const accessSession = access?.callId === props.call.id ? access.session : "";
   const resolved = { ...props, mediaVariant: "original" as const, accessSession };
   return <div className="privacy-media-shell">
     {variantError && <div className="form-error" role="alert">{variantError}</div>}
-    {accessSession ? (isVideoCall(props.call) ? <CallVideoPlayer {...resolved} /> : <CallAudioPlayer {...resolved} />) : <div className="media-access-loading">Проверяем доступ к записи…</div>}
+    {accessSession && !variantError ? (isVideoCall(props.call) ? <CallVideoPlayer key={props.call.id} {...resolved} /> : <CallAudioPlayer key={props.call.id} {...resolved} />) : !variantError && <div className="media-access-loading">Проверяем доступ к записи…</div>}
   </div>;
 }
 
 function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onActiveWordChange, mediaVariant, accessSession }: ResolvedMediaPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const resumeRef = useRef({time: 0, playing: false});
   const speedControlRef = useRef<HTMLDivElement | null>(null);
   const speedHoldTimerRef = useRef<number | null>(null);
   const speedLongPressRef = useRef(false);
@@ -112,11 +122,13 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
   function togglePlayback() {
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) void video.play();
+    resumeRef.current.playing = video.paused;
+    if (video.paused) void video.play().catch(() => { resumeRef.current.playing = false; setError("Не удалось воспроизвести видео"); });
     else video.pause();
   }
 
   function seek(value: number) {
+    resumeRef.current.time = value;
     if (videoRef.current) videoRef.current.currentTime = value;
     setCurrentTime(value);
   }
@@ -172,7 +184,7 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
   async function downloadVideo() {
     setDownloading(true);
     try {
-      const blob = await getCallMediaBlob(call, mediaVariant, accessSession);
+      const blob = await downloadCallMedia(call, mediaVariant);
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -180,7 +192,7 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60_000);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Видео недоступно");
     } finally {
@@ -194,15 +206,22 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
         ref={videoRef}
         crossOrigin="use-credentials"
         preload="metadata"
+        controlsList="nodownload"
         src={source}
         aria-label={`Видеозапись звонка ${call.title}`}
         onError={() => setError("Видео недоступно")}
         onClick={togglePlayback}
-        onLoadedMetadata={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : call.duration_seconds || 0)}
-        onPlay={() => setPlaying(true)}
+        onLoadedMetadata={(event) => {
+          const video = event.currentTarget;
+          setDuration(Number.isFinite(video.duration) ? video.duration : call.duration_seconds || 0);
+          if (resumeRef.current.time > 0) video.currentTime = resumeRef.current.time;
+          if (resumeRef.current.playing) void video.play().catch(() => setError("Не удалось продолжить видео"));
+        }}
+        onPlay={() => { resumeRef.current.playing = true; setPlaying(true); }}
         onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
+        onEnded={() => { resumeRef.current.playing = false; setPlaying(false); }}
         onTimeUpdate={(event) => {
+          if (event.currentTarget.readyState > 0) resumeRef.current.time = event.currentTarget.currentTime;
           setCurrentTime(event.currentTarget.currentTime);
           onActiveWordChange?.(activeTranscriptWordIndex(words, event.currentTarget.currentTime));
         }}
@@ -237,6 +256,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const speakerKeys = useMemo(() => speakers?.length ? speakers.map((speaker) => speaker.key) : Array.from(new Set(runs.map((run) => run.speaker))), [runs, speakers]);
   const hasLane = runs.length > 0;
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const resumeRef = useRef({time: 0, playing: false});
   const waveformRef = useRef<HTMLDivElement | null>(null);
   const speedControlRef = useRef<HTMLDivElement | null>(null);
   const speedHoldTimerRef = useRef<number | null>(null);
@@ -251,8 +271,8 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   const [audioUrl, setAudioUrl] = useState("");
   const [audioError, setAudioError] = useState("");
   const [loadingAudio, setLoadingAudio] = useState(false);
-  const [loadingWaveform, setLoadingWaveform] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
   const [waveform, setWaveform] = useState<number[]>([]);
   const [visibleWaveformBars, setVisibleWaveformBars] = useState(72);
   const [playing, setPlaying] = useState(false);
@@ -264,65 +284,33 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
     () => getCallMediaUrl(call, mediaVariant, accessSession),
     [
       call.id,
-      call.audio_url,
-      call.audio_download_url,
-      call.file_url,
       call.media_url,
-      call.recording_url,
-      call.download_url,
       mediaVariant,
       accessSession
     ]
   );
 
   useEffect(() => {
-    let cancelled = false;
-    let objectUrl = "";
-
-    resetAudioElement(audioRef.current);
-    setAudioUrl("");
+    setAudioUrl(source);
     setAudioError("");
-    setLoadingAudio(true);
-    setPlaying(false);
-    setCurrentTime(0);
+    setDownloadError("");
+    setLoadingAudio(false);
     setDuration(call.duration_seconds || 0);
-    setAudioBlob(null);
-    setWaveform([]);
-    setLoadingWaveform(false);
-
-    getCallMediaBlob(call, mediaVariant, accessSession)
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setAudioBlob(blob);
-        setAudioUrl(objectUrl);
-      })
-      .catch((error) => {
-        if (!cancelled) setAudioError(error instanceof Error ? error.message : "Аудио недоступно");
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingAudio(false);
-      });
-
     return () => {
-      cancelled = true;
-      resetAudioElement(audioRef.current);
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      const audio = audioRef.current;
+      audio?.pause();
     };
   }, [call.duration_seconds, source]);
 
   // The waveform is the seek track; the speaker lane, when there is one, sits
   // under it and tells whose voice fills each stretch.
   useEffect(() => {
-    if (!audioBlob) return;
-    let cancelled = false;
-    setLoadingWaveform(true);
-    buildWaveform(audioBlob, waveformBars)
-      .then((peaks) => { if (!cancelled) setWaveform(peaks); })
-      .catch(() => { if (!cancelled) setWaveform([]); })
-      .finally(() => { if (!cancelled) setLoadingWaveform(false); });
-    return () => { cancelled = true; };
-  }, [audioBlob]);
+    const controller = new AbortController();
+    api.getMediaWaveform(call.id, mediaVariant, accessSession, controller.signal)
+      .then(({peaks}) => { if (!controller.signal.aborted) setWaveform(peaks); })
+      .catch(() => { if (!controller.signal.aborted) setWaveform([]); });
+    return () => controller.abort();
+  }, [call.id, mediaVariant, accessSession]);
 
   useEffect(() => {
     const element = waveformRef.current;
@@ -398,8 +386,10 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
     if (!audio || !audioUrl || audioError) return;
 
     if (audio.paused) {
-      audio.play().catch(() => setAudioError("Не удалось воспроизвести аудио"));
+      resumeRef.current.playing = true;
+      audio.play().catch(() => { resumeRef.current.playing = false; setAudioError("Не удалось воспроизвести аудио"); });
     } else {
+      resumeRef.current.playing = false;
       audio.pause();
     }
   }
@@ -407,6 +397,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   function seek(value: string) {
     const audio = audioRef.current;
     const nextTime = Number(value);
+    resumeRef.current.time = nextTime;
     updateCurrentTime(nextTime);
     if (audio && Number.isFinite(nextTime)) {
       audio.currentTime = nextTime;
@@ -550,23 +541,30 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
     }
   }
 
-  function downloadAudio() {
-    if (!audioBlob) return;
-    const downloadUrl = URL.createObjectURL(audioBlob);
-    const link = document.createElement("a");
-    link.href = downloadUrl;
-    link.download = mediaDownloadName(call);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 0);
+  async function downloadAudio() {
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadError("");
+    try {
+      const blob = await downloadCallMedia(call, mediaVariant);
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = mediaDownloadName(call);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 60_000);
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : "Не удалось скачать запись");
+    } finally { setDownloading(false); }
   }
 
   const effectiveDuration = duration > 0 ? duration : call.duration_seconds;
   const progressPercent = effectiveDuration > 0 ? Math.min(100, Math.max(0, (currentTime / effectiveDuration) * 100)) : 0;
   const waveformReady = waveform.length > 0;
   const displayedWaveform = useMemo(() => resampleWaveform(waveformReady ? waveform : fallbackWaveform, visibleWaveformBars), [waveform, waveformReady, visibleWaveformBars]);
-  const showAudioSkeleton = loadingAudio || (loadingWaveform && !waveformReady);
+  const showAudioSkeleton = loadingAudio;
   const currentTimeLabel = formatDuration(Math.round(currentTime));
   const audioDisabled = !audioUrl || loadingAudio || Boolean(audioError);
   // The bars and the speaker turns are drawn once per recording, not on every
@@ -709,7 +707,8 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
               <button
                 className="audio-download-button"
                 type="button"
-                disabled={!audioBlob}
+                disabled={downloading || Boolean(audioError)}
+                aria-busy={downloading}
                 aria-label="Скачать аудиозапись"
                 onClick={downloadAudio}
               >
@@ -737,16 +736,33 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
           className="call-audio-element"
           src={audioUrl || undefined}
           preload="metadata"
+          crossOrigin="use-credentials"
+          controlsList="nodownload"
+          onLoadStart={() => setLoadingAudio(true)}
+          onError={() => {
+            setLoadingAudio(false);
+            setAudioError("Аудио недоступно. Проверьте доступ к записи и обновите страницу.");
+          }}
+          onLoadedMetadata={(event) => {
+            setLoadingAudio(false);
+            const audio = event.currentTarget;
+            if (resumeRef.current.time > 0) audio.currentTime = resumeRef.current.time;
+            if (resumeRef.current.playing) void audio.play().catch(() => setAudioError("Не удалось продолжить аудио"));
+          }}
           onDurationChange={(event) => {
             const nextDuration = event.currentTarget.duration;
             if (Number.isFinite(nextDuration)) setDuration(nextDuration);
           }}
-          onEnded={() => { setPlaying(false); stopPositionUpdates(); }}
+          onEnded={() => { resumeRef.current.playing = false; setPlaying(false); stopPositionUpdates(); }}
           onPause={() => { setPlaying(false); stopPositionUpdates(); }}
-          onPlay={() => setPlaying(true)}
-          onTimeUpdate={(event) => updateCurrentTime(event.currentTarget.currentTime)}
+          onPlay={() => { resumeRef.current.playing = true; setPlaying(true); }}
+          onTimeUpdate={(event) => {
+            if (event.currentTarget.readyState > 0) resumeRef.current.time = event.currentTarget.currentTime;
+            updateCurrentTime(event.currentTarget.currentTime);
+          }}
         />
       </div>
+      {downloadError && <p className="form-error" role="alert">{downloadError}</p>}
     </div>
   );
 }
@@ -758,51 +774,4 @@ function resampleWaveform(peaks: number[], count: number) {
     const end = Math.max(start + 1, Math.floor((index + 1) * peaks.length / count));
     return Math.max(...peaks.slice(start, end));
   });
-}
-
-function resetAudioElement(audio: HTMLAudioElement | null) {
-  if (!audio) return;
-  audio.pause();
-  if (Number.isFinite(audio.duration)) {
-    audio.currentTime = 0;
-  }
-  audio.load();
-}
-
-async function buildWaveform(blob: Blob, barCount: number) {
-  const AudioContextConstructor = window.AudioContext ?? (window as Window & {
-    webkitAudioContext?: typeof AudioContext;
-  }).webkitAudioContext;
-
-  if (!AudioContextConstructor) {
-    throw new Error("AudioContext is not available");
-  }
-
-  const audioContext = new AudioContextConstructor();
-
-  try {
-    const buffer = await audioContext.decodeAudioData(await blob.arrayBuffer());
-    const channelData = Array.from({ length: buffer.numberOfChannels }, (_, index) => buffer.getChannelData(index));
-    const samplesPerBar = Math.max(1, Math.floor(buffer.length / barCount));
-    const peaks = Array.from({ length: barCount }, (_, barIndex) => {
-      const start = barIndex * samplesPerBar;
-      const end = barIndex === barCount - 1 ? buffer.length : Math.min(buffer.length, start + samplesPerBar);
-      let peak = 0;
-
-      for (let sampleIndex = start; sampleIndex < end; sampleIndex += 1) {
-        let mixed = 0;
-        channelData.forEach((channel) => {
-          mixed += Math.abs(channel[sampleIndex] ?? 0);
-        });
-        peak = Math.max(peak, mixed / channelData.length);
-      }
-
-      return peak;
-    });
-    const maxPeak = Math.max(...peaks, 0.01);
-
-    return peaks.map((peak) => Math.max(0.1, Math.min(1, peak / maxPeak)));
-  } finally {
-    await audioContext.close().catch(() => undefined);
-  }
 }

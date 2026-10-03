@@ -1,6 +1,6 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Box3, Matrix4, Mesh, PerspectiveCamera, Quaternion, Vector3 } from "three";
+import { Box3, Matrix4, Mesh, PerspectiveCamera, Quaternion, Raycaster, Vector3, type Intersection, type Object3D } from "three";
 import { isDemoEvent, type DemoCommand, type DemoEvent, type DemoRole } from "../../../demo/bridge";
 import { cameraAhead, flightState } from "./CameraRig";
 
@@ -105,6 +105,19 @@ export function ScreenProjector({ frame, layerRef, isCurrent, isPrevious }: {
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
+  const scene = useThree((state) => state.scene);
+  const occlusion = useMemo(() => {
+    const solids: Object3D[] = [];
+    scene.traverse((object) => {
+      // Test the original low-poly envelope, even when its visible copy is
+      // batched. Raycasting all detailed furniture would waste every frame.
+      const envelope = /^(slab_|wall_|owner_wall_|deputy_wall_|leader_wall_)/;
+      // The closed slabs already cover the floor footprint, including the
+      // atrium opening. Thousands of decorative carpet triangles add no cover.
+      if (envelope.test(object.name) && !envelope.test(object.parent?.name ?? "")) solids.push(object);
+    });
+    return { solids, ray: new Raycaster(), hits: [] as Intersection[] };
+  }, [scene, frame]);
   const corners = useMemo(() => {
     const right = new Vector3(1, 0, 0).applyQuaternion(frame.quaternion).multiplyScalar(frame.width / 2);
     const up = new Vector3(0, 1, 0).applyQuaternion(frame.quaternion).multiplyScalar(frame.height / 2);
@@ -134,6 +147,10 @@ export function ScreenProjector({ frame, layerRef, isCurrent, isPrevious }: {
       layer.style.opacity = "0";
       layer.style.transform = "translate3d(-20000px, 0, 0)";
     };
+    if (layer.dataset.ready !== "1") {
+      park();
+      return;
+    }
 
     // Only two monitors are ever worth placing: the one the camera is at and
     // the one it has just left.
@@ -145,7 +162,11 @@ export function ScreenProjector({ frame, layerRef, isCurrent, isPrevious }: {
       if (now === "current") fade.current = 0;
       role.current = now;
     }
-    if (now === "idle") return park();
+    // During an approach the GPU screen carries the prepared image. First
+    // painting a complete iframe while its projected scale is changing caused
+    // 150-340ms cold-frame stalls. Switch to the live page at the fixed pose;
+    // the scenario starts 500ms later, after that paint has finished.
+    if (now === "idle" || (now === "current" && flight.active)) return park();
 
     // Projected from where the camera will be on the next frame: the browser
     // applies a transform a frame after the canvas is painted, and without
@@ -160,8 +181,20 @@ export function ScreenProjector({ frame, layerRef, isCurrent, isPrevious }: {
     if (toCamera.dot(screenNormal) <= 0.05) return park();
     const squareness = -viewDirection.dot(screenNormal);
     const measured = Math.min(1, Math.max(0, (squareness - OFF_AXIS) / (SQUARE_ON - OFF_AXIS)));
-    fade.current = now === "current" ? Math.max(fade.current, measured) : Math.min(fade.current, measured);
-    if (fade.current <= 0) return park();
+    const nextFade = now === "current" ? Math.max(fade.current, measured) : Math.min(fade.current, measured);
+    if (nextFade <= 0) {
+      fade.current = 0;
+      return park();
+    }
+    // Cast only when the page could actually be visible. Most of a flight is
+    // off-axis, and those frames need only the cheap orientation test above.
+    toCamera.copy(frame.center).sub(lens.position);
+    occlusion.ray.far = Math.max(0, toCamera.length() - .02);
+    occlusion.ray.set(lens.position, toCamera.normalize());
+    occlusion.hits.length = 0;
+    occlusion.ray.intersectObjects(occlusion.solids, true, occlusion.hits);
+    if (occlusion.hits.length) return park();
+    fade.current = nextFade;
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -229,11 +262,19 @@ export function DemoScreenLayer({ layerRef, role, theme, aspect, playing, live, 
   const src = useMemo(() => `/demo.html?role=${role}&theme=${themeRef.current}${phone ? "&monitor=portrait" : ""}`, [role, phone]);
 
   useEffect(() => {
+    readyRef.current = false;
+    if (layerRef.current) delete layerRef.current.dataset.ready;
+  }, [src, layerRef]);
+
+  useEffect(() => {
     const send = (command: DemoCommand) => iframeRef.current?.contentWindow?.postMessage(command, window.location.origin);
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow || !isDemoEvent(event.data)) return;
       if (event.data.type === "vt-demo:ready") {
         readyRef.current = true;
+        // Until the role chunk has mounted, keep the screenshot on the glass.
+        // A slow connection must not replace it with an empty iframe.
+        if (layerRef.current) layerRef.current.dataset.ready = "1";
         // The address only carried the theme this document was born in. If the
         // visitor changed it while this one was still starting up, it catches
         // up here rather than opening in last year's colours.

@@ -595,10 +595,12 @@ async function request<T>(
 
 async function requestBlob(
   path: string,
-  options: { retryOnUnauthorized?: boolean } = {},
+  options: { retryOnUnauthorized?: boolean; method?: "GET" | "POST"; signal?: AbortSignal } = {},
 ): Promise<Blob> {
   const response = await fetch(`${apiRoot}${path}`, {
     credentials: "include",
+    method: options.method ?? "GET",
+    signal: options.signal,
   });
 
   if (!response.ok) {
@@ -612,7 +614,7 @@ async function requestBlob(
     if (response.status === 401 && options.retryOnUnauthorized !== false) {
       try {
         await refreshSessionRequest();
-        return requestBlob(path, { retryOnUnauthorized: false });
+        return requestBlob(path, { ...options, retryOnUnauthorized: false });
       } catch {
         // Keep the original unauthorized error for the caller.
       }
@@ -699,27 +701,9 @@ function apiPathFromUrl(pathOrUrl: string) {
 }
 
 export function getCallMediaUrl(call: CallResponse, variant?: "original" | "redacted", accessSession?: string) {
-  const callWithAudioLinks = call as CallResponse & {
-    audio_url?: string | null;
-    audio_download_url?: string | null;
-    file_url?: string | null;
-    media_url?: string | null;
-    recording_url?: string | null;
-    download_url?: string | null;
-  };
-  const directUrl = variant ? undefined : [
-    callWithAudioLinks.media_url,
-    callWithAudioLinks.audio_url,
-    callWithAudioLinks.audio_download_url,
-    callWithAudioLinks.file_url,
-    callWithAudioLinks.recording_url,
-    callWithAudioLinks.download_url,
-  ].find(
-    (value): value is string =>
-      typeof value === "string" && value.trim().length > 0,
-  );
-
-  if (directUrl) return absoluteApiAssetUrl(directUrl);
+  // Only the isolated demo document uses locally synthesized recordings.
+  // Product media always goes through our authenticated call endpoint.
+  if (window.location.pathname === "/demo.html" && call.media_url?.startsWith("blob:")) return call.media_url;
 
   const params = new URLSearchParams();
   if (variant) params.set("variant", variant);
@@ -739,6 +723,17 @@ export function getAdminCallAudioBlob(callId: string) {
   return requestBlob(`/admin/calls/${encodeURIComponent(callId)}/audio`);
 }
 
+export function getAdminCallMediaUrl(callId: string) {
+  return `${apiRoot}/admin/calls/${encodeURIComponent(callId)}/media`;
+}
+
+export async function downloadCallMedia(call: CallResponse, variant: "original" | "redacted") {
+  if (window.location.pathname === "/demo.html" && call.media_url?.startsWith("blob:")) return requestAssetBlob(call.media_url);
+  // A cached playback buffer must not bypass a revoked permission at download.
+  const session = await api.createMediaAccessSession(call.id, variant);
+  return requestBlob(`/calls/${encodeURIComponent(call.id)}/media/download${queryString({variant, access_session: session.media_access_session_uuid})}`, { method: "POST" });
+}
+
 export function openAuthorizedEventStream(url: string) {
   return new AuthorizedEventStream(url, refreshSessionRequest);
 }
@@ -751,6 +746,9 @@ function privacyPolicyPath(scope: PrivacyPolicyScope) {
 }
 
 export const api = {
+  getMediaWaveform(callId: string, variant: "original" | "redacted", accessSession: string, signal?: AbortSignal) {
+    return request<{peaks: number[]}>(`/calls/${encodeURIComponent(callId)}/media/waveform${queryString({variant, access_session: accessSession})}`, {signal});
+  },
   assistantCapabilities(companyId: string) { return request<AssistantCapabilities>(`/assistant/capabilities?company_uuid=${encodeURIComponent(companyId)}`); },
   contentSearch(companyId: string, query: string, filters: {call_uuids?:string[];folder_uuids?:string[];from?:string;to?:string} = {}) { return request<ContentSearchResponse>(`/calls/content-search${queryString({company_uuid:companyId||undefined,q:query,limit:20,...filters,call_uuids:filters.call_uuids?.join(","),folder_uuids:filters.folder_uuids?.join(",")})}`); },
   listAssistantChats(companyId: string) { return request<{items:AssistantChat[]}>(`/assistant/chats?company_uuid=${encodeURIComponent(companyId)}`); },

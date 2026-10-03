@@ -1,9 +1,14 @@
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { BoxGeometry, BufferGeometry, Group, Material, Mesh, MeshBasicMaterial, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Quaternion, SRGBColorSpace, Texture, TextureLoader, Vector3, WebGLRenderTarget } from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { CameraRig } from "./CameraRig";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshPhysicalMaterial, MeshStandardMaterial, Object3D, PerspectiveCamera, PlaneGeometry, PMREMGenerator, Quaternion, SRGBColorSpace, Texture, TextureLoader, Vector3, WebGLRenderTarget } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { KTX2Loader } from "three-stdlib";
+import { batchStatics } from "./staticBatches";
+import { SceneDiagnostics } from "./SceneDiagnostics";
+import { CameraRig, cameraRouteAudit, prepareCameraRoutes } from "./CameraRig";
+import { FigureBudget } from "./FigureBudget";
+import { FrameBudget } from "./FrameBudget";
 import { Figure, type FigurePlacement } from "./Figure";
 import { ScreenProjector, screenFrame, type ScreenFrame } from "./MonitorScreen";
 import {
@@ -20,12 +25,11 @@ import {
   type Viewport
 } from "./shots";
 
-export const OFFICE_URL = "/assets/scene/office.glb";
+export const OFFICE_URL = "/assets/scene/office.glb?v=18";
 const DRACO_PATH = "/draco/gltf/";
 
-// The room starts loading as soon as the landing's code does, not when the
-// canvas mounts.
-useGLTF.preload(OFFICE_URL, DRACO_PATH);
+// Compressed textures need the actual renderer's supported GPU formats.
+// Loading begins when OfficeModel configures its local decoder below.
 
 
 /**
@@ -99,13 +103,13 @@ export type CursorState = { x: number; y: number; down: boolean; typing: boolean
  */
 const screenImages = new Map<string, Promise<Texture | null>>();
 
-function loadScreenImage(role: MonitorKey, theme: "light" | "dark") {
-  const key = `${role}-${theme}`;
+function loadScreenImage(role: MonitorKey, theme: "light" | "dark", portrait = false) {
+  const key = `${role}${portrait ? "-portrait" : ""}-${theme}`;
   const cached = screenImages.get(key);
   if (cached) return cached;
   const pending = new Promise<Texture | null>((resolve) => {
     new TextureLoader().load(
-      `/assets/scene/screens/${key}.jpg`,
+      `/assets/scene/screens/${key}.jpg?v=3`,
       (texture) => {
         texture.colorSpace = SRGBColorSpace;
         // glTF hands over its UVs with the origin at the top left, which is
@@ -130,117 +134,36 @@ type OfficeSet = {
   placements: FigurePlacement[];
 };
 
-/**
- * Replaces the office's physical materials with plain standard ones.
- *
- * Two costs come off at once. Real transmission makes three.js render the
- * whole scene again into an off-screen target for every glass surface. And the
- * physical shader itself — clearcoat, sheen, iridescence, index of refraction
- * — is several times the price of the standard one per pixel, which integrated
- * graphics feels the moment a moving camera fills the screen with window wall
- * and glass partitions. At this distance the two look the same.
- */
+/** Transmission is replaced by inexpensive sorted glass, preserving PBR maps. */
 function flattenGlass(root: Group) {
   const swapped = new Map<MeshPhysicalMaterial, MeshStandardMaterial>();
-
-  const simplify = (material: MeshPhysicalMaterial) => {
-    const existing = swapped.get(material);
-    if (existing) return existing;
-    const glass = material.transmission > 0;
-    const plain = new MeshStandardMaterial({
-      name: material.name,
-      color: material.color,
-      roughness: glass ? 0.08 : material.roughness,
-      metalness: glass ? 0 : material.metalness,
-      emissive: material.emissive,
-      emissiveIntensity: material.emissiveIntensity,
-      side: material.side,
-      transparent: glass || material.transparent,
-      opacity: glass ? Math.min(0.34, 1 - material.transmission * 0.66) : material.opacity,
-      depthWrite: !glass && material.depthWrite
-    });
-    swapped.set(material, plain);
-    return plain;
-  };
-
   root.traverse((object) => {
     const mesh = object as Mesh;
     if (!mesh.isMesh) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const next = materials.map((material) => {
-      const physical = material as MeshPhysicalMaterial;
-      return physical?.isMeshPhysicalMaterial ? simplify(physical) : material;
+    const next = materials.map((source) => {
+      const physical = source as MeshPhysicalMaterial;
+      if (!physical.isMeshPhysicalMaterial) return source;
+      let plain = swapped.get(physical);
+      if (!plain) {
+        plain = new MeshStandardMaterial().copy(physical);
+        if (physical.transmission > 0) {
+          plain.roughness = .12;
+          plain.metalness = 0;
+          plain.transparent = true;
+          plain.opacity = .04;
+          plain.depthWrite = false;
+          // One thin pane, rather than two blended front/back passes. Stacked
+          // partitions must not darken the whole floor as the camera moves.
+          plain.forceSinglePass = true;
+        }
+        swapped.set(physical, plain);
+      }
+      return plain;
     });
     mesh.material = Array.isArray(mesh.material) ? next : next[0];
   });
-
-  for (const material of swapped.keys()) material.dispose();
-}
-
-/**
- * Welds the room's static furniture into one mesh per material.
- *
- * The office arrives as four hundred separate nodes — every chair, monitor arm
- * and light panel its own draw call, eight hundred of them in the wide shot.
- * Integrated graphics spends more time issuing those than drawing them, and
- * the cost lands exactly where the camera moves. Everything that never moves is
- * baked into its material's mesh; screens, anchors and the figures are left
- * alone.
- */
-function mergeStatics(root: Group) {
-  const byMaterial = new Map<Material, BufferGeometry[]>();
-  const consumed: Mesh[] = [];
-
-  root.updateMatrixWorld(true);
-  root.traverse((object) => {
-    const mesh = object as Mesh & { isSkinnedMesh?: boolean; isInstancedMesh?: boolean };
-    if (!mesh.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh || mesh.userData.responsiveMonitor) return;
-    if (!mesh.visible || Array.isArray(mesh.material) || mesh.morphTargetInfluences?.length) return;
-
-    const geometry = mesh.geometry.clone();
-    geometry.applyMatrix4(mesh.matrixWorld);
-    // Position, normal and the texture coordinates of the screens; nothing
-    // else. An attribute present on one geometry and missing on another refuses
-    // to merge, so the odd one out is settled per material below.
-    for (const name of Object.keys(geometry.attributes)) {
-      if (name !== "position" && name !== "normal" && name !== "uv") geometry.deleteAttribute(name);
-    }
-    if (!geometry.attributes.normal) geometry.computeVertexNormals();
-
-    const material = mesh.material as Material;
-    const bucket = byMaterial.get(material);
-    if (bucket) bucket.push(geometry);
-    else byMaterial.set(material, [geometry]);
-    consumed.push(mesh);
-  });
-
-  let merged = 0;
-  for (const [material, geometries] of byMaterial) {
-    if (geometries.length < 2) {
-      for (const geometry of geometries) geometry.dispose();
-      continue;
-    }
-    // Twenty screens all carry texture coordinates and every wall panel carries
-    // none; either is fine, a mixture is not.
-    if (!geometries.every((part) => part.attributes.uv)) {
-      for (const part of geometries) part.deleteAttribute("uv");
-    }
-    const geometry = mergeGeometries(geometries, false);
-    for (const part of geometries) part.dispose();
-    if (!geometry) continue;
-    const mesh = new Mesh(geometry, material);
-    mesh.name = `merged_${material.name || merged}`;
-    mesh.matrixAutoUpdate = false;
-    root.add(mesh);
-    merged += 1;
-  }
-
-  if (merged === 0) return;
-  for (const mesh of consumed) {
-    // Kept in the tree but no longer drawn: the anchors that hang off these
-    // nodes are what the camera shots are built from.
-    if (byMaterial.get(mesh.material as Material)?.length !== 1) mesh.visible = false;
-  }
+  return () => { for (const material of swapped.values()) material.dispose(); };
 }
 
 const heroCameraMissing = (root: Group) => !root.getObjectByName("cam_hero_wide");
@@ -300,6 +223,7 @@ function portraitMonitor(frame: ScreenFrame, base: Vector3, screenMaterial: Mesh
   const metal = new MeshStandardMaterial({ color: "#292827", metalness: 0.22, roughness: 0.48 });
   const stand = new MeshStandardMaterial({ color: "#383635", metalness: 0.22, roughness: 0.55 });
   const group = new Group();
+  group.userData.responsiveMonitor = true;
 
   const bezel = new Mesh(new BoxGeometry(width + 0.052, height + 0.052, 0.038), metal);
   bezel.position.copy(center);
@@ -327,17 +251,67 @@ function OfficeModel({ viewport, theme, onReady }: {
   theme: "light" | "dark";
   onReady: (set: OfficeSet) => void;
 }) {
-  const gltf = useGLTF(OFFICE_URL, DRACO_PATH);
   const gl = useThree((state) => state.gl);
+  const phoneScreens = viewport.width <= 720;
+  const ktx = useMemo(() => new KTX2Loader().setTranscoderPath("/basis/").setWorkerLimit(2).detectSupport(gl), [gl]);
+  const gltf = useGLTF(OFFICE_URL, DRACO_PATH, true, (loader) => loader.setKTX2Loader(ktx));
+  // Never mutate the loader cache: remounts and StrictMode get an intact source.
+  const scene = useMemo(() => gltf.scene.clone(true), [gltf.scene]);
+  const floorLightmaps = useTexture(["/assets/scene/floor1_light.jpg?v=18", "/assets/scene/floor2_light.jpg?v=18"]);
   const [build, setBuild] = useState<OfficeBuild | null>(null);
+  const [picturesReady, setPicturesReady] = useState(false);
 
   // Everything that changes the room itself happens once. It used to share an
   // effect with the camera shots, which depend on the window, so dragging an
   // edge welded the already welded furniture all over again.
   useEffect(() => {
-    const scene = gltf.scene;
     scene.updateMatrixWorld(true);
-    flattenGlass(scene);
+    const disposeSimplified = flattenGlass(scene);
+    const bakedMaterials: MeshBasicMaterial[] = [];
+    const originalFloors: { mesh: Mesh; material: MeshStandardMaterial }[] = [];
+    scene.getObjectByName("exterior_city_backdrop")?.traverse(object => {
+      const mesh = object as Mesh;
+      if (!mesh.isMesh) return;
+      const source = mesh.material as MeshStandardMaterial;
+      const material = new MeshBasicMaterial({ name: "exterior_city_unlit", map: source.emissiveMap, toneMapped: false, side: source.side });
+      originalFloors.push({mesh, material: source});
+      bakedMaterials.push(material);
+      mesh.material = material;
+    });
+    for (let floor = 1; floor <= 2; floor += 1) {
+      const root = scene.getObjectByName(`floor${floor}_carpet`);
+      const lightMap = floorLightmaps[floor - 1];
+      lightMap.colorSpace = SRGBColorSpace;
+      lightMap.flipY = false;
+      lightMap.channel = 1;
+      // useTexture has already uploaded this external image with TextureLoader's
+      // flipY=true. Changing metadata alone leaves the old orientation on GPU.
+      lightMap.needsUpdate = true;
+      gl.initTexture(lightMap);
+      root?.traverse((object) => {
+        const mesh = object as Mesh;
+        if (!mesh.isMesh) return;
+        const source = mesh.material as MeshStandardMaterial;
+        originalFloors.push({ mesh, material: source });
+        const material = new MeshBasicMaterial({
+          name: `baked_floor${floor}`, color: source.name === "carpet_b" ? "#999b9e" : "#888b8f",
+          lightMap, lightMapIntensity: 4 * Math.PI, side: source.side
+        });
+        mesh.material = material;
+        bakedMaterials.push(material);
+      });
+    }
+    scene.traverse((object) => {
+      const mesh = object as Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) for (const value of Object.values(material)) {
+        if (value instanceof Texture) {
+          value.anisotropy = Math.min(4, gl.capabilities.getMaxAnisotropy());
+          gl.initTexture(value);
+        }
+      }
+    });
 
     const heroAnchor = firstNamed(scene, DESK_ANCHOR_NAMES.employee);
     const heroPose = heroAnchor ? anchorPose(heroAnchor) : null;
@@ -399,8 +373,17 @@ function OfficeModel({ viewport, theme, onReady }: {
 
     // After the screens have their own materials and their frames are taken, so
     // neither is lost in the weld.
-    mergeStatics(scene);
+    const disposeBatches = batchStatics(scene);
     for (const pair of responsiveMonitors) scene.add(pair.portrait);
+    // The office is static, including the hidden originals retained for
+    // anchors/occlusion. Rebuilding thousands of world matrices on every
+    // camera frame adds CPU work without changing their positions.
+    scene.updateMatrixWorld(true);
+    const staticTransforms: Array<{object: Object3D; local: boolean; world: boolean}> = [];
+    scene.traverse(object => {
+      staticTransforms.push({object, local: object.matrixAutoUpdate, world: object.matrixWorldAutoUpdate});
+      object.matrixAutoUpdate = object.matrixWorldAutoUpdate = false;
+    });
     if (missing.length) console.warn("office scene: no screen mesh for", missing.join(", "));
     if (heroCameraMissing(scene)) console.warn("office scene: no cam_hero_wide, falling back to a computed wide shot");
 
@@ -435,6 +418,13 @@ function OfficeModel({ viewport, theme, onReady }: {
 
     setBuild({ screens, portraitScreens, responsiveMonitors, materials, room, placements, hero });
     return () => {
+      staticTransforms.forEach(({object, local, world}) => { object.matrixAutoUpdate = local; object.matrixWorldAutoUpdate = world; });
+      disposeBatches();
+      originalFloors.forEach(({ mesh, material }) => { mesh.material = material; });
+      disposeSimplified();
+      bakedMaterials.forEach((material) => material.dispose());
+      Object.values(materials).forEach((material) => material?.dispose());
+      room.dispose();
       for (const pair of responsiveMonitors) {
         scene.remove(pair.portrait);
         pair.original.forEach((part) => { part.visible = true; });
@@ -443,18 +433,18 @@ function OfficeModel({ viewport, theme, onReady }: {
           if (!mesh.isMesh) return;
           mesh.geometry.dispose();
           // The glass shares its material with the original screen.
-          if ((mesh.material as MeshStandardMaterial).isMeshStandardMaterial) (mesh.material as Material).dispose();
+          if ((mesh.material as MeshStandardMaterial).isMeshStandardMaterial) mesh.material instanceof MeshStandardMaterial && mesh.material.dispose();
         });
       }
     };
     // The theme is read once here for the colour under the picture; the picture
     // itself follows it in its own effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gltf]);
+  }, [scene, gl, floorLightmaps]);
 
   // The camera shots depend on the window, and only on it.
   useEffect(() => {
-    if (!build) return;
+    if (!build || !picturesReady) return;
     const phone = viewport.width <= 720;
     for (const pair of build.responsiveMonitors ?? []) {
       pair.original.forEach((mesh) => { mesh.visible = !phone; });
@@ -467,8 +457,9 @@ function OfficeModel({ viewport, theme, onReady }: {
       const frame = screens[key];
       if (frame) shots[key] = screenView(frame, viewport);
     }
+    prepareCameraRoutes(shots);
     onReady({ shots, screens, placements: build.placements });
-  }, [build, viewport, onReady]);
+  }, [build, picturesReady, viewport, onReady]);
 
   // The pictures on the glass follow the landing's theme. Both sets are fetched
   // at the start, so flipping the switch swaps them in the same frame instead of
@@ -476,13 +467,13 @@ function OfficeModel({ viewport, theme, onReady }: {
   useEffect(() => {
     if (!build) return;
     let live = true;
-    const dress = (material: MeshBasicMaterial, role: MonitorKey) => {
+    const dress = (material: MeshBasicMaterial, role: MonitorKey, portrait = false) => {
       // Only until the picture arrives: this material multiplies its colour by
       // its map, and the dark theme's near-black background multiplied a
       // perfectly good screenshot down to nothing. With a picture on it the
       // colour has to be white.
       if (!material.map) material.color.set(SCREEN_GLOW[theme]);
-      loadScreenImage(role, theme).then((texture) => {
+      loadScreenImage(role, theme, portrait).then((texture) => {
         if (!live || !texture) return;
         gl.initTexture(texture);
         material.map = texture;
@@ -492,7 +483,7 @@ function OfficeModel({ viewport, theme, onReady }: {
     };
     for (const key of Object.keys(build.materials) as MonitorKey[]) {
       const material = build.materials[key];
-      if (material) dress(material, key);
+      if (material) dress(material, key, phoneScreens);
     }
     // The floor's own monitors show the call list: it is what the room does.
     dress(build.room, "employee");
@@ -503,14 +494,19 @@ function OfficeModel({ viewport, theme, onReady }: {
     // middle of an animation.
     const other = theme === "dark" ? "light" : "dark";
     for (const key of MONITOR_ROLES) {
-      loadScreenImage(key, other).then((texture) => {
+      loadScreenImage(key, other, phoneScreens).then((texture) => {
         if (live && texture) gl.initTexture(texture);
       });
     }
+    Promise.all([...MONITOR_ROLES.flatMap((key) => [loadScreenImage(key, "light", phoneScreens), loadScreenImage(key, "dark", phoneScreens)]), loadScreenImage("employee", "light"), loadScreenImage("employee", "dark")]).then((textures) => {
+      if (!live) return;
+      textures.forEach((texture) => { if (texture) gl.initTexture(texture); });
+      setPicturesReady(true);
+    });
     return () => { live = false; };
-  }, [build, theme, gl]);
+  }, [build, theme, gl, phoneScreens]);
 
-  return <primitive object={gltf.scene} />;
+  return <primitive object={scene} dispose={null} />;
 }
 
 /**
@@ -573,36 +569,120 @@ const WARMUP_DIRECTIONS = [
   new Vector3(0, 1, 0), new Vector3(0, -1, 0)
 ];
 
-function SceneWarmup({ ready }: { ready: boolean }) {
+const WARMUP_POSITIONS = [
+  new Vector3(11, 1.7, -6), new Vector3(12, 1.7, -13),
+  new Vector3(19, 1.7, -14), new Vector3(10, 5.1, -7),
+  new Vector3(3.5, 5.1, -14), new Vector3(16, 5.1, -8)
+];
+
+function SceneWarmup({ ready, onPrepared }: { ready: boolean; onPrepared: () => void }) {
   const gl = useThree((state) => state.gl);
   const scene = useThree((state) => state.scene);
   const step = useRef(0);
+  const compiled = useRef(false);
+  const failed = useRef(false);
   const kit = useMemo(() => ({
-    target: new WebGLRenderTarget(16, 16),
-    camera: new PerspectiveCamera(150, 1, 0.05, 90)
+    target: new WebGLRenderTarget(128, 128),
+    camera: new PerspectiveCamera(130, 1, 0.05, 1700),
+    look: new Vector3()
   }), []);
-
+  // Both display formats must reach the GPU while the loading curtain is up.
+  // The currently hidden format otherwise uploads/compiles during a resize.
+  const exposeDisplayVariants = useCallback(() => {
+    const hidden = new Set<Object3D>();
+    const expose = (object: Object3D) => {
+      for (let part: Object3D | null = object; part && part !== scene; part = part.parent) {
+        if (!part.visible) { hidden.add(part); part.visible = true; }
+      }
+    };
+    scene.traverse((object) => {
+      if (object.userData.responsiveMonitor && !object.visible) {
+        expose(object);
+      }
+      const mesh = object as Mesh;
+      if (mesh.isMesh) {
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        if (materials.some(material => typeof material.userData.figureAppearance === "number")) expose(mesh);
+      }
+    });
+    return () => hidden.forEach((object) => { object.visible = false; });
+  }, [scene]);
   useEffect(() => () => kit.target.dispose(), [kit]);
-
+  useEffect(() => {
+    if (!ready) return;
+    let live = true;
+    const restore = exposeDisplayVariants();
+    const pending = gl.compileAsync(scene, kit.camera);
+    restore();
+    pending.then(() => { if (live) compiled.current = true; })
+      .catch(() => { failed.current = true; });
+    return () => { live = false; };
+  }, [ready, gl, scene, kit, exposeDisplayVariants]);
   useFrame(() => {
-    if (!ready || step.current >= WARMUP_DIRECTIONS.length) return;
-    // Compiling alone was not enough: a buffer is uploaded the first time it is
-    // actually drawn, and that bill arrived mid-flight. One tiny render per
-    // frame in every direction pays it while the visitor reads the headline.
-    const direction = WARMUP_DIRECTIONS[step.current];
-    step.current += 1;
-    kit.camera.position.set(11, 2.2, -9);
-    kit.camera.lookAt(kit.camera.position.clone().add(direction));
+    if (failed.current) throw new Error("Office GPU preparation failed");
+    if (!compiled.current || step.current >= WARMUP_POSITIONS.length * 6) return;
+    const position = WARMUP_POSITIONS[Math.floor(step.current / 6)];
+    const direction = WARMUP_DIRECTIONS[step.current % 6];
+    kit.camera.position.copy(position);
+    kit.camera.lookAt(kit.look.copy(position).add(direction));
+    const previous = gl.getRenderTarget();
+    const restore = exposeDisplayVariants();
     try {
       gl.setRenderTarget(kit.target);
       gl.render(scene, kit.camera);
-    } catch {
-      step.current = WARMUP_DIRECTIONS.length;
+      step.current += 1;
     } finally {
-      gl.setRenderTarget(null);
+      restore();
+      gl.setRenderTarget(previous);
+    }
+    if (step.current === WARMUP_POSITIONS.length * 6) {
+      if (window.__officeDiagnostics) {
+        const indices = new Set<number>(), skin = new Set<string>(), clothing = new Set<string>(), hair = new Set<string>();
+        scene.traverse(object => {
+          const mesh = object as Mesh;
+          if (!mesh.isMesh) return;
+          for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+            const appearance = material.userData.figureAppearance;
+            if (typeof appearance !== "number") continue;
+            indices.add(appearance);
+            const tint = (material as MeshStandardMaterial).color;
+            if (material.name === "Skin") skin.add(tint.getHexString());
+            if (material.name === "Shirt") clothing.add(tint.getHexString());
+            if (material.name === "Hair") hair.add(tint.getHexString());
+          }
+        });
+        window.__officeDiagnostics.appearances = {indices: [...indices], skin: [...skin], clothing: [...clothing], hair: [...hair]};
+        const city = scene.getObjectByName("exterior_city_backdrop") as Mesh | undefined;
+        const cityMaterial = city?.material as MeshBasicMaterial | undefined;
+        const cityImage = cityMaterial?.map?.image as {width: number; height: number} | undefined;
+        window.__officeDiagnostics.exterior = {
+          legacyObjects: ["ground", "exterior_blocks", "exterior_low_borders", "exterior_park_backdrop"].filter(name => !!scene.getObjectByName(name)),
+          city: !!city, material: cityMaterial?.name ?? "",
+          image: cityImage ? {width: cityImage.width, height: cityImage.height} : null
+        };
+        window.__officeDiagnostics.navigation = cameraRouteAudit();
+        window.__officeDiagnostics.ready = true;
+      }
+      onPrepared();
     }
   });
+  return null;
+}
 
+function Reflections() {
+  const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
+  useEffect(() => {
+    const generator = new PMREMGenerator(gl);
+    const room = new RoomEnvironment();
+    const target = generator.fromScene(room, .04, .1, 50, { size: 128 });
+    const previous = scene.environment;
+    scene.environment = target.texture;
+    scene.environmentIntensity = .28;
+    room.dispose();
+    generator.dispose();
+    return () => { scene.environment = previous; target.dispose(); };
+  }, [gl, scene]);
   return null;
 }
 
@@ -611,14 +691,17 @@ function Lights() {
   return (
     <>
       <hemisphereLight args={["#fff4e6", "#8d847a", 1.6]} />
-      <directionalLight position={[6, 14, 10]} intensity={2.2} color="#fff1dc" />
+      <directionalLight position={[6.72, 20.4, -14.4]} intensity={2.2} color="#fff1dc" />
       <directionalLight position={[16, 9, -18]} intensity={0.7} color="#e8eefc" />
     </>
   );
 }
 
-export function OfficeStage({ shotKey, theme, officeAvailable, figureAvailable, cursor, screenLayers, onTransition, onScreens }: {
+export function OfficeStage({ shotKey, active, rasterReady, theme, officeAvailable, figureAvailable, cursor, screenLayers, onTransition, onScreens, onReduceRaster }: {
   shotKey: ShotKey;
+  active: boolean;
+  /** Start adaptive quality only after GPU warmup and all demo-page startup. */
+  rasterReady: boolean;
   /** The landing's theme: the monitors, glass and pages alike, run in the same one. */
   theme: "light" | "dark";
   officeAvailable: boolean;
@@ -629,8 +712,13 @@ export function OfficeStage({ shotKey, theme, officeAvailable, figureAvailable, 
   onTransition: (active: boolean) => void;
   /** The glass of each monitor, once the room is known. */
   onScreens: (screens: Partial<Record<MonitorKey, ScreenFrame>>) => void;
+  onReduceRaster: (factor: number) => void;
 }) {
   const [office, setOffice] = useState<OfficeSet | null>(null);
+  const [gpuPrepared, setGpuPrepared] = useState(false);
+  const [figuresLoaded, setFiguresLoaded] = useState(false);
+  const handlePrepared = useCallback(() => setGpuPrepared(true), []);
+  const handleFigureLoaded = useCallback(() => setFiguresLoaded(true), []);
   // Which monitor the camera is leaving, so its page can stay lit for the first
   // moment of the flight.
   const previousShot = useRef<ShotKey>(shotKey);
@@ -663,14 +751,18 @@ export function OfficeStage({ shotKey, theme, officeAvailable, figureAvailable, 
   const roomReady = !officeAvailable || office !== null;
 
   useEffect(() => {
-    onScreens(screens);
-  }, [screens, onScreens]);
+    if (gpuPrepared) onScreens(screens);
+  }, [gpuPrepared, screens, onScreens]);
 
   return (
     <>
       <CameraRig shot={shots[shotKey]} shots={shots} shotKey={shotKey} snapKey={office ? "office" : "placeholder"} onTransition={onTransition} />
       <Lights />
-      <SceneWarmup ready={roomReady} />
+      <Reflections />
+      <SceneDiagnostics shot={shotKey} />
+      <FigureBudget active={active} />
+      <FrameBudget ready={gpuPrepared && rasterReady} active={active} onReduce={onReduceRaster} />
+      <SceneWarmup ready={roomReady && (!figureAvailable || figuresLoaded)} onPrepared={handlePrepared} />
       {officeAvailable ? (
         <Suspense fallback={null}>
           <OfficeModel viewport={viewport} theme={theme} onReady={setOffice} />
@@ -684,6 +776,7 @@ export function OfficeStage({ shotKey, theme, officeAvailable, figureAvailable, 
             <Figure
               key={`${placement.position.x}:${placement.position.z}`}
               placement={placement}
+              onLoaded={handleFigureLoaded}
               seed={index * 1.7}
               typing={placement.typing !== false}
             />

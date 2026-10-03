@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones, ListTodo, RefreshCw, ScrollText, Search, ShieldCheck, Undo2, Users, X, XCircle } from "lucide-react";
-import { api, ApiError, getAdminCallAudioBlob } from "../../api";
+import { api, ApiError, getAdminCallMediaUrl } from "../../api";
 import { AuditTrailsPanel } from "./AuditTrailsPanel";
 import { isVideoCall } from "../../shared/lib/media";
 import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
@@ -570,9 +570,11 @@ function UserCallsPanel({ user }: { user: UserResponse }) {
 }
 
 function AdminMediaPlayer({ call }: { call: CallResponse }) {
-  const [url, setUrl] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
-  useEffect(() => { let alive = true; let objectUrl = ""; setUrl(""); setError(""); setLoading(true); getAdminCallAudioBlob(call.id).then((blob) => { if (!alive) return; objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }).catch((loadError) => { if (alive) setError(loadError instanceof ApiError && loadError.code === "audio_file_not_found" ? "Файл записи недоступен" : message(loadError)); }).finally(() => { if (alive) setLoading(false); }); return () => { alive = false; if (objectUrl) URL.revokeObjectURL(objectUrl); }; }, [call.id]);
-  if (loading) return <p className="admin-session-summary">Загрузка записи…</p>; if (error) return <p className="admin-notice">{error}</p>; return isVideoCall(call) ? <video className="admin-media" controls src={url} /> : <audio className="admin-audio" controls src={url} />;
+  const [error, setError] = useState("");
+  useEffect(() => setError(""), [call.id]);
+  const mediaProps = {src: getAdminCallMediaUrl(call.id), preload: "metadata" as const, controls: true, controlsList: "nodownload", crossOrigin: "use-credentials" as const, onError: () => setError("Файл записи недоступен. Проверьте доступ и обновите страницу.")};
+  if (error) return <p className="admin-notice">{error}</p>;
+  return isVideoCall(call) ? <video key={call.id} className="admin-media" {...mediaProps} /> : <audio key={call.id} className="admin-audio" {...mediaProps} />;
 }
 
 function UserAvatar({ user }: { user: UserResponse }) {

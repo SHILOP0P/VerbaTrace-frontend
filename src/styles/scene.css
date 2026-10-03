@@ -149,7 +149,9 @@
   transform-origin: 0 0;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.45s ease;
+  /* The camera already supplies a continuous fade. A second compositor
+     transition delayed live monitors after the camera had reached them. */
+  transition: none;
   /* Its own compositor layer: without this the browser re-rastered a page the
      size of a desktop every frame the camera's approach changed its scale, and
      the flight lost a third of a second at a time. */
@@ -286,6 +288,7 @@
     transform: translate(var(--caption-shift), -50%);
 }
 
+
 .scene-block[data-caption-layout="side"] .scene-caption.side-left { left: var(--scene-caption-left); }
 .scene-block[data-caption-layout="side"] .scene-caption.side-right { right: var(--scene-caption-right); }
 .scene-block[data-caption-layout="side"] .scene-caption.is-visible { transform: translate(0, -50%); }
@@ -314,28 +317,47 @@
 .scene-dots {
   position: absolute;
   top: 50%;
-  right: 28px;
+  right: 20px;
   z-index: 6;
   display: grid;
-  gap: 12px;
+  gap: 4px;
   margin: 0;
-  padding: 0;
+  padding: 5px 2px;
   list-style: none;
+  border: 1px solid rgba(255, 250, 245, .3);
+  border-radius: 999px;
+  background: rgba(29, 25, 22, .84);
+  box-shadow: 0 4px 16px rgba(20, 13, 10, .16);
   transform: translateY(-50%);
 }
 
 .scene-dots button {
-  width: 10px;
-  height: 10px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 0;
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  transition: background 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+  transition: background .2s ease;
 }
 
-.scene-dots .is-active button {
+.scene-dots button::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border: 2px solid #e9dfd2;
+  border-radius: 50%;
+  background: #655d55;
+  transition: background .2s ease, transform .2s ease, border-color .2s ease;
+}
+
+.scene-dots button:hover { background: rgba(255, 250, 245, .14); }
+.scene-dots button:focus-visible { outline: 2px solid #ff9a6b; outline-offset: -1px; }
+
+.scene-dots .is-active button::before {
   background: #ff7a43;
   border-color: #ff7a43;
   transform: scale(1.25);
@@ -372,6 +394,7 @@
   }
 
   .scene-hero-copy,
+  .scene-screen-layer,
   .scene-caption {
     transition: none;
   }
@@ -379,7 +402,7 @@
 
 @media (max-width: 720px) {
   .scene-dots {
-    right: 12px;
+    right: 4px;
   }
 }
 

@@ -1,0 +1,24 @@
+[
+  {
+    "tier": "mid",
+    "ratio": 0.28,
+    "triangles": 6128,
+    "bytes": 248520,
+    "animations": [
+      "type",
+      "idle",
+      "click"
+    ]
+  },
+  {
+    "tier": "far",
+    "ratio": 0.1,
+    "triangles": 2188,
+    "bytes": 114320,
+    "animations": [
+      "type",
+      "idle",
+      "click"
+    ]
+  }
+]

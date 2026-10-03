@@ -9,6 +9,7 @@ import { DemoScreenLayer, type ScreenFrame } from "./MonitorScreen";
 import { OFFICE_URL, OfficeStage, type CursorState } from "./OfficeStage";
 import { captionLayout, SHOT_ORDER, type MonitorKey, type ShotKey } from "./shots";
 import { useStepNavigation } from "./useStepNavigation";
+import { flightState } from "./CameraRig";
 
 const sceneLabels: Record<ShotKey, string> = {
   hero: "Офис",
@@ -89,10 +90,10 @@ const PIXEL_BUDGET = 880_000;
  *  the cost of the office from the cost of the interface on its screens. */
 const screensEnabled = new URLSearchParams(window.location.search).get("screens") !== "0";
 
-function renderScaleFor(width: number, height: number) {
+function renderScaleFor(width: number, height: number, pixelBudget = PIXEL_BUDGET) {
   const area = Math.max(1, width * height);
   const device = Math.min(window.devicePixelRatio || 1, 1.5);
-  return Math.max(0.7, Math.min(device, Math.sqrt(PIXEL_BUDGET / area)));
+  return Math.min(device, Math.sqrt(pixelBudget / area));
 }
 
 const readDocumentTheme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
@@ -204,11 +205,13 @@ function writeStoredStep(step: number) {
   }
 }
 
-export function LandingScene({ onStart, fallback, onReady, onStage }: {
+export function LandingScene({ onStart, fallback, onReady, onUnavailable, onStage }: {
   onStart: () => void;
   fallback: ReactNode;
-  /** Fires once the office is on screen, or once it is clear it will not be. */
+  /** Fires once the room and the first required monitor are ready. */
   onReady?: () => void;
+  /** Missing WebGL or a failed renderer hands the page back to the flat hero. */
+  onUnavailable?: () => void;
   /** What the loading curtain should say it is doing. */
   onStage?: (stage: "room" | "screens") => void;
 }) {
@@ -226,9 +229,31 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
   const [bootedMonitors, setBootedMonitors] = useState<MonitorKey[]>([]);
   const [onScreen, setOnScreen] = useState(true);
   const [renderScale, setRenderScale] = useState(() => renderScaleFor(window.innerWidth, window.innerHeight));
+  const [pixelBudget, setPixelBudget] = useState(PIXEL_BUDGET);
+  const budgetRef = useRef(pixelBudget);
+  budgetRef.current = pixelBudget;
+  const reduceRasterBudget = useCallback((factor: number) => {
+    setPixelBudget((current) => Math.max(320_000, Math.round(current * factor)));
+  }, []);
+  useEffect(() => {
+    setRenderScale(renderScaleFor(window.innerWidth, window.innerHeight, pixelBudget));
+  }, [pixelBudget]);
   const [captionViewport, setCaptionViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const layout = captionLayout(captionViewport);
   const blockRef = useRef<HTMLElement>(null);
+  const requestedShot = useRef(SHOT_ORDER[step]);
+  const handleStep = useCallback((next: number) => {
+    if (next === step) return;
+    requestedShot.current = SHOT_ORDER[next];
+    if (!sceneFailed) setTransitioning(true);
+    setStep(next);
+  }, [step, sceneFailed]);
+  const handleTransition = useCallback((active: boolean) => {
+    // A frame of the previous shot may finish while React commits navigation.
+    // It cannot unlock the newly requested flight or reveal its live screen.
+    if (flightState().shotKey !== requestedShot.current) return;
+    setTransitioning(active);
+  }, []);
   const cursor = useRef<CursorState>({ x: 0.5, y: 0.5, down: false, typing: false });
   const employeeLayer = useRef<HTMLDivElement>(null);
   const leaderLayer = useRef<HTMLDivElement>(null);
@@ -260,16 +285,15 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
   }, []);
 
   // Below the office the page is an ordinary one: the pages on the monitors
-  // stop playing until the room comes back into view. The room itself keeps
-  // rendering — switching the render loop off proved to be a good way to end
-  // up with an empty canvas and no way back.
+  // stop playing until the room comes back into view. Canvas renders on demand
+  // below the viewport and resumes its normal loop when the room returns.
   useEffect(() => {
     const block = blockRef.current;
     if (!block) return;
     const update = () => {
       const rect = block.getBoundingClientRect();
       setOnScreen(rect.bottom > 0 && rect.top < (window.innerHeight || 0));
-      setRenderScale(renderScaleFor(window.innerWidth, window.innerHeight));
+      setRenderScale(renderScaleFor(window.innerWidth, window.innerHeight, budgetRef.current));
     };
     update();
     window.addEventListener("scroll", update, { passive: true });
@@ -300,14 +324,19 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
     };
   }, [step]);
 
-  // A flight lasts about two seconds. If the scene ever stops reporting, the
-  // page must not stay locked with a dark monitor waiting for a camera that is
-  // no longer moving.
+  // Longer inter-floor flights must not unlock halfway through. Release only
+  // after arrival, or if an otherwise visible flight makes no progress.
   useEffect(() => {
-    if (!transitioning) return;
-    const timer = window.setTimeout(() => setTransitioning(false), 5000);
-    return () => window.clearTimeout(timer);
-  }, [transitioning]);
+    if (!transitioning || !onScreen) return;
+    let previous = flightState().progress, advanced = performance.now();
+    const timer = window.setInterval(() => {
+      const state = flightState(), now = performance.now();
+      if (state.shotKey !== requestedShot.current) return;
+      if (document.hidden || state.progress !== previous) { previous = state.progress; advanced = now; return; }
+      if (!state.active || now - advanced > 8000) setTransitioning(false);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [transitioning, onScreen]);
 
   const shotKey = SHOT_ORDER[step];
   const parked = !transitioning && !sceneFailed && onScreen;
@@ -327,35 +356,37 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
   // is the moment there is something to look at.
   const roomReady = Object.keys(screenAspects).length > 0;
   const announced = useRef(false);
-  const everythingReady = roomReady && bootedMonitors.length >= MONITORS.length;
+  const requiredMonitor = shotKey === "hero" ? "employee" : shotKey as MonitorKey;
+  const everythingReady = roomReady && (!screensEnabled || bootedMonitors.includes(requiredMonitor));
 
   useEffect(() => {
-    if (announced.current || !(everythingReady || sceneFailed)) return;
+    if (sceneFailed) {
+      onUnavailable?.();
+      return;
+    }
+    if (announced.current || !everythingReady) return;
     announced.current = true;
     onReady?.();
-  }, [everythingReady, sceneFailed, onReady]);
+  }, [everythingReady, sceneFailed, onReady, onUnavailable]);
   const monitor = shotKey === "hero" ? null : (shotKey as MonitorKey);
 
-  // Every monitor's page is a whole application in an iframe, and building one
-  // costs the main thread the best part of a second. All four are built at the
-  // start, one after another, while the loading curtain is still up — that is
-  // the only moment in the visit when a pause cannot be seen.
+  // Start with the employee screen. Other roles load when selected, then warm
+  // the next stop once the current screen is ready. Keep visited documents so
+  // returning to a monitor preserves its scenario and needs no second download.
   useEffect(() => {
-    // Not before the room: four applications downloading at once starved the
-    // office model itself and the first screen stayed empty for seconds.
-    if (sceneFailed || !roomReady) return;
+    if (!screensEnabled || sceneFailed || !roomReady) return;
     onStage?.("screens");
-    const open = (key: MonitorKey) =>
-      setOpenedMonitors((current) => (current.includes(key) ? current : [...current, key]));
-    const timers = MONITORS.map((key, index) => window.setTimeout(() => open(key), index * 150));
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [sceneFailed, roomReady, onStage]);
+    const next = SHOT_ORDER[step + 1];
+    const wanted: MonitorKey[] = [requiredMonitor];
+    if (shotKey !== "hero" && bootedMonitors.includes(requiredMonitor) && next && next !== "hero") wanted.push(next);
+    setOpenedMonitors(current => wanted.every(key => current.includes(key)) ? current : [...current, ...wanted.filter(key => !current.includes(key))]);
+  }, [sceneFailed, roomReady, onStage, shotKey, step, requiredMonitor, bootedMonitors]);
 
   const handleBooted = useCallback((key: MonitorKey) => {
     setBootedMonitors((current) => (current.includes(key) ? current : [...current, key]));
   }, []);
 
-  useStepNavigation({ enabled: !sceneFailed, stepCount: SHOT_ORDER.length, step, locked: transitioning, onStep: setStep });
+  useStepNavigation({ enabled: !sceneFailed, stepCount: SHOT_ORDER.length, step, locked: transitioning, onStep: handleStep });
 
   const handleScreenEvent = useCallback((event: DemoEvent) => {
     if (event.type === "vt-demo:cursor") {
@@ -412,7 +443,8 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
             <Canvas
               gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
               dpr={renderScale}
-              camera={{ fov: 44, near: 0.05, far: 80, position: [0, 3, 8] }}
+              frameloop={onScreen ? "always" : "demand"}
+              camera={{ fov: 44, near: 0.05, far: 1700, position: [0, 3, 8] }}
               style={{ background: "transparent" }}
               onCreated={({ gl }) => {
                 // A lost context leaves a frozen picture behind; the flat first
@@ -422,12 +454,15 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
             >
               <OfficeStage
                 shotKey={shotKey}
+                active={onScreen}
+                rasterReady={everythingReady}
+                onReduceRaster={reduceRasterBudget}
                 theme={theme}
                 officeAvailable={officeAvailable}
                 figureAvailable={figureAvailable}
                 cursor={cursor}
                 screenLayers={screenLayers}
-                onTransition={setTransitioning}
+                onTransition={handleTransition}
                 onScreens={handleScreens}
               />
             </Canvas>
@@ -480,12 +515,12 @@ export function LandingScene({ onStart, fallback, onReady, onStage }: {
       <ol className="scene-dots" aria-label="Сцены">
         {SHOT_ORDER.map((key, index) => (
           <li key={key} className={index === step ? "is-active" : ""}>
-            <button type="button" aria-label={sceneLabels[key]} onClick={() => {
+            <button type="button" aria-label={sceneLabels[key]} title={sceneLabels[key]} aria-current={index === step ? "step" : undefined} onClick={() => {
               if (transitioning) return;
               if (window.scrollY < (blockRef.current?.offsetHeight ?? 0)) {
                 window.scrollTo({ top: 0, behavior: "instant" });
               }
-              setStep(index);
+              handleStep(index);
             }} />
           </li>
         ))}

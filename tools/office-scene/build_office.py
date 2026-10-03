@@ -1,8 +1,8 @@
 """
 build_office.py -- parametric 3D office for the VerbaTrace scroll-driven landing page.
 
-Groundwork only: geometry, materials, lighting for previews, five named cameras,
-preview renders and a Draco-compressed GLB. No characters, no baking.
+Parametric shell, authored furniture, PBR materials and five named cameras.
+The optional detail module adds the approved interiors and offline lighting.
 
 Run headless from PowerShell:
 
@@ -89,10 +89,10 @@ ACCENT_CHAIR_WS = 3         # the single orange chair (product accent, used spar
 
 # --- Leader's glass office (floor 1, far end, window corner) ---
 LEADER_OFFICE = (16.0, ROOM_X, 10.5, ROOM_Y)   # x0, x1, y0, y1
-LEADER_DOOR_T = 0.5         # door position along the west glass wall, from its y0 end
+LEADER_DOOR_T = 4.1         # hinge along the south/front wall, measured from x0
 DOOR_W = 0.95
 DOOR_H = 2.1
-DOOR_OPEN_DEG = 35          # doors stand slightly open so they read as doors
+DOOR_OPEN_DEG = 82          # usable open doorways for the walking camera
 GLASS_POST_PITCH = 1.25
 GLASS_T = 0.012             # pane thickness
 GLASS_PREVIEW_ALPHA = 0.22  # preview-only alpha for glass; the GLB gets alpha = 1 + transmission
@@ -113,8 +113,7 @@ RENDER_RES = (1280, 800)
 RENDER_SAMPLES = 32
 
 # --- Lighting (preview renders only; the GLB ships without lights) ---
-SUN_DIR = (-0.55, -0.6, -0.42)  # low afternoon sun from the window side and +X: the lit strip reaches
-                                # ~6 m into the room (two desk rows) and mullion shadows run diagonally
+SUN_DIR = (-0.28, -0.6, -0.85)  # daylight from north; high elevation keeps window shadows close to glazing
 SUN_STRENGTH = 4.0
 AREA_GRID = (3, 2)              # area lights per floor; each one casts shadows, so keep the count low
 AREA_POWER = 170.0
@@ -761,8 +760,9 @@ def glass_wall(name, p0, p1, z0, z1, col, door_t=None, post_pitch=GLASS_POST_PIT
     if door_t is not None:
         segments = [(0.0, door_t), (door_t + DOOR_W, L)]
         # header over the door and a fixed transom light above it
-        frame.box((DOOR_W, rail, rail), at(door_t + DOOR_W / 2, DOOR_H + rail / 2), MAT.frame, rot=rot)
-        glass.box((DOOR_W, 0.012, z1 - DOOR_H - 2 * rail), at(door_t + DOOR_W / 2, (DOOR_H + rail + z1 - rail) / 2),
+        header_z = z0 + DOOR_H
+        frame.box((DOOR_W, rail, rail), at(door_t + DOOR_W / 2, header_z + rail / 2), MAT.frame, rot=rot)
+        glass.box((DOOR_W, 0.012, z1 - header_z - 2 * rail), at(door_t + DOOR_W / 2, (header_z + z1) / 2),
                   MAT.glass, rot=rot)
     for (a, b_) in segments:
         span = b_ - a
@@ -782,7 +782,7 @@ def glass_wall(name, p0, p1, z0, z1, col, door_t=None, post_pitch=GLASS_POST_PIT
         door = build_door(name + "_door")
         ob = add_object(name + "_door", door, col)
         # Hinge at the door_t end; the leaf swings toward the wall's +normal side (interior).
-        place(ob, frame_matrix(at(door_t, 0), yaw + rad(DOOR_OPEN_DEG)))
+        place(ob, frame_matrix(at(door_t, z0), yaw + rad(DOOR_OPEN_DEG)))
         ob.visible_shadow = False
     return g
 
@@ -1051,9 +1051,10 @@ def build_leader_office():
     col = "LeaderOffice"
     x0, x1, y0, y1 = LEADER_OFFICE
     # Glass on the two interior sides; the other two are the building's east and window walls.
-    # The west wall is traced from y1 to y0 so the door swings inward (toward +X).
-    glass_wall("leader_glass_w", (x0, y1), (x0, y0), 0, CEIL_H, col, door_t=(y1 - y0) - LEADER_DOOR_T - DOOR_W)
-    glass_wall("leader_glass_s", (x0, y0), (x1, y0), 0, CEIL_H, col)
+    # Front-right entrance aligns with the free monitor's approach; the west
+    # partition is continuous. The leaf opens north into the room.
+    glass_wall("leader_glass_w", (x0, y1), (x0, y0), 0, CEIL_H, col)
+    glass_wall("leader_glass_s", (x0, y0), (x1, y0), 0, CEIL_H, col, door_t=LEADER_DOOR_T)
     frame = frame_matrix(((x0 + x1) / 2 + 0.7, (y0 + y1) / 2 + 0.3, 0), rad(90))   # leader faces -X (the floor)
     screen = manager_desk("desk_leader", "monitor_27", "leader", col, frame)
     add_empty("leader_desk", "Anchors", screen, (0, 0, rad(90)), {"kind": "leader"})
@@ -1148,7 +1149,7 @@ def build_floor2():
 
     # Deputy's room east of the void: glass front at x = x0 facing the void.
     x0, x1, y0, y1 = DEPUTY_ROOM
-    glass_wall("deputy_glass", (x0, y1), (x0, y0), z, zc, col, door_t=y1 - y0 - DOOR_W - 0.3)
+    glass_wall("deputy_glass", (x0, y1), (x0, y0), z, zc, col, door_t=y1 - y0 - DOOR_W - 0.1)
     solid_wall("deputy_wall_e", (x1 + 0.075, y0 - 0.15), (x1 + 0.075, y1 + 0.15), z, zc, 0.15, MAT.wall, col)
     solid_wall("deputy_wall_s", (x0, y0 - 0.075), (x1, y0 - 0.075), z, zc, 0.15, MAT.wall, col)
     solid_wall("deputy_wall_n", (x0, y1 + 0.075), (x1, y1 + 0.075), z, zc, 0.15, MAT.wall, col)
@@ -1210,7 +1211,7 @@ def make_camera(name, loc, target, lens):
     data.sensor_fit = "HORIZONTAL"
     data.sensor_width = 36
     data.clip_start = 0.05
-    data.clip_end = 200
+    data.clip_end = 1700
     cam = add_object(name, data, "Cameras", loc=loc)
     look_at(cam, target)
     return cam
@@ -1324,7 +1325,7 @@ def export_glb(out_dir):
         export_skins=False,
         export_morph=False,
         export_yup=True,
-        export_image_format="NONE",
+        export_image_format="AUTO",
     )
     size = os.path.getsize(path)
     log("exported %s: %.2f MB (%d bytes) in %.1fs" % (path, size / 1e6, size, time.time() - t0))
@@ -1341,20 +1342,29 @@ def parse_args():
     ap = argparse.ArgumentParser(description="Build the VerbaTrace office scene")
     ap.add_argument("--out", required=True, help="output folder for renders, GLB and .blend")
     ap.add_argument("--render", action="store_true", help="render the five cameras as PNG")
-    ap.add_argument("--export", action="store_true", help="export office.glb (Draco)")
+    ap.add_argument("--export", action="store_true", help="export office.glb (uncompressed, shared meshes)")
     ap.add_argument("--blend", action="store_true", help="also save office.blend for inspection")
+    ap.add_argument("--detail", action="store_true", help="build approved detailed interiors with PBR materials")
+    ap.add_argument("--bake", action="store_true", help="bake static floor lighting (requires --detail)")
     ap.add_argument("--only", default="", help="comma-separated camera names to render (default all)")
     return ap.parse_args(argv)
 
 
 def main():
     args = parse_args()
+    args.out = os.path.abspath(args.out)
     os.makedirs(args.out, exist_ok=True)
     t0 = time.time()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     scene.unit_settings.system = "METRIC"
     rng = random.Random(RANDOM_SEED)
+
+    detail = None
+    if args.detail:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import office_detail as detail
+        detail.install(sys.modules[__name__])
 
     build_materials()
     build_templates(rng)
@@ -1365,12 +1375,16 @@ def main():
     build_atrium()
     owner_frame, deputy_frame = build_floor2()
     build_lights()
+    setup_render(scene)
+    if detail:
+        detail.finish(sys.modules[__name__], args.out, bake=args.bake)
     cams = build_cameras(hero_frame, leader_frame, deputy_frame, owner_frame)
     setup_render(scene)
     log("scene built in %.1fs" % (time.time() - t0))
     print_stats()
 
     if args.blend:
+        bpy.ops.file.pack_all()
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(args.out, "office.blend"))
     if args.render:
         wanted = [c for c in cams if not args.only or c.name in args.only.split(",")]

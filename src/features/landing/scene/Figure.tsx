@@ -1,14 +1,20 @@
-import { useAnimations, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, type RefObject } from "react";
-import { Bone, Group, Material, Mesh, Object3D, Quaternion, Vector3 } from "three";
+import { AnimationAction, AnimationMixer, Bone, Group, Material, Mesh, MeshStandardMaterial, Object3D, Quaternion, SkinnedMesh, Vector3 } from "three";
+import { dressFigure } from "./figureAppearance";
+import { figureAnimates, registerFigure } from "./FigureBudget";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { CursorState } from "./OfficeStage";
 
-export const FIGURE_URL = "/assets/scene/figure.glb";
+export const FIGURE_URL = "/assets/scene/figure.glb?v=3";
 const DRACO_PATH = "/draco/gltf/";
 
 useGLTF.preload(FIGURE_URL, DRACO_PATH);
+const MID_URL = "/assets/scene/figure-mid.glb?v=3";
+const FAR_URL = "/assets/scene/figure-far.glb?v=3";
+useGLTF.preload(MID_URL, DRACO_PATH);
+useGLTF.preload(FAR_URL, DRACO_PATH);
 
 
 /**
@@ -129,18 +135,41 @@ function solveArm(upper: Bone, fore: Bone, hand: Bone, targetWorld: Vector3, pol
  * breathe in unison. Given a cursor, the right arm follows the mouse of the
  * screen that cursor belongs to.
  */
-export function Figure({ placement, cursor, seed = 0, typing = true }: {
+export function Figure({ placement, cursor, seed = 0, typing = true, onLoaded }: {
   placement: FigurePlacement;
   cursor?: RefObject<CursorState>;
   seed?: number;
   /** Whether this one taps at the keyboard now and then. */
   typing?: boolean;
+  onLoaded?: () => void;
 }) {
   const group = useRef<Group>(null);
   const gltf = useGLTF(FIGURE_URL, DRACO_PATH);
+  const mid = useGLTF(MID_URL, DRACO_PATH);
+  const far = useGLTF(FAR_URL, DRACO_PATH);
   // Skinned meshes cannot share a scene between instances: the clone brings its
   // own skeleton, so every figure poses on its own.
-  const scene = useMemo(() => cloneSkinned(gltf.scene), [gltf]);
+  const kit = useMemo(() => {
+    const scene = cloneSkinned(gltf.scene);
+    const high: SkinnedMesh[] = [];
+    scene.traverse((object) => { if ((object as SkinnedMesh).isSkinnedMesh) high.push(object as SkinnedMesh); });
+    const reference = high[0];
+    const levels: Mesh[][] = [high];
+    for (const source of [mid.scene, far.scene]) {
+      let mesh: SkinnedMesh | undefined;
+      source.traverse((object) => { if ((object as SkinnedMesh).isSkinnedMesh) mesh = object as SkinnedMesh; });
+      if (!mesh || !reference) throw new Error("Figure distance tier is missing its skin");
+      const tier = new SkinnedMesh(mesh.geometry, mesh.material);
+      tier.bind(reference.skeleton, reference.bindMatrix);
+      tier.visible = false;
+      tier.userData.figureTier = levels.length;
+      reference.parent!.add(tier);
+      levels.push([tier]);
+    }
+    return { scene, levels };
+  }, [gltf, mid, far]);
+  const { scene, levels } = kit;
+  const tier = useRef(0);
   // The clone shares its materials with every other figure, and one of them has
   // to fade on its own. Each gets its own copy; there are a dozen people in the
   // room, so the extra state costs nothing.
@@ -151,13 +180,26 @@ export function Figure({ placement, cursor, seed = 0, typing = true }: {
       if (!mesh.isMesh) return;
       const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material).clone();
       material.depthWrite = true;
+      // Fade uses this same program for the whole visit. Configure it before
+      // compileAsync, including tiers/people hidden in the initial wide shot.
+      material.transparent = true;
+      material.forceSinglePass = true;
+      if (material instanceof MeshStandardMaterial) dressFigure(material, Math.round(seed / 1.7));
       mesh.material = material;
       list.push(material);
     });
     return list;
-  }, [scene]);
+  }, [scene, seed]);
   const faded = useRef(-1);
-  const { actions } = useAnimations(gltf.animations, group);
+  const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
+  const actions = useMemo(() => ({} as Record<string, AnimationAction>), []);
+  useEffect(() => {
+    for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
+    return () => { mixer.stopAllAction(); mixer.uncacheRoot(scene); };
+  }, [mixer, scene, actions, gltf.animations]);
+  useEffect(() => registerFigure(scene, placement.position), [scene, placement.position]);
+  useEffect(() => { onLoaded?.(); }, [onLoaded]);
+  useEffect(() => () => { skins.forEach((material) => material.dispose()); }, [skins]);
   const bones = useMemo(() => {
     const find = (names: string[]) => {
       for (const name of names) {
@@ -184,10 +226,11 @@ export function Figure({ placement, cursor, seed = 0, typing = true }: {
     idle.reset().fadeIn(0.4).play();
     // A shared clip started at the same instant everywhere reads as a chorus.
     idle.time = (seed * 0.37) % Math.max(0.1, idle.getClip().duration);
+    mixer.update(0);
     return () => {
       idle.fadeOut(0.2);
     };
-  }, [actions, seed]);
+  }, [actions, mixer, seed]);
 
   useFrame((state, delta) => {
     // Somebody four desks away is a handful of thousand triangles of skinned
@@ -195,6 +238,15 @@ export function Figure({ placement, cursor, seed = 0, typing = true }: {
     const group3d = group.current;
     if (group3d) {
       const distance = state.camera.position.distanceTo(scratch.target.copy(placement.position).add(headOffset));
+      // Shared skeleton, three preloaded geometries; no React remount or mixer
+      // allocation on a camera flight. Hysteresis prevents threshold flicker.
+      const next = distance < (tier.current === 0 ? 4.3 : 3.7) ? 0
+        : distance < (tier.current === 2 ? 8.5 : 9.2) ? 1 : 2;
+      if (next !== tier.current) {
+        levels[tier.current].forEach((mesh) => { mesh.visible = false; });
+        levels[next].forEach((mesh) => { mesh.visible = true; });
+        tier.current = next;
+      }
       const near = Math.min(1, Math.max(0, (distance - FADE_GONE) / (FADE_FULL - FADE_GONE)));
       const far = Math.min(1, Math.max(0, (VISIBLE_RANGE - distance) / FAR_FADE));
       const fade = Math.min(near, far);
@@ -204,12 +256,16 @@ export function Figure({ placement, cursor, seed = 0, typing = true }: {
       if (Math.abs(fade - faded.current) > 0.004) {
         faded.current = fade;
         for (const material of skins) {
-          material.transparent = fade < 1;
+          // One precompiled shader variant throughout the camera route.
+          material.transparent = true;
           material.opacity = fade;
           material.depthWrite = fade > 0.85;
         }
       }
     }
+
+    if (!figureAnimates(scene)) return;
+    mixer.update(Math.min(delta, .05));
 
     const type = actions.type;
     if (type) {

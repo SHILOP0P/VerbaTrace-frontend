@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { api, ApiError, openAuthorizedEventStream } from "./api";
 import type {
   AnalysisInstruction,
@@ -26,43 +26,52 @@ import {
 import { callIdFromLocation, pageUrl } from "./app/location";
 import { useTheme } from "./app/use-theme";
 import { loadOrganizationContext, loadWorkspaceContext } from "./app/workspace-loader";
-import { AnalysisPage } from "./features/analysis/AnalysisPage";
-import { CallsPage } from "./features/calls/CallsPage";
-import { TranscriptionEditPage } from "./features/calls/TranscriptionEditPage";
-import { TranscriptionComparePage } from "./features/calls/TranscriptionComparePage";
-import { CompaniesPage } from "./features/companies/CompaniesPage";
-import { CreateCompanyPage } from "./features/companies/CreateCompanyPage";
-import { ActionDetailPage, ActionsPage } from "./features/actions/ActionsPage";
-import { ContactsPage } from "./features/contacts/ContactsPage";
-import { InstructionsPage } from "./features/instructions/InstructionsPage";
-import { InstructionHistoryPage } from "./features/instructions/InstructionHistoryPage";
-import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
-import { InstructionComparePage } from "./features/instructions/InstructionComparePage";
-import { NewInstructionPage } from "./features/instructions/NewInstructionPage";
-import { InvitationsPage } from "./features/invitations/InvitationsPage";
 import { Landing } from "./features/landing/Landing";
-import { AuthenticatedShell } from "./features/layout/AuthenticatedShell";
-import { MonitoringPage } from "./features/monitoring/MonitoringPage";
-import { NotificationsPage } from "./features/notifications/NotificationsPage";
-import { OverviewPage } from "./features/overview/OverviewPage";
-import { DevicesPage, ProfileEditPage, ProfilePage } from "./features/profile/ProfilePage";
-import { AiReportsPage } from "./features/reports/AiReportsPage";
-import { SettingsPage } from "./features/settings/SettingsPage";
-import { PrivacySettingsPage } from "./features/settings/PrivacySettingsPage";
-import { NotificationSettingsPage } from "./features/settings/NotificationSettingsPage";
-import { TariffsPage } from "./features/tariffs/TariffsPage";
-import { IntegrationsPage } from "./features/integrations/IntegrationsPage";
-import { UploadPage } from "./features/upload/UploadPage";
-import { AdminPage } from "./features/admin/AdminPage";
-import { QualityReviewsPage } from "./features/quality-reviews/QualityReviewsPage";
-import { QualityReviewPage } from "./features/quality-reviews/QualityReviewPage";
-import { SupportAccessDecisionDialog } from "./features/support-access/SupportAccessDecisionDialog";
+import { TextBlockSkeleton } from "./shared/ui/loading";
+import { PageLoadBoundary } from "./shared/ui/PageLoadBoundary";
 import {
   nextTimelineStatuses,
   parseCallStatusEvent,
   timelineFromStatus
 } from "./shared/lib/call-status";
 import { useAuth } from "./features/auth/AuthProvider";
+
+// The public landing needs none of the workspace routes. Each route starts
+// downloading when it is first opened; the shell stays visible during navigation.
+const AuthenticatedShell = lazy(() => import("./features/layout/AuthenticatedShell").then(m => ({ default: m.AuthenticatedShell })));
+const AnalysisPage = lazy(() => import("./features/analysis/AnalysisPage").then(m => ({ default: m.AnalysisPage })));
+const CallsPage = lazy(() => import("./features/calls/CallsPage").then(m => ({ default: m.CallsPage })));
+const TranscriptionEditPage = lazy(() => import("./features/calls/TranscriptionEditPage").then(m => ({ default: m.TranscriptionEditPage })));
+const TranscriptionComparePage = lazy(() => import("./features/calls/TranscriptionComparePage").then(m => ({ default: m.TranscriptionComparePage })));
+const CompaniesPage = lazy(() => import("./features/companies/CompaniesPage").then(m => ({ default: m.CompaniesPage })));
+const CreateCompanyPage = lazy(() => import("./features/companies/CreateCompanyPage").then(m => ({ default: m.CreateCompanyPage })));
+const ActionsPage = lazy(() => import("./features/actions/ActionsPage").then(m => ({ default: m.ActionsPage })));
+const ActionDetailPage = lazy(() => import("./features/actions/ActionsPage").then(m => ({ default: m.ActionDetailPage })));
+const ContactsPage = lazy(() => import("./features/contacts/ContactsPage").then(m => ({ default: m.ContactsPage })));
+const InstructionsPage = lazy(() => import("./features/instructions/InstructionsPage").then(m => ({ default: m.InstructionsPage })));
+const InstructionHistoryPage = lazy(() => import("./features/instructions/InstructionHistoryPage").then(m => ({ default: m.InstructionHistoryPage })));
+const AnalyticsPage = lazy(() => import("./features/analytics/AnalyticsPage").then(m => ({ default: m.AnalyticsPage })));
+const InstructionComparePage = lazy(() => import("./features/instructions/InstructionComparePage").then(m => ({ default: m.InstructionComparePage })));
+const NewInstructionPage = lazy(() => import("./features/instructions/NewInstructionPage").then(m => ({ default: m.NewInstructionPage })));
+const InvitationsPage = lazy(() => import("./features/invitations/InvitationsPage").then(m => ({ default: m.InvitationsPage })));
+const MonitoringPage = lazy(() => import("./features/monitoring/MonitoringPage").then(m => ({ default: m.MonitoringPage })));
+const NotificationsPage = lazy(() => import("./features/notifications/NotificationsPage").then(m => ({ default: m.NotificationsPage })));
+const OverviewPage = lazy(() => import("./features/overview/OverviewPage").then(m => ({ default: m.OverviewPage })));
+const ProfilePage = lazy(() => import("./features/profile/ProfilePage").then(m => ({ default: m.ProfilePage })));
+const ProfileEditPage = lazy(() => import("./features/profile/ProfilePage").then(m => ({ default: m.ProfileEditPage })));
+const DevicesPage = lazy(() => import("./features/profile/ProfilePage").then(m => ({ default: m.DevicesPage })));
+const AiReportsPage = lazy(() => import("./features/reports/AiReportsPage").then(m => ({ default: m.AiReportsPage })));
+const SettingsPage = lazy(() => import("./features/settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const PrivacySettingsPage = lazy(() => import("./features/settings/PrivacySettingsPage").then(m => ({ default: m.PrivacySettingsPage })));
+const NotificationSettingsPage = lazy(() => import("./features/settings/NotificationSettingsPage").then(m => ({ default: m.NotificationSettingsPage })));
+const TariffsPage = lazy(() => import("./features/tariffs/TariffsPage").then(m => ({ default: m.TariffsPage })));
+const IntegrationsPage = lazy(() => import("./features/integrations/IntegrationsPage").then(m => ({ default: m.IntegrationsPage })));
+const UploadPage = lazy(() => import("./features/upload/UploadPage").then(m => ({ default: m.UploadPage })));
+const AdminPage = lazy(() => import("./features/admin/AdminPage").then(m => ({ default: m.AdminPage })));
+const QualityReviewsPage = lazy(() => import("./features/quality-reviews/QualityReviewsPage").then(m => ({ default: m.QualityReviewsPage })));
+const QualityReviewPage = lazy(() => import("./features/quality-reviews/QualityReviewPage").then(m => ({ default: m.QualityReviewPage })));
+const SupportAccessDecisionDialog = lazy(() => import("./features/support-access/SupportAccessDecisionDialog").then(m => ({ default: m.SupportAccessDecisionDialog })));
+const pageLoading = <section role="status" aria-label="Загрузка раздела"><TextBlockSkeleton rows={4} /></section>;
 
 const callsRefreshIntervalMs = 5_000;
 
@@ -675,6 +684,8 @@ function App() {
   }
 
   return (
+    <PageLoadBoundary>
+    <Suspense fallback={pageLoading}>
     <AuthenticatedShell
       activePage={page}
       session={session}
@@ -696,6 +707,8 @@ function App() {
       onToggleTheme={toggleTheme}
       onLogout={logout}
     >
+      <PageLoadBoundary resetKey={page}>
+      <Suspense fallback={pageLoading}>
       {(page === "teamAnalytics" || page === "teamAnalyticsEmployee") && (
         <AnalyticsPage
           departments={departments}
@@ -972,8 +985,12 @@ function App() {
         />
       )}
       {page === "settingsIntegrations" && <IntegrationsPage session={session} companies={companies} departments={departments} onBack={() => navigate("settings")} />}
-	  {supportAccessRequestId?<SupportAccessDecisionDialog requestId={supportAccessRequestId} currentUserId={session.user.id} onClose={()=>setSupportAccessRequestId("")}/>:null}
+      </Suspense>
+      </PageLoadBoundary>
+	  {supportAccessRequestId?<Suspense fallback={null}><SupportAccessDecisionDialog requestId={supportAccessRequestId} currentUserId={session.user.id} onClose={()=>setSupportAccessRequestId("")}/></Suspense>:null}
     </AuthenticatedShell>
+    </Suspense>
+    </PageLoadBoundary>
   );
 }
 

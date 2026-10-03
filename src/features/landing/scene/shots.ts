@@ -227,14 +227,14 @@ export const ROOMS: Room[] = [
     name: "leader",
     floorLevel: 0,
     bounds: { minX: 16.0, maxX: 21.5, minZ: -17.0, maxZ: -10.5 },
-    door: new Vector3(16.0, WALK_HEIGHT, -11.475),
-    inward: new Vector3(1, 0, 0)
+    door: new Vector3(20.575, WALK_HEIGHT, -10.5),
+    inward: new Vector3(0, 0, -1)
   },
   {
     name: "deputy",
     floorLevel: BUILDING.floorTwoLevel,
     bounds: { minX: 7.6, maxX: 12.6, minZ: -10.0, maxZ: -4.0 },
-    door: new Vector3(7.6, BUILDING.floorTwoLevel + WALK_HEIGHT, -4.775),
+    door: new Vector3(7.6, BUILDING.floorTwoLevel + WALK_HEIGHT, -4.575),
     inward: new Vector3(1, 0, 0)
   },
   {
@@ -279,6 +279,9 @@ export function setOccupants(points: Vector3[]) {
   occupants.length = 0;
   for (const point of points) occupants.push(point.clone());
 }
+
+/** Opt-in route audit uses the same seats as the actual character placement. */
+export function occupiedSeats() { return occupants.map(point => point.toArray()); }
 
 /** Pushes a waypoint out of anybody it would land in. Over their heads it does nothing. */
 export function keepOffPeople(point: Vector3) {

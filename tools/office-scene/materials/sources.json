@@ -1,0 +1,135 @@
+[
+  {
+    "id": "wood_table_001",
+    "licenseUrl": "https://polyhaven.com/license",
+    "source": "https://polyhaven.com/a/wood_table_001",
+    "files": {
+      "Diffuse": {
+        "bytes": 215573,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_diff_1k.jpg",
+        "sha256": "460dd08d240f4a1f02982415048c3c5c200f385db212da18dc7e2df68bf4d0be",
+        "md5": "56652a7339b16a76afad20d3585f66ea",
+        "file": "wood_table_001-Diffuse.jpg"
+      },
+      "nor_gl": {
+        "bytes": 51927,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_nor_gl_1k.jpg",
+        "sha256": "9bf7ddf5721e225c20290f1772ae37f9bdfd49658f6d458259eb794e2149d3cf",
+        "md5": "6360e09967add8baecaa5ecc55fb5e03",
+        "file": "wood_table_001-nor_gl.jpg"
+      },
+      "Rough": {
+        "bytes": 237261,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/wood_table_001/wood_table_001_rough_1k.jpg",
+        "sha256": "a2ca9ae89dfe7b8e2e5e92f0aa43467845417de8a50205b5852ef0d57c7624f9",
+        "md5": "05b60bd20a1cc4355c5d73a99b245d44",
+        "file": "wood_table_001-Rough.jpg"
+      }
+    },
+    "scale": null,
+    "license": "CC0-1.0",
+    "authors": {
+      "Dimitrios Savva": "Photography",
+      "Rico Cilliers": "Processing"
+    }
+  },
+  {
+    "id": "fine_grained_wood",
+    "licenseUrl": "https://polyhaven.com/license",
+    "source": "https://polyhaven.com/a/fine_grained_wood",
+    "files": {
+      "Diffuse": {
+        "bytes": 336305,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/fine_grained_wood/fine_grained_wood_col_1k.jpg",
+        "sha256": "d171f45ef01bc6e239b00dfaa4961bcd27f7d8e93e3962da3bd3d0ce703d802c",
+        "md5": "3db9decdde678e087e67ff99d30c0a73",
+        "file": "fine_grained_wood-Diffuse.jpg"
+      },
+      "nor_gl": {
+        "bytes": 193626,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/fine_grained_wood/fine_grained_wood_nor_gl_1k.jpg",
+        "sha256": "ba95eadc009818e161d0f753191f1bacc3fc861e593be0bc6d82b437f9ec8044",
+        "md5": "a9e33e87ea5c32945fc30553767b7046",
+        "file": "fine_grained_wood-nor_gl.jpg"
+      },
+      "Rough": {
+        "bytes": 215155,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/fine_grained_wood/fine_grained_wood_rough_1k.jpg",
+        "sha256": "f281f682e62fe322303dfeaa13dac18b5cb9e113617fe0aca43605b49161d82b",
+        "md5": "5e29204cca6747b5df219e9a7255540f",
+        "file": "fine_grained_wood-Rough.jpg"
+      }
+    },
+    "scale": "30x30CM",
+    "license": "CC0-1.0",
+    "authors": {
+      "Rob Tuytel": "All"
+    }
+  },
+  {
+    "id": "fabric_pattern_07",
+    "licenseUrl": "https://polyhaven.com/license",
+    "source": "https://polyhaven.com/a/fabric_pattern_07",
+    "files": {
+      "Rough": {
+        "bytes": 488744,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/fabric_pattern_07/fabric_pattern_07_rough_1k.jpg",
+        "sha256": "3d90ac40b5c32a15649cc8525b7eeed133ea46b63a0e3eae5e34911d5c967e3a",
+        "md5": "28f47eb9de3e4ebe1dc519f601335fc4",
+        "file": "fabric_pattern_07-Rough.jpg"
+      },
+      "nor_gl": {
+        "bytes": 828071,
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/fabric_pattern_07/fabric_pattern_07_nor_gl_1k.jpg",
+        "sha256": "f6955bbdead9f023f2357f6f8808ed49627d10882cd2a3cb6b5a5ace155abc45",
+        "md5": "cdbbc2ebe5d75f6edd66ba090f3be49f",
+        "file": "fabric_pattern_07-nor_gl.jpg"
+      }
+    },
+    "scale": "30x30 cm",
+    "license": "CC0-1.0",
+    "authors": {
+      "Rob Tuytel": "All"
+    }
+  },
+  {
+    "id": "exterior_user_skyscraper",
+    "method": "Image explicitly supplied and selected by user on 2026-10-02",
+    "file": "exterior-user-skyscraper.png",
+    "sha256": "0d5c6b301d8115896960ae0cd1a49f1afe021fb03732d839f2a2a3ab24802c61",
+    "resolution": [
+      1774,
+      887
+    ],
+    "projection": "2:1 image mapped onto full 360-degree sphere; original capture projection and angular coverage not confirmed",
+    "note": "Original user image preserved. Runtime uses an ImageGen restored derivative at the same native 1774x887 size. Sun and mapping retained; no native 4K claim."
+  },
+  {
+    "id": "exterior_user_skyscraper_enhanced",
+    "method": "Native ImageGen edit/restoration of user-selected city",
+    "file": "exterior-user-skyscraper-enhanced.png",
+    "sha256": "8a7c3ae4ea60d9a1e058ad89ca84ef95879cfc2f4d9981cec11354cb9c3b099c",
+    "resolution": [
+      1774,
+      887
+    ],
+    "prompt": "exterior-quality-prompt.txt",
+    "note": "Reconstructed photographic detail, not verified survey data. Requested 4K edit returned 1774x887; Native restoration kept separately; GPU sampling derivative resampled to 4096x2048. Runtime ETC1S quality 255; UASTC rejected due to 9.37MB texture download size."
+  },
+  {
+    "id": "exterior_user_skyscraper_runtime",
+    "method": "Offline Lanczos3 resampling and restrained sharpening after native ImageGen restoration",
+    "file": "exterior-user-skyscraper-runtime.png",
+    "sha256": "5a7b219ba4c0b8e118129aed045cf83b373f5c87550668596d154635707b2da8",
+    "resolution": [
+      4096,
+      2048
+    ],
+    "nativeSourceResolution": [
+      1774,
+      887
+    ],
+    "script": "tools/office-scene/prepare_city_texture.cjs",
+    "note": "4096x2048 GPU texture, not native 4K photography. Resampling does not add captured information."
+  }
+]

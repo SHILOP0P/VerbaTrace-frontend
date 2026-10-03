@@ -56,3 +56,15 @@ export function buildConversationWav(
 
   return new Blob([bytes], { type: "audio/wav" });
 }
+
+// Fixture-only envelope: no network or whole-recording AudioContext decoding.
+export async function demoWaveform(recording: Blob, barCount = 240) {
+  const samples = new Int16Array(await recording.arrayBuffer(), 44);
+  const peaks = Array.from({length: barCount}, () => 0);
+  for (let i = 0; i < samples.length; i++) {
+    const bar = Math.min(barCount - 1, Math.floor(i * barCount / samples.length));
+    peaks[bar] = Math.max(peaks[bar], Math.abs(samples[i]));
+  }
+  const max = Math.max(...peaks, 1);
+  return {peaks: peaks.map(peak => Math.max(0.1, peak / max))};
+}

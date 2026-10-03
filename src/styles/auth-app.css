@@ -8877,9 +8877,20 @@ html[data-theme="light"] .integration-secret-dialog code { color: #176eae; }
 /* The free slot pairs a description with a create form. Side by side one of
    them always ended up cramped or wrapped away, leaving a hole next to the
    text, so the form simply sits under the description. */
-.company-limit-row.empty-slot { align-items: stretch; flex-direction: column; }
+.company-limit-row.empty-slot { align-items: stretch; flex-direction: column; justify-content: flex-start; gap: 16px; container-type: inline-size; }
 .company-limit-row.empty-slot > * { flex: 0 0 auto; min-width: 0; }
 .company-limit-row.empty-slot small { overflow: visible; white-space: normal; text-overflow: clip; }
+.company-slot-description { display: grid; gap: 6px; }
+.company-slot-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.company-slot-heading .status-chip { flex: 0 0 auto; }
+.empty-slot .create-company-form.compact { grid-template-columns: minmax(0, 1fr) auto; margin: 0; }
+.empty-slot .create-company-form.compact input { width: 100%; min-width: 0; text-overflow: clip; }
+.empty-slot .create-company-form.compact .primary-button { min-height: 44px; height: 44px; justify-content: center; gap: 8px; padding-inline: 16px; white-space: nowrap; }
+.empty-slot .create-company-form.compact .primary-button svg { flex: 0 0 auto; }
+@container (max-width: 380px) {
+  .empty-slot .create-company-form.compact { grid-template-columns: minmax(0, 1fr); }
+  .empty-slot .create-company-form.compact .primary-button { width: 100%; }
+}
 /* The QA row keeps three fixed minimums (150 + 240 + 190), which is wider than
    the workspace on a tablet: the whole page then overflowed to the right. The
    later unprefixed rule was winning over the media query meant to handle it. */

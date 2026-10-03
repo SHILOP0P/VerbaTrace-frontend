@@ -1,17 +1,9 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense, useEffect, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/inter/wght.css";
 import "../styles/index.css";
 import { installFrameGuards } from "./frame-guards";
 import { installMemoryStorage } from "./memory-storage";
-import { installEmployeeFixtures } from "./fixtures/employee";
-import { installLeaderFixtures } from "./fixtures/leader";
-import { installDeputyFixtures } from "./fixtures/deputy";
-import { installOwnerFixtures } from "./fixtures/owner";
-import { DemoEmployeeScreen } from "./DemoEmployeeScreen";
-import { DemoLeaderScreen } from "./DemoLeaderScreen";
-import { DemoDeputyScreen } from "./DemoDeputyScreen";
-import { DemoOwnerScreen } from "./DemoOwnerScreen";
 import type { DemoRole } from "./bridge";
 import { setInitialMonitorView } from "./monitor-viewport";
 
@@ -24,25 +16,59 @@ const params = new URLSearchParams(window.location.search);
 const autoplay = params.get("autoplay") === "1";
 const role = (params.get("role") ?? "employee") as DemoRole;
 
+function InitialMonitorView({ children }: { children: ReactNode }) {
+  useEffect(() => setInitialMonitorView(role), []);
+  return children;
+}
+
 // The theme is not handled here. This document and the landing share an origin,
 // so the landing sets the attribute on it directly, in the same frame as its
 // own — a message would arrive a frame late and the sweep would be in two
 // halves. Nothing is remounted either way, so the recording carries on.
 
-function screenFor(value: DemoRole) {
-  switch (value) {
+// Each iframe downloads its own role, rather than all four screens and fixtures.
+// Fixtures are installed before the screen mounts and only once per document.
+const DemoScreen = lazy(async () => {
+  switch (role) {
     case "leader":
-      return <DemoLeaderScreen fixture={installLeaderFixtures()} autoplay={autoplay} />;
+      {
+        const [{ DemoLeaderScreen }, { installLeaderFixtures }] = await Promise.all([
+          import("./DemoLeaderScreen"), import("./fixtures/leader")
+        ]);
+        const fixture = installLeaderFixtures();
+        return { default: () => <InitialMonitorView><DemoLeaderScreen fixture={fixture} autoplay={autoplay} /></InitialMonitorView> };
+      }
     case "deputy":
-      return <DemoDeputyScreen fixture={installDeputyFixtures()} autoplay={autoplay} />;
+      {
+        const [{ DemoDeputyScreen }, { installDeputyFixtures }] = await Promise.all([
+          import("./DemoDeputyScreen"), import("./fixtures/deputy")
+        ]);
+        const fixture = installDeputyFixtures();
+        return { default: () => <InitialMonitorView><DemoDeputyScreen fixture={fixture} autoplay={autoplay} /></InitialMonitorView> };
+      }
     case "owner":
-      return <DemoOwnerScreen fixture={installOwnerFixtures()} autoplay={autoplay} />;
+      {
+        const [{ DemoOwnerScreen }, { installOwnerFixtures }] = await Promise.all([
+          import("./DemoOwnerScreen"), import("./fixtures/owner")
+        ]);
+        const fixture = installOwnerFixtures();
+        return { default: () => <InitialMonitorView><DemoOwnerScreen fixture={fixture} autoplay={autoplay} /></InitialMonitorView> };
+      }
     default:
-      return <DemoEmployeeScreen fixture={installEmployeeFixtures()} autoplay={autoplay} />;
+      {
+        const [{ DemoEmployeeScreen }, { installEmployeeFixtures }] = await Promise.all([
+          import("./DemoEmployeeScreen"), import("./fixtures/employee")
+        ]);
+        const fixture = installEmployeeFixtures();
+        return { default: () => <InitialMonitorView><DemoEmployeeScreen fixture={fixture} autoplay={autoplay} /></InitialMonitorView> };
+      }
   }
-}
+});
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>{screenFor(role)}</StrictMode>
+  <StrictMode>
+    <Suspense fallback={<main role="status" aria-label="Загрузка рабочего места" />}>
+      <DemoScreen />
+    </Suspense>
+  </StrictMode>
 );
-setInitialMonitorView(role);

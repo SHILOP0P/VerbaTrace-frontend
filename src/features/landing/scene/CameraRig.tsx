@@ -1,7 +1,9 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo } from "react";
 import { CatmullRomCurve3, PerspectiveCamera, Vector3 } from "three";
-import { BUILDING, ceilingAbove, doorPoint, floorUnder, keepOffPeople, keepOffWalls, roomAt, SHOT_ORDER, STAND_HEIGHT, type Room, type Shot, type ShotKey } from "./shots";
+import { buildFocusedLookTrack, buildLookTrack, flightEase, sampleLookTrack, type LookTrack } from "./cameraLook";
+import { storyFocus, storyStaging, storyRoute } from "./storyRoutes";
+import { BUILDING, ceilingAbove, doorPoint, floorUnder, keepOffPeople, keepOffWalls, occupiedSeats, roomAt, SHOT_ORDER, STAND_HEIGHT, type Room, type Shot, type ShotKey } from "./shots";
 
 /** A flight is paced by its length: a hop across a pod is not a trip upstairs. */
 const SECONDS_BASE = 1.5;
@@ -56,11 +58,13 @@ function pushOutOfRooms(point: Vector3, from: Vector3, to: Vector3) {
   return point.copy(candidates[0]);
 }
 
-const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-const smoothstep = (edge0: number, edge1: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-};
+const easeInOut = flightEase;
+
+function secondsFor(curve: CatmullRomCurve3) {
+  const crossFloor = (curve.points[0].y < BUILDING.floorSplit) !== (curve.points.at(-1)!.y < BUILDING.floorSplit);
+  const bothUpstairs = curve.points[0].y >= BUILDING.floorSplit && curve.points.at(-1)!.y >= BUILDING.floorSplit;
+  return Math.min(SECONDS_MAX, Math.max(SECONDS_MIN, SECONDS_BASE + curve.getLength() * SECONDS_PER_METRE)) * (crossFloor ? 1.5 : bothUpstairs ? 1.35 : 1);
+}
 
 /**
  * Keeps a point of the route inside the building, and inside whatever room it
@@ -109,11 +113,14 @@ function buildPath(fromPosition: Vector3, fromTarget: Vector3, to: Shot) {
   const arriving = to.position.clone().sub(to.target);
   const closeUp = arriving.length() < CLOSE_UP;
   const facing = closeUp ? arriving.normalize() : null;
+  // Two tight first-floor approaches otherwise skim chair backs. Preserve
+  // their original corridor and postpone only the last descent to the screen.
+  const lateDescent = !!facing && (!toRoom || toRoom.name === "leader");
   const settle = facing
     ? keepInside(clampToRoom(to.position.clone().addScaledVector(facing, RETREAT + 1.3).setY(standing(to.position)), toRoom))
     : null;
   const approach = facing
-    ? keepInside(clampToRoom(to.position.clone().addScaledVector(facing, RETREAT).setY(to.position.y + 0.3), toRoom))
+    ? keepInside(clampToRoom(to.position.clone().addScaledVector(facing, RETREAT).setY(lateDescent ? standing(to.position) : to.position.y + 0.3), toRoom))
     : null;
 
   // Where the open-floor part of the trip begins and ends: the doorstep, if
@@ -177,6 +184,9 @@ function buildPath(fromPosition: Vector3, fromTarget: Vector3, to: Shot) {
   // of no length is a tangent of no direction.
   if (settle) points.push(settle);
   if (approach && (!settle || settle.distanceTo(approach) > 0.5)) points.push(approach);
+  if (lateDescent && facing) points.push(keepInside(clampToRoom(
+    to.position.clone().addScaledVector(facing, .42).setY(standing(to.position)), toRoom
+  )));
   points.push(to.position.clone());
   const route = [points[0]];
   for (const point of points.slice(1)) {
@@ -185,7 +195,50 @@ function buildPath(fromPosition: Vector3, fromTarget: Vector3, to: Shot) {
   // Unevenly spaced waypoints (a desk, a door, then a long aisle) made the
   // uniform spline overshoot corners and turn back on itself. Centripetal
   // spacing follows the same necessary passages without those loops.
-  return new CatmullRomCurve3(route, false, "centripetal");
+  const curve = new CatmullRomCurve3(route, false, "centripetal");
+  // Refine only distance sampling, preserving the original curve's shape.
+  // Cache before playback so short door/arrival segments do not change pace
+  // due to a coarse arc-length lookup table.
+  curve.arcLengthDivisions = 800;
+  curve.updateArcLengths();
+  return curve;
+}
+
+const pathCache = new Map<string, CatmullRomCurve3>();
+const lookCache = new WeakMap<CatmullRomCurve3, LookTrack>();
+const opticsCache = new WeakMap<CatmullRomCurve3, {fromFov: number; toFov: number}>();
+function cameraPath(fromPosition: Vector3, fromTarget: Vector3, to: Shot, fromKey?: ShotKey, toKey?: ShotKey) {
+  const key = `${fromKey}:${toKey}|` + [fromPosition, fromTarget, to.position, to.target]
+    .map(point => point.toArray().join(",")).join(";");
+  let curve = pathCache.get(key);
+  if (!curve) {
+    curve = storyRoute(fromPosition, to, fromKey, toKey) ?? buildPath(fromPosition, fromTarget, to);
+    pathCache.set(key, curve);
+    const focus = fromKey && toKey ? storyFocus(to, toKey) : null;
+    lookCache.set(curve, focus ? buildFocusedLookTrack(curve, fromTarget, to.target, focus, toKey === "employee", storyStaging(curve, fromKey, toKey))
+      : buildLookTrack(curve, fromTarget, to.target, false, roomAt(to.position)));
+  }
+  return curve;
+}
+
+export function prepareCameraRoutes(shots: Record<ShotKey, Shot>) {
+  pathCache.clear();
+  for (let i = 0; i < SHOT_ORDER.length; i++) for (const to of SHOT_ORDER.slice(i + 1)) {
+    const from = shots[SHOT_ORDER[i]];
+    const curve = cameraPath(from.position, from.target, shots[to], SHOT_ORDER[i], to);
+    opticsCache.set(curve, {fromFov: from.fov, toFov: shots[to].fov});
+  }
+}
+
+export function cameraRouteAudit() {
+  return { method: "shared room reveals for every direct pair; diagonal departures and concurrent turns; gentle inter-floor lift, quintic pacing, exact reverse playback",
+    secondsBase: SECONDS_BASE, secondsPerMetre: SECONDS_PER_METRE, secondsMin: SECONDS_MIN, secondsMax: SECONDS_MAX,
+    flightFovBoostDegrees: FLIGHT_FOV_BOOST,
+    occupiedSeats: occupiedSeats(),
+    routes: [...pathCache.entries()].map(([key, curve]) => {
+      const [fromKey, toKey] = key.split("|")[0].split(":");
+      return {fromKey, toKey, ...opticsCache.get(curve), lengthMetres: curve.getLength(), seconds: secondsFor(curve), points: curve.points.map(point => point.toArray()), look: lookCache.get(curve)};
+    }) };
 }
 
 /**
@@ -228,12 +281,14 @@ type ForwardRoute = {
   fromFov: number;
 };
 
-/** A return trip reuses the exact curve and look-at data of the outward trip. */
+/** A return trip replays the exact outward curve, view and lens backwards. */
 const forwardRoutes = new Map<string, ForwardRoute>();
 const routeKey = (from: ShotKey, to: ShotKey) => `${from}:${to}`;
 
 const POSE_KEY = "verbatrace.landing.camera-pose";
+const POSE_REVISION = "office-v18-restored-city-shared-room-approach";
 type StoredPose = {
+  revision?: string;
   shotKey: string;
   at: number;
   position: [number, number, number];
@@ -248,78 +303,35 @@ function readPose(shotKey: string): StoredPose | null {
     const raw = window.sessionStorage.getItem(POSE_KEY);
     if (!raw) return null;
     const pose = JSON.parse(raw) as StoredPose;
-    if (pose.shotKey !== shotKey || Date.now() - pose.at > 5 * 60_000 ||
+    if (pose.revision !== POSE_REVISION || pose.shotKey !== shotKey || Date.now() - pose.at > 5 * 60_000 ||
         ![...pose.position, ...pose.target, pose.fov].every(Number.isFinite)) return null;
     return pose;
   } catch { return null; }
 }
 
 const look = new Vector3();
-const toGoal = new Vector3();
-const turnAxis = new Vector3();
 const predicted = new PerspectiveCamera();
 
 /** How far in front of the camera the look-at point is put once it is a direction. */
 const LOOK_DISTANCE = 2.5;
 
-/** The unit direction from one point to another; false if there is none. */
-function aim(from: Vector3, to: Vector3, out: Vector3) {
-  out.copy(to).sub(from);
-  const length = out.length();
-  if (length < 0.0001) return false;
-  out.divideScalar(length);
-  return true;
-}
-
-/** Turns through an angle rather than lerping vectors, which accelerates near a sharp bend. */
-function turn(direction: Vector3, towards: Vector3, amount: number, preferred: Vector3) {
-  if (amount <= 0) return;
-  if (amount >= 1) { direction.copy(towards); return; }
-  const dot = Math.min(1, Math.max(-1, direction.dot(towards)));
-  if (dot > 0.9995) { direction.lerp(towards, amount).normalize(); return; }
-  if (dot < -0.999999) {
-    // An almost opposite pair has no unique shortest arc. Keep one stable axis
-    // instead of letting a tiny change in direction flip the camera turn.
-    turnAxis.crossVectors(direction, preferred);
-    if (turnAxis.lengthSq() < 0.000001) turnAxis.set(0, 1, 0).cross(direction);
-    if (turnAxis.lengthSq() < 0.000001) turnAxis.set(1, 0, 0).cross(direction);
-    direction.applyAxisAngle(turnAxis.normalize(), Math.PI * amount).normalize();
-    return;
-  }
-  const angle = Math.acos(dot);
-  const sin = Math.sin(angle);
-  direction.multiplyScalar(Math.sin((1 - amount) * angle) / sin)
-    .addScaledVector(towards, Math.sin(amount * angle) / sin)
-    .normalize();
-}
-
 /** Samples the flight at a point in time into the given vectors; returns the lens. */
 function sample(progress: number, position: Vector3, target: Vector3) {
   const to = rig.routeTo;
   if (!rig.curve || !to) return rig.fov;
-  // The easing, route direction, camera turn and FOV are all sampled at the
-  // same instant as the outward flight. Only time runs backwards on the return.
+  // Position, view and lens share the same timeline in both directions.
   const clamped = Math.min(1, Math.max(0, rig.reverse ? 1 - progress : progress));
   const t = easeInOut(clamped);
   rig.curve.getPointAt(t, position);
-  // A single shortest-arc turn joins the two fixed shot directions. Following
-  // the moving path tangent and then reacquiring the destination made the
-  // camera turn back and forth at every aisle and doorway bend.
-  if (!aim(to.position, to.target, toGoal)) {
-    target.copy(to.target);
-    return rig.fov;
-  }
-  if (!aim(rig.curve.points[0], rig.fromTarget, look)) look.copy(toGoal);
-  turn(look, toGoal, smoothstep(0.04, 0.96, clamped), toGoal);
+  sampleLookTrack(lookCache.get(rig.curve)!, clamped, look);
   target.copy(position).addScaledVector(look, LOOK_DISTANCE);
-  if (clamped > 0.999) target.copy(to.target);
   if (progress > 0.999 && rig.goal) target.copy(rig.goal.target);
   return rig.fromFov + (to.fov - rig.fromFov) * t + FLIGHT_FOV_BOOST * Math.sin(Math.PI * clamped);
 }
 
 /** How far along a flight the camera is, for anything that has to keep step with it. */
 export function flightState() {
-  return { active: rig.progress < 1, progress: rig.progress };
+  return { active: rig.progress < 1, progress: rig.progress, reverse: rig.reverse, shotKey: rig.shotKey };
 }
 
 /**
@@ -356,7 +368,7 @@ export function CameraRig({ shot, shots, shotKey, snapKey, onTransition }: {
     const savePose = () => {
       try {
         window.sessionStorage.setItem(POSE_KEY, JSON.stringify({
-          shotKey: rig.shotKey, at: Date.now(), position: rig.position.toArray(), target: rig.target.toArray(),
+          revision: POSE_REVISION, shotKey: rig.shotKey, at: Date.now(), position: rig.position.toArray(), target: rig.target.toArray(),
           fov: rig.fov, active: rig.progress < 1,
           route: rig.progress < 1 && rig.routeFromKey && rig.routeToKey ? {
             fromKey: rig.routeFromKey, toKey: rig.routeToKey,
@@ -407,11 +419,11 @@ export function CameraRig({ shot, shots, shotKey, snapKey, onTransition }: {
           if (validRoute) {
             const from = shots[route.fromKey];
             const to = shots[route.toKey];
-            const curve = buildPath(from.position, from.target, to);
-            const time = route.reverse ? 1 - route.progress : route.progress;
+            const curve = cameraPath(from.position, from.target, to, route.fromKey, route.toKey);
+            const time = easeInOut(route.reverse ? 1 - route.progress : route.progress);
             // A resize can move a shot. Use the saved instant only if its old
             // position still belongs to the reconstructed route.
-            if (curve.getPointAt(easeInOut(time)).distanceTo(rig.position) < 0.75) {
+            if (curve.getPointAt(time).distanceTo(rig.position) < 0.75) {
               rig.curve = curve;
               rig.fromTarget.copy(from.target);
               rig.fromFov = from.fov;
@@ -429,10 +441,10 @@ export function CameraRig({ shot, shots, shotKey, snapKey, onTransition }: {
             // Older saved poses have no route; retain their original recovery.
             rig.fromTarget.copy(rig.target);
             rig.fromFov = rig.fov;
-            rig.curve = buildPath(rig.position, rig.target, shot);
+            rig.curve = cameraPath(rig.position, rig.target, shot);
             rig.progress = 0;
           }
-          rig.seconds = Math.min(SECONDS_MAX, Math.max(SECONDS_MIN, SECONDS_BASE + rig.curve.getLength() * SECONDS_PER_METRE));
+          rig.seconds = secondsFor(rig.curve);
         }
         try { window.sessionStorage.removeItem(POSE_KEY); } catch { /* storage may be unavailable */ }
       }
@@ -440,44 +452,59 @@ export function CameraRig({ shot, shots, shotKey, snapKey, onTransition }: {
   } else if (rig.goal !== null && rig.goal !== shot) {
     const previousShot = rig.goal;
     const previousKey = rig.shotKey;
-    const reverse = SHOT_ORDER.indexOf(shotKey) < SHOT_ORDER.indexOf(previousKey);
-    if (reverse) {
-      const key = routeKey(shotKey, previousKey);
-      const cached = forwardRoutes.get(key);
-      const route = cached?.from === shot && cached.to === previousShot ? cached : {
-        curve: buildPath(shot.position, shot.target, previousShot),
-        from: shot, to: previousShot, fromTarget: shot.target.clone(), fromFov: shot.fov
-      };
-      forwardRoutes.set(key, route);
-      rig.curve = route.curve;
-      rig.fromTarget.copy(route.fromTarget);
-      rig.fromFov = route.fromFov;
-      rig.routeTo = route.to;
-      rig.routeFromKey = shotKey;
-      rig.routeToKey = previousKey;
-      rig.reverse = true;
+    if (previousKey === shotKey) {
+      // A responsive reframe is not another story trip. In flight, rebuild
+      // the same endpoints and retain its phase; at rest, reframe directly.
+      if (rig.progress < 1 && rig.routeFromKey && rig.routeToKey) {
+        const from = shots[rig.routeFromKey], to = shots[rig.routeToKey];
+        rig.curve = cameraPath(from.position, from.target, to, rig.routeFromKey, rig.routeToKey);
+        rig.fromTarget.copy(from.target);
+        rig.fromFov = from.fov;
+        rig.routeTo = to;
+        forwardRoutes.set(routeKey(rig.routeFromKey, rig.routeToKey), {curve: rig.curve, from, to, fromTarget: from.target.clone(), fromFov: from.fov});
+      } else {
+        rig.position.copy(shot.position); rig.target.copy(shot.target); rig.fov = shot.fov;
+        rig.nextPosition.copy(shot.position); rig.nextTarget.copy(shot.target); rig.nextFov = shot.fov;
+        rig.curve = null; rig.progress = 1;
+      }
+      rig.goal = shot;
     } else {
-      // Outward flights keep their existing path and timing. Saving that route
-      // means the next backwards step can play the very same flight in reverse.
-      rig.fromTarget.copy(rig.target);
-      rig.fromFov = rig.fov;
-      rig.curve = buildPath(rig.position, rig.target, shot);
-      rig.routeTo = shot;
-      rig.routeFromKey = previousKey;
-      rig.routeToKey = shotKey;
-      rig.reverse = false;
-      if (previousKey !== shotKey) forwardRoutes.set(routeKey(previousKey, shotKey), {
-        curve: rig.curve, from: previousShot, to: shot,
-        fromTarget: rig.fromTarget.clone(), fromFov: rig.fromFov
-      });
+      const reverse = SHOT_ORDER.indexOf(shotKey) < SHOT_ORDER.indexOf(previousKey);
+      if (reverse) {
+        const key = routeKey(shotKey, previousKey);
+        const cached = forwardRoutes.get(key);
+        const route = cached?.from === shot && cached.to === previousShot ? cached : {
+          curve: cameraPath(shot.position, shot.target, previousShot, shotKey, previousKey),
+          from: shot, to: previousShot, fromTarget: shot.target.clone(), fromFov: shot.fov
+        };
+        forwardRoutes.set(key, route);
+        rig.curve = route.curve;
+        rig.fromTarget.copy(route.fromTarget);
+        rig.fromFov = route.fromFov;
+        rig.routeTo = route.to;
+        rig.routeFromKey = shotKey;
+        rig.routeToKey = previousKey;
+        rig.reverse = true;
+      } else {
+        // Outward flights keep their existing path and timing. Saving that route
+        // means the next backwards step can play the very same flight in reverse.
+        rig.fromTarget.copy(rig.target);
+        rig.fromFov = rig.fov;
+        rig.curve = cameraPath(rig.position, rig.target, shot, previousKey, shotKey);
+        rig.routeTo = shot;
+        rig.routeFromKey = previousKey;
+        rig.routeToKey = shotKey;
+        rig.reverse = false;
+        if (previousKey !== shotKey) forwardRoutes.set(routeKey(previousKey, shotKey), {
+          curve: rig.curve, from: previousShot, to: shot,
+          fromTarget: rig.fromTarget.clone(), fromFov: rig.fromFov
+        });
+      }
+      rig.seconds = secondsFor(rig.curve);
+      rig.progress = 0;
+      rig.goal = shot;
+      rig.shotKey = shotKey;
     }
-    rig.seconds = Math.min(
-      SECONDS_MAX,
-      Math.max(SECONDS_MIN, SECONDS_BASE + rig.curve.getLength() * SECONDS_PER_METRE)
-    );
-    rig.progress = 0;
-    rig.goal = shot;
-    rig.shotKey = shotKey;
   }
 
   useFrame((state, delta) => {
@@ -500,7 +527,7 @@ export function CameraRig({ shot, shots, shotKey, snapKey, onTransition }: {
 
     camera.position.copy(rig.position);
     camera.lookAt(rig.target);
-    if (Math.abs(camera.fov - rig.fov) > 0.01) {
+    if (camera.fov !== rig.fov) {
       camera.fov = rig.fov;
       camera.updateProjectionMatrix();
     }

@@ -225,9 +225,11 @@ export function CompaniesPage({
               ))}
               {Array.from({ length: freeSlots }).map((_, index) => (
                 <div className="company-limit-row empty-slot" key={`slot-${index}`}>
-                  <div>
-                    <strong>Свободный слот</strong>
-                    <span className="status-chip warn">Можно создать</span>
+                  <div className="company-slot-description">
+                    <div className="company-slot-heading">
+                      <strong>Свободный слот</strong>
+                      <span className="status-chip warn">Можно создать</span>
+                    </div>
                     <small>Доступен в текущей бизнес-подписке</small>
                   </div>
                   <CreateCompanyForm onCreated={onCompanyCreated} compact />
@@ -1027,7 +1029,7 @@ export function CreateCompanyForm({
       </label>
       <button className="primary-button" type="submit" disabled={busy}>
         <Plus size={18} />
-        {busy ? "Создаю..." : "Создать компанию"}
+        <span>{busy ? "Создаю..." : "Создать компанию"}</span>
       </button>
       {error && <div className="form-error">{error}</div>}
       {success && <div className="form-success">{success}</div>}

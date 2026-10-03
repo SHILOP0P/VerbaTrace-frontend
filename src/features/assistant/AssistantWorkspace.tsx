@@ -1,4 +1,5 @@
 import { CalendarRange, Download, Expand, Folder, Link2, MessageSquare, Minimize2, PanelLeft, PanelRightClose, PanelRightOpen, Paperclip, Phone, Plus, Search, SearchCheck, Send, Trash2, X } from "lucide-react";
+import "../../styles/assistant.css";
 import { FormEvent, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";

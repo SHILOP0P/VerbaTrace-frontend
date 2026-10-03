@@ -15,8 +15,8 @@ function nextCaption(stage: "room" | "screens", previous?: string) {
  *
  * Without it the first thing a visitor met was a dark screen with a headline
  * and no room behind it, which reads as a broken page rather than a loading
- * one. It leaves as soon as the scene says it is ready, but never before a
- * moment has passed, so a cached visit does not flash it.
+ * one. It fades as soon as the scene is ready. The parent removes it entirely
+ * when the startup deadline or a scene error selects the ordinary landing.
  */
 export function LandingLoader({ done, stage }: { done: boolean; stage: "room" | "screens" }) {
   const [gone, setGone] = useState(false);

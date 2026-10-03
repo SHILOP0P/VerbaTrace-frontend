@@ -28,7 +28,7 @@ import { useDismissibleLayer, useEscapeDismiss } from "../../shared/ui/dismissib
 import { normalTimelineSteps, statusMeta } from "../../shared/lib/call-status";
 import { comparePlans } from "../../shared/lib/plans";
 import { Logo } from "../../shared/ui/primitives";
-import { TariffSection, TariffSkeleton } from "../tariffs/TariffsPage";
+import { TariffSection, TariffSkeleton } from "../tariffs/TariffCards";
 import { BrainIcon } from "./BrainIcon";
 import { LandingLoader } from "./LandingLoader";
 import { LandingStory } from "./LandingStory";
@@ -44,6 +44,8 @@ const LandingScene = lazy(() =>
 );
 
 const LANDING_SCROLL_KEY = "verbatrace.landing.scroll-y";
+const SCENE_LOAD_TIMEOUT_MS = 12_000;
+type SceneStartup = "loading" | "ready" | "fallback";
 
 export function Landing({
   session,
@@ -61,9 +63,9 @@ export function Landing({
   // A link from the reset letter opens the dialog on the new password.
   const [showAuth, setShowAuth] = useState<AuthMode | null>(() => window.location.pathname === "/reset-password" && new URLSearchParams(window.location.search).get("token") ? "reset" : null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sceneReady, setSceneReady] = useState(false);
-  /** The curtain stays up for a moment even on a cached visit, so it never blinks. */
-  const [curtainHeld, setCurtainHeld] = useState(false);
+  const [sceneStartup, setSceneStartup] = useState<SceneStartup>(() =>
+    new URLSearchParams(window.location.search).get("flat") === "1" ? "fallback" : "loading"
+  );
   const [loadingStage, setLoadingStage] = useState<"room" | "screens">("room");
   const benefitsRef = useRef<HTMLElement | null>(null);
   const workflowRef = useRef<HTMLElement | null>(null);
@@ -80,6 +82,11 @@ export function Landing({
   useDismissibleLayer(mobileMenuOpen, headerRef, () => setMobileMenuOpen(false));
 
   useLayoutEffect(() => {
+    // Section navigation belongs to scroll position, not the page address.
+    // Clean legacy links too, while preserving query parameters and history.
+    if (window.location.hash) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
     const previousRestoration = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
     const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
@@ -109,7 +116,7 @@ export function Landing({
   }, []);
 
   useEffect(() => {
-    if (!sceneReady || !curtainHeld || scrollRestored.current) return;
+    if (sceneStartup === "loading" || scrollRestored.current) return;
     let cancelled = false;
     void document.fonts.ready.then(() => {
       if (cancelled) return;
@@ -120,7 +127,7 @@ export function Landing({
       });
     });
     return () => { cancelled = true; };
-  }, [sceneReady, curtainHeld]);
+  }, [sceneStartup]);
 
   useEffect(() => {
     const sections = [benefitsRef.current, workflowRef.current].filter(Boolean) as HTMLElement[];
@@ -219,18 +226,20 @@ export function Landing({
     };
   }, []);
 
-  // The curtain lifts when the office is ready, and in any case after a few
-  // seconds: a slow model must not keep the whole landing behind it.
-  const markSceneReady = useCallback(() => setSceneReady(true), []);
+  // The first completed outcome wins. Once the deadline switches to the flat
+  // hero, a late scene callback cannot bring the office back over the page.
+  const markSceneReady = useCallback(() => {
+    setSceneStartup((current) => current === "loading" ? "ready" : current);
+  }, []);
+  const markSceneUnavailable = useCallback(() => setSceneStartup("fallback"), []);
 
   useEffect(() => {
-    const cap = window.setTimeout(() => setSceneReady(true), 9000);
-    const floor = window.setTimeout(() => setCurtainHeld(true), 600);
-    return () => {
-      window.clearTimeout(cap);
-      window.clearTimeout(floor);
-    };
-  }, []);
+    if (sceneStartup !== "loading") return;
+    const deadline = window.setTimeout(() => {
+      setSceneStartup((current) => current === "loading" ? "fallback" : current);
+    }, SCENE_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(deadline);
+  }, [sceneStartup]);
 
   function handleStart() {
     if (session) {
@@ -242,7 +251,7 @@ export function Landing({
   }
 
   return (
-    <main className="landing" id="landing-top">
+    <main className="landing" id="landing-top" data-scene-startup={sceneStartup}>
       <div className="landing-bg" />
       <header className="landing-header" ref={headerRef}>
         <Logo />
@@ -277,17 +286,22 @@ export function Landing({
       {/* The office is the first screen, but it is never the only way in: a
           browser without WebGL, a missing model or a bug in the scene falls
           back to the flat hero instead of an empty page. */}
-      <LandingLoader done={sceneReady && curtainHeld} stage={loadingStage} />
-      <SceneErrorBoundary fallback={<LandingHero onStart={handleStart} />} onError={markSceneReady}>
-        <Suspense fallback={<LandingHero onStart={handleStart} />}>
-          <LandingScene
-            onStart={handleStart}
-            fallback={<LandingHero onStart={handleStart} />}
-            onReady={markSceneReady}
-            onStage={setLoadingStage}
-          />
-        </Suspense>
-      </SceneErrorBoundary>
+      {sceneStartup === "fallback" ? <LandingHero onStart={handleStart} /> : (
+        <>
+          <LandingLoader done={sceneStartup === "ready"} stage={loadingStage} />
+          <SceneErrorBoundary fallback={<LandingHero onStart={handleStart} />} onError={markSceneUnavailable}>
+            <Suspense fallback={<LandingHero onStart={handleStart} />}>
+              <LandingScene
+                onStart={handleStart}
+                fallback={<LandingHero onStart={handleStart} />}
+                onReady={markSceneReady}
+                onUnavailable={markSceneUnavailable}
+                onStage={setLoadingStage}
+              />
+            </Suspense>
+          </SceneErrorBoundary>
+        </>
+      )}
 
       {/* Everything the product does, in the order a call travels through it. */}
       <LandingStory />

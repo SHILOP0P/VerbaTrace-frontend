@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   Bell,
   Check,
@@ -8,7 +9,6 @@ import {
   ChevronsRight,
   LogOut,
   Menu,
-  Moon,
   Search,
   SearchCheck,
   CheckCheck,
@@ -35,6 +35,7 @@ import type {
 
 import { adminSidebarItem, AppTheme, isSettingsPage, sidebarItems, ThemeToggleEvent } from "../../app/runtime";
 import { Logo } from "../../shared/ui/primitives";
+import { ThemeToggle } from "../../shared/ui/theme-toggle";
 import { useDismissibleLayer } from "../../shared/ui/dismissible-layer";
 import { readWorkspaceCompanyId, storeWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { creditForecast } from "../../shared/lib/credits";
@@ -135,7 +136,6 @@ export function AuthenticatedShell({
   const deferUnreadUntilNextCloseRef = useRef(new Set<string>());
   const calendarPopoverRef = useRef<HTMLDivElement>(null);
   const profilePopoverRef = useRef<HTMLDivElement>(null);
-  const themeLabel = theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему";
   const activeSidebarPage = activePage === "transcriptionCompare" ? "calls" : activePage === "qualityReview" ? "qualityReviews" : activePage === "teamAnalyticsEmployee" ? "teamAnalytics" : activePage === "settingsCompanies" ? "settingsCompanies" : isSettingsPage(activePage) ? "settings" : activePage;
   const fullName = `${session.user.full_name} ${session.user.full_surname}`.trim();
   const avatarInitial = profileInitial(session.user.full_surname || session.user.full_name || session.user.username);
@@ -667,9 +667,7 @@ export function AuthenticatedShell({
             {notificationsOpen && <CustomScrollbar targetRef={notificationListRef} className="notifications-scroll-thumb" />}
           </div>
           <ToolButton label="Поиск и помощник по звонкам" className={`icon-button assistant-header-launcher ${assistantOpen?"active":""}`} aria-expanded={assistantOpen} onClick={()=>{setAssistantMounted(true);setAssistantOpen(v=>!v)}}><SearchCheck size={20}/></ToolButton>
-          <button className="icon-button theme-toggle" type="button" onClick={onToggleTheme} aria-label={themeLabel}>
-            <Moon size={19} fill={theme === "dark" ? "currentColor" : "none"} />
-          </button>
+          <ThemeToggle theme={theme} onClick={onToggleTheme} />
           <div className="header-popover-wrap" ref={profilePopoverRef}>
             <button
               className="header-profile-link"
@@ -756,7 +754,7 @@ export function AuthenticatedShell({
                 </strong>
               </div>
               <div className="sidebar-progress" aria-hidden="true">
-                <span style={{ width: `${usageLoading ? 0 : creditRemainingPercent}%` }} />
+                <span className={cssClass({ width: `${usageLoading ? 0 : creditRemainingPercent}%` })} />
               </div>
               {!usageLoading && <small>{creditLimit > 0 ? creditForecastLine ?? "осталось" : "активных кредитов нет"}</small>}
             </div>
@@ -779,9 +777,9 @@ export function AuthenticatedShell({
           rather than count as a click outside and immediately reopen it. */}
       <div className="mobile-nav-layer" ref={mobileMoreRef}>
         <nav
-          className="mobile-bottom-nav"
+          className={["mobile-bottom-nav", cssClass({ "--nav-columns": barSections + leavingSections + 1 } as CSSProperties)].filter(Boolean).join(" ")}
           aria-label="Основная навигация"
-          style={{ "--nav-columns": barSections + leavingSections + 1 } as CSSProperties}
+
         >
           {sidebarItems.slice(0, barSections + leavingSections).map((item, index) => (
             <button
@@ -859,7 +857,7 @@ function WorkspaceBadge({ company }: { company?: CompanyResponse }) {
   const letters = company.name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "К";
   let hash = 0;
   for (const char of company.name) hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  return <span className="workspace-badge" aria-hidden="true" style={{ "--badge-hue": hash } as React.CSSProperties}>{letters}</span>;
+  return <span className={["workspace-badge", cssClass({ "--badge-hue": hash } as React.CSSProperties)].filter(Boolean).join(" ")} aria-hidden="true" >{letters}</span>;
 }
 
 function WorkspaceOptions({ companies, selectedCompany, personalPlan, companyPlan, onSelect, compact = false }: {

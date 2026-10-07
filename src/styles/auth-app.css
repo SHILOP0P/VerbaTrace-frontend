@@ -44,7 +44,6 @@ html[data-theme="light"] .app-shell {
   --app-score: #b75527;
   --app-base: #efe7de;
   --app-glass: rgba(255, 250, 245, 0.72);
-  --app-glass-strong: rgba(255, 250, 245, 0.9);
   --app-border: rgba(97, 72, 58, 0.18);
   --app-active: #ffe8dc;
   --evidence-bg: #fff1e9;
@@ -6398,7 +6397,6 @@ html[data-theme="light"] .app-shell .timeline-step.processing::before {
   display: inline-block;
   width: 12px;
   height: 12px;
-  flex: 0 0 auto;
   background: var(--folder-color);
   border-radius: 50%;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder-color) 18%, transparent);
@@ -6889,6 +6887,9 @@ html[data-theme="light"] .call-folder-form-actions .ghost-button:hover {
   grid-template-columns: 46px minmax(0, 1fr);
   gap: 14px;
   width: min(560px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px;
   color: var(--app-text);
   background:
@@ -7032,21 +7033,31 @@ html[data-theme="light"] .confirm-dialog-actions .ghost-button:focus-visible {
   box-shadow: inset 0 0 0 1px rgba(255, 90, 47, 0.58);
 }
 
-.call-scope-tabs.segmented.scope {
+html[data-theme] .app-shell .call-scope-tabs.segmented.scope {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
   width: 100%;
   max-width: 100%;
   margin: 0 0 4px;
   grid-auto-columns: minmax(0, 1fr);
+  flex-shrink: 0;
 }
+
+/* The drawer scrolls its content; controls must retain their own height. */
+.app-shell .calls-sidebar > :not(.call-list) { flex-shrink: 0; }
 
 .call-favorite-filter {
   margin: 12px 0 14px;
 }
 
-.call-scope-tabs.segmented.scope button {
+html[data-theme] .app-shell .call-scope-tabs.segmented.scope > button {
   min-width: 0;
-  padding-inline: 12px;
-  white-space: nowrap;
+  padding-inline: clamp(3px, 1vw, 10px);
+  font-size: clamp(11px, 3.3vw, 14px);
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .app-shell .call-scope-tabs.segmented.scope button.active {

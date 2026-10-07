@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import {
   Children,
   isValidElement,
@@ -106,7 +107,6 @@ export function SelectControl({
     }
     const host = document.createElement("span");
     host.className = "app-shell select-menu-portal-root";
-    host.style.cssText = "all:unset;display:contents;pointer-events:none;";
     document.body.appendChild(host);
     setPortalRoot(host);
     return () => {
@@ -175,8 +175,8 @@ export function SelectControl({
         <span className="select-value">
           {selectedOption?.color && (
             <i
-              className="select-option-color"
-              style={{ "--select-option-color": selectedOption.color } as CSSProperties}
+              className={["select-option-color", cssClass({ "--select-option-color": selectedOption.color } as CSSProperties)].filter(Boolean).join(" ")}
+
             />
           )}
           <span>{selectedOption?.label ?? "Не выбрано"}</span>
@@ -185,18 +185,18 @@ export function SelectControl({
       {name && <input type="hidden" name={name} value={currentValue} />}
       {open && portalRoot && createPortal(
         <span
-          className={`select-menu select-menu-portal ${menuClassName ?? ""}`}
-          role="listbox"
-          aria-labelledby={controlId}
-          ref={menuRef}
-          style={{
+          className={[`select-menu select-menu-portal ${menuClassName ?? ""}`, cssClass({
             left: menuPosition.left,
             top: menuPosition.top,
             width: menuPosition.width,
             pointerEvents: "auto",
             position: "fixed",
             zIndex: 10001
-          }}
+          })].filter(Boolean).join(" ")}
+          role="listbox"
+          aria-labelledby={controlId}
+          ref={menuRef}
+
         >
           {options.map((option) => (
             <button
@@ -210,8 +210,8 @@ export function SelectControl({
             >
               {option.color && (
                 <i
-                  className="select-option-color"
-                  style={{ "--select-option-color": option.color } as CSSProperties}
+                  className={["select-option-color", cssClass({ "--select-option-color": option.color } as CSSProperties)].filter(Boolean).join(" ")}
+
                 />
               )}
               <span>{option.label}</span>

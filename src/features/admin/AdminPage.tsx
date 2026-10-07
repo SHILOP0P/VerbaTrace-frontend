@@ -3,7 +3,7 @@ import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones
 import { api, ApiError, getAdminCallMediaUrl } from "../../api";
 import { AuditTrailsPanel } from "./AuditTrailsPanel";
 import { isVideoCall } from "../../shared/lib/media";
-import { useEscapeDismiss } from "../../shared/ui/dismissible-layer";
+import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { SelectControl } from "../../shared/ui/primitives";
 import { DateTimePicker } from "../../shared/ui/DateTimePicker";
 import { formatUsername } from "../calls/call-page-utils";
@@ -308,7 +308,7 @@ function UserDetail({ user, capabilities, onBack, onUpdated }: { user: UserRespo
       <section className="admin-detail"><h2>Доступ и безопасность</h2>
         {has(capabilities, "admin.sessions.read") && <SessionsPanel userId={user.id} canManage={has(capabilities, "admin.sessions.manage")} onNotice={setNotice} />}
         {has(capabilities, "admin.subscriptions.read") && <SubscriptionPanel kind="users" id={user.id} canManage={has(capabilities, "admin.subscriptions.manage")} />}
-        {has(capabilities, "admin.calls.read") && <UserCallsPanel user={user} />}
+        {has(capabilities, "admin.calls.read") && <UserCallsPanel user={user} canManage={has(capabilities, "admin.calls.manage")} />}
       </section>
     </div>
   </section>;
@@ -562,11 +562,28 @@ function UsageResetPanel({ kind, id }: { kind: SubscriptionOwner; id: string }) 
   return <div className="admin-action-block admin-usage-reset"><h3>Сброс лимита кредитов</h3><p>Создаёт новый allowance подписки до ближайшего сброса — период идёт 30 дней от покупки. Купленные кредиты кошелька не меняются.</p><label className={reasonInvalid ? "admin-required-field" : undefined}>Причина<input ref={reasonRef} aria-invalid={reasonInvalid} value={reason} onChange={(event) => { setReason(event.target.value); setReasonInvalid(false); }} placeholder="Обязательна для аудита" /></label>{status && <p className="admin-action-status" role="status">{status}</p>}<button className="ghost-button small admin-action-button admin-reset-button" type="button" disabled={busy} onClick={() => void resetUsage()}>{busy ? "Сбрасываю…" : "Сбросить лимит"}</button></div>;
 }
 
-function UserCallsPanel({ user }: { user: UserResponse }) {
+function UserCallsPanel({ user, canManage }: { user: UserResponse; canManage: boolean }) {
   const [open, setOpen] = useState(false); const [calls, setCalls] = useState<CallResponse[]>([]); const [selectedCall, setSelectedCall] = useState<CallResponse | null>(null); const [loading, setLoading] = useState(false); const [notice, setNotice] = useState("");
+  const [deletion, setDeletion] = useState<{ call: CallResponse; permanent: boolean } | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function deleteCall() {
+    if (!deletion || !reason.trim() || busy) return;
+    setBusy(true);
+    try {
+      const result = await api.deleteAdminCall(deletion.call.id, reason.trim(), deletion.permanent);
+      setCalls((current) => current.filter((call) => call.id !== deletion.call.id));
+      setSelectedCall(null);
+      const text = result?.files_pending ? "Звонок удалён. Очистка файлов продолжится автоматически." : deletion.permanent ? "Звонок и его файлы удалены безвозвратно" : "Звонок перемещён в корзину на 30 дней";
+      showAdminAlert(text);
+      setDeletion(null);
+      setReason("");
+    } catch (error) { showAdminAlert(message(error), "error"); }
+    finally { setBusy(false); }
+  }
   async function loadCalls() { setOpen(true); setLoading(true); setNotice(""); try { const response = await api.listAdminUserCalls(user.id, { limit: 50, offset: 0 }); setCalls(response.items); setSelectedCall((current) => current ? response.items.find((call) => call.id === current.id) ?? null : null); } catch (error) { if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { setOpen(false); return; } setNotice(message(error)); } finally { setLoading(false); } }
   if (!open) return <div className="admin-action-block"><h3>Звонки</h3><button className="ghost-button small" type="button" onClick={() => void loadCalls()}>Звонки пользователя</button></div>;
-  return <div className="admin-action-block"><div className="admin-panel-head"><h3>Звонки пользователя</h3><button className="ghost-button small" type="button" disabled={loading} aria-busy={loading} onClick={() => void loadCalls()}><RefreshCw className={loading ? "refresh-icon spinning" : "refresh-icon"} size={14} />Обновить</button></div>{loading && calls.length === 0 ? <p className="admin-session-summary">Загрузка звонков…</p> : notice ? <p className="admin-notice">{notice}</p> : calls.length === 0 ? <p className="admin-session-summary">Звонков пока нет</p> : <ul className="admin-calls" aria-busy={loading}>{calls.map((call) => <li key={call.id}><button type="button" className={selectedCall?.id === call.id ? "active" : ""} onClick={() => setSelectedCall(call)}><span><strong>{call.title}</strong><small>{date(call.created_at)} · {callStatusLabel(call.status)}</small></span><Headphones size={16} /></button></li>)}</ul>}{selectedCall && <div className="admin-call-card"><h2>{selectedCall.title}</h2><p>{date(selectedCall.created_at)} · {callStatusLabel(selectedCall.status)}</p><AdminMediaPlayer call={selectedCall} /></div>}</div>;
+  return <div className="admin-action-block"><div className="admin-panel-head"><h3>Звонки пользователя</h3><button className="ghost-button small" type="button" disabled={loading || busy} aria-busy={loading} onClick={() => void loadCalls()}><RefreshCw className={loading ? "refresh-icon spinning" : "refresh-icon"} size={14} />Обновить</button></div>{loading && calls.length === 0 ? <p className="admin-session-summary">Загрузка звонков…</p> : notice ? <p className="admin-notice">{notice}</p> : calls.length === 0 ? <p className="admin-session-summary">Звонков пока нет</p> : <ul className="admin-calls" aria-busy={loading}>{calls.map((call) => <li key={call.id}><button type="button" disabled={busy} className={selectedCall?.id === call.id ? "active" : ""} onClick={() => setSelectedCall(call)}><span><strong>{call.title}</strong><small>{date(call.created_at)} · {callStatusLabel(call.status)}</small></span><Headphones size={16} /></button></li>)}</ul>}{selectedCall && <div className="admin-call-card"><h2>{selectedCall.title}</h2><p>{date(selectedCall.created_at)} · {callStatusLabel(selectedCall.status)}</p>{selectedCall.audio_url && <AdminMediaPlayer call={selectedCall} />}{canManage && <div className="admin-call-actions"><button type="button" className="ghost-button small" onClick={() => { setReason(""); setDeletion({call: selectedCall, permanent: false}); }}>В корзину</button><button type="button" className="ghost-button small" onClick={() => { setReason(""); setDeletion({call: selectedCall, permanent: true}); }}>Удалить навсегда</button></div>}</div>}{deletion && <ReasonDialog title={deletion.permanent ? "Удалить звонок навсегда" : "Переместить звонок в корзину"} description={deletion.permanent ? `«${deletion.call.title}»: запись, транскрипция и анализ будут удалены без возможности восстановления. Укажите причину.` : `«${deletion.call.title}»: пользователь сможет восстановить звонок из корзины в течение 30 дней. Укажите причину.`} reason={reason} busy={busy} onReason={setReason} onCancel={() => setDeletion(null)} onConfirm={() => void deleteCall()} />}</div>;
 }
 
 function AdminMediaPlayer({ call }: { call: CallResponse }) {
@@ -581,10 +598,10 @@ function UserAvatar({ user }: { user: UserResponse }) {
   return <span className={`admin-avatar ${user.avatar_url ? "has-image" : ""}`} aria-label={`Аватар пользователя ${fullName(user)}`}>{user.avatar_url ? <img src={user.avatar_url} alt="" /> : <span>{initials(user)}</span>}</span>;
 }
 
-function ReasonDialog({ title, reason, busy, onReason, onCancel, onConfirm }: { title: string; reason: string; busy: boolean; onReason: (value: string) => void; onCancel: () => void; onConfirm: () => void }) {
-  useEscapeDismiss(!busy, onCancel);
-
-  return <div className="confirm-dialog-layer" role="presentation" onPointerDown={(event) => { if (!busy && event.target === event.currentTarget) onCancel(); }}><form className="confirm-dialog danger" role="dialog" aria-modal="true" aria-label={title} onSubmit={(event) => { event.preventDefault(); if (!busy && reason.trim()) onConfirm(); }}><div className="confirm-dialog-content"><div className="confirm-dialog-head"><h2>{title}</h2></div><p>Причина обязательна для аудита действия.</p><label className="admin-dialog-field">Причина<input autoFocus value={reason} onChange={(event) => onReason(event.target.value)} /></label><div className="confirm-dialog-actions"><button className="primary-button small danger-confirm" type="submit" disabled={busy || !reason.trim()}>{busy ? "Выполняю…" : "Подтвердить"}</button><button className="ghost-button small" type="button" disabled={busy} onClick={onCancel}>Отмена</button></div></div></form></div>;
+function ReasonDialog({ title, reason, busy, onReason, onCancel, onConfirm, description }: { title: string; reason: string; busy: boolean; onReason: (value: string) => void; onCancel: () => void; onConfirm: () => void; description?: string }) {
+  return <ConfirmDialog open title={title} message={description ?? "Причина обязательна для аудита действия."} variant="danger" busy={busy} confirmDisabled={!reason.trim()} onCancel={onCancel} onConfirm={onConfirm}>
+    <label className="admin-dialog-field">Причина<input autoFocus required disabled={busy} maxLength={2000} value={reason} onChange={(event) => onReason(event.target.value)} /></label>
+  </ConfirmDialog>;
 }
 
 /*

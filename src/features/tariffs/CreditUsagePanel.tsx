@@ -13,6 +13,7 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
   const managed = companies.filter((company) => company.manager_user_uuid === session.user.id);
   const [scope, setScope] = useState(companyId ?? "personal");
   const [data, setData] = useState<CreditDashboardResponse | null>(null);
+  const [dataScope, setDataScope] = useState("");
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [visibilitySaving, setVisibilitySaving] = useState(false);
@@ -20,6 +21,7 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
   const [integrationAccess, setIntegrationAccess] = useState(false);
   const [sandboxWallet, setSandboxWallet] = useState<SandboxWalletDashboard | null>(null);
   const [sandboxWalletError, setSandboxWalletError] = useState(false);
+  const canReadIntegrationScope = scope === "personal" || (dataScope === scope && data?.can_manage_visibility === true);
 
   useEffect(() => {
     if (companyId) setScope(companyId);
@@ -30,9 +32,10 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
     setError("");
     setHiddenByManager(false);
     setData(null);
+    setDataScope("");
     const { from, to } = creditActivityRange();
     const request = scope === "personal" ? api.getCreditDashboard(from, to) : api.getCompanyCreditDashboard(scope, from, to);
-    request.then((value) => { if (active) setData(value); }).catch((reason) => {
+    request.then((value) => { if (active) { setData(value); setDataScope(scope); } }).catch((reason) => {
       if (!active) return;
       setData(null);
       if (reason instanceof ApiError && reason.status === 403 && companyId) {
@@ -51,12 +54,17 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
     setIntegrationAccess(false);
     setSandboxWallet(null);
     setSandboxWalletError(false);
+    if (!canReadIntegrationScope) return;
     const ownerType = scope === "personal" ? "user" : "company";
     const ownerId = scope === "personal" ? undefined : scope;
-    api.listDeveloperApplications(ownerType, ownerId).then(async ({ applications }) => {
-      if (!active) return;
+    const subscription = scope === "personal" ? api.getSubscription() : api.getCompanySubscription(scope);
+    subscription.then((value) => {
+      if (!active || !value.plan.api_access_enabled) return null;
+      return api.listDeveloperApplications(ownerType, ownerId);
+    }).then(async (value) => {
+      if (!active || !value) return;
       setIntegrationAccess(true);
-      const sandbox = applications.find((application) => application.environment === "sandbox" && application.status !== "revoked");
+      const sandbox = value.applications.find((application) => application.environment === "sandbox" && application.status !== "revoked");
       if (!sandbox) return;
       try {
         const wallet = await api.getSandboxWallet(sandbox.application_uuid);
@@ -71,7 +79,7 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
       }
     });
     return () => { active = false; };
-  }, [scope, refresh]);
+  }, [scope, refresh, canReadIntegrationScope]);
 
 
   async function updateVisibility(visible: boolean) {

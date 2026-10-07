@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { cssStyle } from "../shared/lib/css-styles";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   AppTheme,
@@ -15,6 +16,7 @@ export function useTheme() {
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => readThemePreference());
   const [systemTheme, setSystemTheme] = useState<AppTheme>(() => getSystemTheme());
   const theme = themePreference === "system" ? systemTheme : themePreference;
+  const running = useRef<ReturnType<NonNullable<ViewTransitionDocument["startViewTransition"]>> | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -27,7 +29,7 @@ export function useTheme() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
+    cssStyle(document.documentElement).colorScheme = theme;
   }, [theme]);
 
   function toggleTheme(event: ThemeToggleEvent) {
@@ -41,9 +43,9 @@ export function useTheme() {
     const root = document.documentElement;
     const transitionDocument = document as ViewTransitionDocument;
 
-    root.style.setProperty("--theme-reveal-x", `${originX}px`);
-    root.style.setProperty("--theme-reveal-y", `${originY}px`);
-    root.style.setProperty("--theme-reveal-radius", `${radius}px`);
+    cssStyle(root).setProperty("--theme-reveal-x", `${originX}px`);
+    cssStyle(root).setProperty("--theme-reveal-y", `${originY}px`);
+    cssStyle(root).setProperty("--theme-reveal-radius", `${radius}px`);
 
     const applyTheme = () => {
       flushSync(() => {
@@ -56,18 +58,22 @@ export function useTheme() {
       });
     };
 
-    if (!transitionDocument.startViewTransition) {
+    running.current?.skipTransition();
+    if (!transitionDocument.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) {
       applyTheme();
       return;
     }
 
     root.classList.add("theme-reveal-running");
     const transition = transitionDocument.startViewTransition(applyTheme);
-    transition.finished.finally(() => {
+    running.current = transition;
+    void transition.finished.catch(() => undefined).finally(() => {
+      if (running.current !== transition) return;
+      running.current = null;
       root.classList.remove("theme-reveal-running");
-      root.style.removeProperty("--theme-reveal-x");
-      root.style.removeProperty("--theme-reveal-y");
-      root.style.removeProperty("--theme-reveal-radius");
+      cssStyle(root).removeProperty("--theme-reveal-x");
+      cssStyle(root).removeProperty("--theme-reveal-y");
+      cssStyle(root).removeProperty("--theme-reveal-radius");
     });
   }
 

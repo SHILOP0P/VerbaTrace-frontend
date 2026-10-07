@@ -1,0 +1,13 @@
+.vt-theme-toggle {display:grid;place-items:center;flex:0 0 auto;width:42px;height:42px;padding:0;border:1px solid var(--vt-line-mid);border-radius:12px;color:var(--vt-text);background:var(--vt-s1);cursor:pointer;transition:color .3s,background-color .3s,border-color .3s;}
+.vt-theme-toggle:hover {background:var(--vt-s2);color:var(--vt-accent-text);}
+.vt-theme-toggle:focus-visible {outline:2px solid var(--vt-accent-text);outline-offset:3px;}
+.vt-theme-window {position:relative;display:block;width:100%;height:100%;border-radius:inherit;overflow:clip;view-transition-name:vt-theme-icon;}
+.vt-theme-toggle .vt-theme-glyph {position:absolute;inset:0;margin:auto;opacity:0;transform-origin:50% calc(50% + 24px);transform:rotate(90deg);transition:none;}
+.vt-theme-toggle .vt-theme-glyph[data-active="true"] {opacity:1;transform:rotate(0deg);}
+::view-transition-group(vt-theme-icon) {animation:none;overflow:clip;border-radius:12px;}
+::view-transition-old(vt-theme-icon) {animation:vt-theme-icon-out 430ms cubic-bezier(.22,1,.36,1) both;mix-blend-mode:normal;transform-origin:50% calc(50% + 24px);}
+::view-transition-new(vt-theme-icon) {animation:vt-theme-icon-in 430ms cubic-bezier(.22,1,.36,1) both;mix-blend-mode:normal;transform-origin:50% calc(50% + 24px);}
+@keyframes vt-theme-icon-out {from {opacity:1;transform:rotate(0deg);}to {opacity:0;transform:rotate(-90deg);}}
+@keyframes vt-theme-icon-in {from {opacity:0;transform:rotate(90deg);}to {opacity:1;transform:rotate(0deg);}}
+@media(max-width:620px) {.vt-theme-toggle {width:37px;height:37px;border-radius:10px;}}
+@media(prefers-reduced-motion:reduce) {::view-transition-old(vt-theme-icon),::view-transition-new(vt-theme-icon) {animation:none;}.vt-theme-toggle {transition:none;}}

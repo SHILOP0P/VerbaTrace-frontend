@@ -1,3 +1,4 @@
+import { cssStyle } from "../../shared/lib/css-styles";
 import DOMPurify from "dompurify";
 import { Download, ExternalLink, FileText, Minus, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -58,7 +59,7 @@ function PDFPage({ document, pageNumber, scale }: { document: PDFDocumentProxy; 
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       const canvas = canvasRef.current;
       canvas.width = Math.floor(viewport.width * ratio); canvas.height = Math.floor(viewport.height * ratio);
-      canvas.style.width = `${Math.floor(viewport.width)}px`; canvas.style.height = `${Math.floor(viewport.height)}px`;
+      cssStyle(canvas).width = `${Math.floor(viewport.width)}px`; cssStyle(canvas).height = `${Math.floor(viewport.height)}px`;
       const context = canvas.getContext("2d");
       if (!context) return;
       renderTask = page.render({ canvas, canvasContext: context, viewport, transform: ratio === 1 ? undefined : [ratio, 0, 0, ratio, 0, 0] });

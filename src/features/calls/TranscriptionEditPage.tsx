@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import { ArrowLeft, Check, Eye, Plus, RotateCcw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
@@ -200,7 +201,7 @@ export function TranscriptionEditPage({
       <div className="transcription-participant-grid">
         {assignments.map((assignment) => {
           const color = speakerColor(assignment.speaker_key, assignments);
-          return <article className="transcription-participant-card" style={{ "--speaker-color": color } as CSSProperties} key={assignment.speaker_key}>
+          return <article className={["transcription-participant-card", cssClass({ "--speaker-color": color } as CSSProperties)].filter(Boolean).join(" ")}  key={assignment.speaker_key}>
             <div className="transcription-participant-title"><span /><div><small>Спикер</small><strong>{assignment.display_name || assignment.speaker_key}</strong></div><button className="transcription-participant-remove" type="button" aria-label={`Удалить спикера ${assignment.display_name || assignment.speaker_key}`} title="Удалить спикера" onClick={() => requestRemoveSpeaker(assignment.speaker_key)}><Trash2 size={17} /></button></div>
             <label><span>Отображаемое имя</span><input value={assignment.display_name} onChange={(event) => setAssignments((current) => current.map((item) => item.speaker_key === assignment.speaker_key ? { ...item, display_name: event.target.value } : item))} /></label>
             <label><span>Роль</span><SelectControl aria-label={`Роль спикера ${assignment.speaker_key}`} value={assignment.role} onChange={(event) => setAssignments((current) => current.map((item) => item.speaker_key === assignment.speaker_key ? { ...item, role: event.target.value as TranscriptionSpeakerRole, custom_role: event.target.value === "other" ? item.custom_role : undefined } : item))}><option value="unknown">Не определена</option><option value="client">Клиент</option><option value="manager">Менеджер</option><option value="operator">Оператор</option><option value="partner">Партнёр</option><option value="other">Другая</option></SelectControl></label>
@@ -214,7 +215,7 @@ export function TranscriptionEditPage({
       </div>
     </section>}
     <main className="transcription-edit-dialogue">
-      {groups.map((group) => <section className={`transcription-edit-utterance${group.words.some((_, offset) => changed.has(group.startIndex + offset)) ? " is-changed" : ""}`} key={group.startIndex} style={{ "--speaker-color": speakerColor(group.speaker || "unknown", assignments) } as CSSProperties}>
+      {groups.map((group) => <section className={[`transcription-edit-utterance${group.words.some((_, offset) => changed.has(group.startIndex + offset)) ? " is-changed" : ""}`, cssClass({ "--speaker-color": speakerColor(group.speaker || "unknown", assignments) } as CSSProperties)].filter(Boolean).join(" ")} key={group.startIndex} >
         <header>
           <label><span>Говорящий</span><SelectControl aria-label={`Говорящий в реплике ${group.startIndex + 1}`} value={group.speaker || "unknown"} onChange={(event) => updateGroupSpeaker(group.startIndex, group.words.length, event.target.value)}>{assignments.map((item) => <option value={item.speaker_key} key={item.speaker_key}>{item.display_name || speakerLabel(item.speaker_key)}</option>)}</SelectControl></label>
           <time>{formatSegmentTimeRange(group.words[0]?.start_seconds, group.words.at(-1)?.end_seconds)}</time>

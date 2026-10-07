@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
@@ -65,11 +66,11 @@ export const CreditActivityChart = memo(function CreditActivityChart({ activity,
     </div></div>
     <p className="credit-activity-description" id={descriptionId}>{descriptions[period]}</p>
     <div className="credit-heatmap-scroll" ref={scrollRef} onMouseLeave={() => setTooltip(null)}>
-      <div className="credit-heatmap-canvas" style={{ "--calendar-columns": chart.columns } as CSSProperties}>
+      <div className={["credit-heatmap-canvas", cssClass({ "--calendar-columns": chart.columns } as CSSProperties)].filter(Boolean).join(" ")} >
         <div className="credit-heatmap" ref={gridRef} role="group" aria-label={`Активность кредитов: ${modes[period]}`} aria-describedby={descriptionId}>
-          {chart.cells.map((cell, index) => <button type="button" key={`${period}-${index}`} className={`credit-activity-cell${cell.placeholder ? " is-placeholder" : ""}`} data-level={cell.level} data-credits={cell.credits} data-date={cell.date} disabled={cell.placeholder} tabIndex={index === (focused ?? lastIndex) ? 0 : -1}
+          {chart.cells.map((cell, index) => <button type="button" key={`${period}-${index}`} className={[`credit-activity-cell${cell.placeholder ? " is-placeholder" : ""}`, cssClass({ "--wave-delay": `${Math.floor(index / 7) * 5 + index % 7 * 12}ms` } as CSSProperties)].filter(Boolean).join(" ")} data-level={cell.level} data-credits={cell.credits} data-date={cell.date} disabled={cell.placeholder} tabIndex={index === (focused ?? lastIndex) ? 0 : -1}
             aria-label={`${cell.date}${cell.endDate !== cell.date ? ` — ${cell.endDate}` : ""}: ${formatActivityCredits(cell.credits)}`}
-            style={{ "--wave-delay": `${Math.floor(index / 7) * 5 + index % 7 * 12}ms` } as CSSProperties}
+
             aria-describedby={!tooltip?.legend && tooltip?.index === index ? tooltipId : undefined}
             onMouseEnter={event => showTooltip(event.currentTarget, index)} onFocus={event => { setFocused(index); showTooltip(event.currentTarget, index); }} onBlur={() => setTooltip(null)}
             onKeyDown={event => {
@@ -82,10 +83,10 @@ export const CreditActivityChart = memo(function CreditActivityChart({ activity,
               if (next >= 0 && next < chart.cells.length) gridRef.current?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
             }} />)}
         </div>
-        <div className="credit-heatmap-months">{chart.months.map((month, index) => <span key={month.column} className={index === chart.months.length - 1 ? "is-last" : ""} style={{ gridColumn: `${month.column} / ${chart.months[index + 1]?.column ?? chart.columns + 1}` }}>{month.label}</span>)}</div>
+        <div className="credit-heatmap-months">{chart.months.map((month, index) => <span key={month.column} className={[index === chart.months.length - 1 ? "is-last" : "", cssClass({ gridColumn: `${month.column} / ${chart.months[index + 1]?.column ?? chart.columns + 1}` })].filter(Boolean).join(" ")} >{month.label}</span>)}</div>
       </div>
     </div>
     <div className="credit-activity-legend" aria-label="Диапазоны расхода кредитов" onMouseLeave={() => setTooltip(null)}><span>Меньше</span>{creditActivityLegend.map((label, level) => <button type="button" className="credit-activity-cell" data-level={level} key={level} aria-label={label} aria-describedby={tooltip?.legend && tooltip.index === level ? tooltipId : undefined} onMouseEnter={event => showTooltip(event.currentTarget, level, true)} onFocus={event => showTooltip(event.currentTarget, level, true)} onBlur={() => setTooltip(null)} onKeyDown={event => { if (event.key === "Escape") setTooltip(null); }} />)}<span>Больше</span></div>
-    {tooltip && createPortal(<div role="tooltip" id={tooltipId} className="credit-activity-tooltip" style={{ left: tooltip.left, top: tooltip.top }}>{tooltip.legend ? creditActivityLegend[tooltip.index] : formatActivityCredits(chart.cells[tooltip.index]?.credits ?? 0)}</div>, document.body)}
+    {tooltip && createPortal(<div role="tooltip" id={tooltipId} className={["credit-activity-tooltip", cssClass({ left: tooltip.left, top: tooltip.top })].filter(Boolean).join(" ")} >{tooltip.legend ? creditActivityLegend[tooltip.index] : formatActivityCredits(chart.cells[tooltip.index]?.credits ?? 0)}</div>, document.body)}
   </div>;
 });

@@ -1,3 +1,4 @@
+import { cssStyle } from "../../shared/lib/css-styles";
 import { ClipboardEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -42,8 +43,8 @@ export function LiveMarkdownEditor({ value, onChange }: { value: string; onChang
   }, [activeLine]);
 
   function resize(textarea: HTMLTextAreaElement) {
-    textarea.style.height = "0";
-    textarea.style.height = `${Math.max(38, textarea.scrollHeight)}px`;
+    cssStyle(textarea).height = "0";
+    cssStyle(textarea).height = `${Math.max(38, textarea.scrollHeight)}px`;
   }
 
   // Every change goes through here, so undo sees it. Typing into the same line

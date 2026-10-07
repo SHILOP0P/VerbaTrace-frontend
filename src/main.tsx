@@ -5,6 +5,9 @@ import { AuthProvider } from "./features/auth/AuthProvider";
 // Self-hosted: the interface font must not depend on a third-party CDN.
 import "@fontsource-variable/inter/wght.css";
 import "./styles/index.css";
+import { startStyleClassBridge } from "./shared/lib/css-styles";
+
+startStyleClassBridge();
 
 // Auth cookies are bound to the host name, so "localhost" and "127.0.0.1" keep
 // separate sessions and opening the other host looks like a random sign-out.

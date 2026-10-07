@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronUp, Minus } from "lucide-react";
 import { type ReactNode, useId, useMemo, useState } from "react";
 import type { AnalyticsDelta, AnalyticsDistribution, AnalyticsMarker, AnalyticsSample, AnalyticsTrendPoint } from "../../types";
@@ -60,7 +61,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, pinned, initia
   const cellStyle = (column: DataColumn<T>) => column.width ? { flex: `0 0 ${column.width}px` } : undefined;
   return <div className="data-table" role="table">
     <div className="data-table-row data-table-head" role="row">
-      {columns.map((column) => <div key={column.key} role="columnheader" data-priority={column.priority} className={`data-table-cell${column.align === "end" ? " is-end" : ""}${column.width ? "" : " is-grow"}`} style={cellStyle(column)}>
+      {columns.map((column) => <div key={column.key} role="columnheader" data-priority={column.priority} className={[`data-table-cell${column.align === "end" ? " is-end" : ""}${column.width ? "" : " is-grow"}`, cssClass(cellStyle(column))].filter(Boolean).join(" ")} >
         {column.sortValue ? <button type="button" className="data-table-sort" onClick={() => toggle(column)} aria-sort={sort?.key === column.key ? (sort.order === "asc" ? "ascending" : "descending") : "none"}>
           {column.label}{sort?.key === column.key ? (sort.order === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />) : null}
         </button> : column.label}
@@ -70,7 +71,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick, pinned, initia
     {sorted.map((row) => <div key={rowKey(row)} role="row" className={`data-table-row${onRowClick ? " is-clickable" : ""}${pinned?.(row) ? " is-pinned" : ""}`}
       tabIndex={onRowClick ? 0 : undefined} onClick={onRowClick ? () => onRowClick(row) : undefined}
       onKeyDown={onRowClick ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onRowClick(row); } } : undefined}>
-      {columns.map((column) => <div key={column.key} role="cell" data-priority={column.priority} data-label={column.label} className={`data-table-cell${column.align === "end" ? " is-end" : ""}${column.width ? "" : " is-grow"}`} style={cellStyle(column)}>
+      {columns.map((column) => <div key={column.key} role="cell" data-priority={column.priority} data-label={column.label} className={[`data-table-cell${column.align === "end" ? " is-end" : ""}${column.width ? "" : " is-grow"}`, cssClass(cellStyle(column))].filter(Boolean).join(" ")} >
         {column.render(row)}
       </div>)}
     </div>)}
@@ -148,8 +149,8 @@ export function TrendChart({ points, reference, markers = [], label, referenceLa
   const hit = (series: AnalyticsTrendPoint[], seriesLabel: string, isReference: boolean) => scored(series).map((point) => {
     const left = x(point.bucket) / CHART_WIDTH * 100;
     return <HoverHint key={`${isReference ? "ref" : "own"}-${point.bucket}`}
-      className={`chart-hit trend-chart-hit${isReference ? " is-reference" : ""}${left / 100 <= progress ? " is-drawn" : ""}`}
-      style={{ left: `${left}%`, top: `${y(point.avg!) / CHART_HEIGHT * 100}%` }}
+      className={[`chart-hit trend-chart-hit${isReference ? " is-reference" : ""}${left / 100 <= progress ? " is-drawn" : ""}`, cssClass({ left: `${left}%`, top: `${y(point.avg!) / CHART_HEIGHT * 100}%` })].filter(Boolean).join(" ")}
+
       label={`${point.avg} / 100`} detail={`${seriesLabel} · ${formatBucket(point.bucket)} · ${point.n} ${callsWord(point.n)}`} />;
   });
   return <figure className="trend-chart" aria-label={label}>
@@ -163,7 +164,7 @@ export function TrendChart({ points, reference, markers = [], label, referenceLa
           <path className="trend-chart-line" d={path(points)} />
         </g>
       </svg>
-      {markers.map((marker) => { const mx = markerX(marker.date); return mx === null ? null : <HoverHint key={`hint-${marker.kind}-${marker.date}-${marker.label}`} className="trend-chart-marker-hit" style={{ left: `${mx / CHART_WIDTH * 100}%` }} label={marker.label} detail={formatBucket(marker.date.slice(0, 10))} />; })}
+      {markers.map((marker) => { const mx = markerX(marker.date); return mx === null ? null : <HoverHint key={`hint-${marker.kind}-${marker.date}-${marker.label}`} className={["trend-chart-marker-hit", cssClass({ left: `${mx / CHART_WIDTH * 100}%` })].filter(Boolean).join(" ")}  label={marker.label} detail={formatBucket(marker.date.slice(0, 10))} />; })}
       {reference?.length ? hit(reference, referenceLabel ?? "Сравнение", true) : null}
       {hit(points, label, false)}
     </div>
@@ -206,7 +207,7 @@ export function DistributionBar({ distribution }: { distribution: AnalyticsDistr
   const total = DISTRIBUTION_ORDER.reduce((sum, [key]) => sum + distribution[key], 0);
   if (total === 0) return <span className="distribution-bar is-empty" aria-label="Нет оценок" />;
   return <HoverHint focusable={false} className="distribution-bar" label="Оценки критерия" detail={DISTRIBUTION_ORDER.filter(([key]) => distribution[key] > 0).map(([key, label]) => `${label}: ${distribution[key]}`).join(" · ")}>
-    {DISTRIBUTION_ORDER.map(([key]) => distribution[key] > 0 ? <i key={key} className={`is-${key}`} style={{ flexGrow: distribution[key] }} /> : null)}
+    {DISTRIBUTION_ORDER.map(([key]) => distribution[key] > 0 ? <i key={key} className={[`is-${key}`, cssClass({ flexGrow: distribution[key] })].filter(Boolean).join(" ")}  /> : null)}
   </HoverHint>;
 }
 

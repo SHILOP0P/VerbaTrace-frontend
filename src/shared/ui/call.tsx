@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import {
   Check,
   ChevronDown,
@@ -113,6 +114,12 @@ function AnalysisTimeline({
   retryBusy: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  if (analysisStatus === "stale") {
+    return <div className="call-waiting-notice" role="status">
+      <p>Транскрипция изменена. Запустите анализ повторно, чтобы обновить результат.</p>
+      {onRetry && <button className="ghost-button small" type="button" disabled={retryBusy} onClick={onRetry}>Обновить анализ</button>}
+    </div>;
+  }
   const labels = ["Загрузка", "Транскрипция", "Поиск вопросов", "Разбор ответов", "Проверка и итог"];
   const finished = analysisStatus === "done" || (current === "analyzed" && !analysisStatus);
   const failed = analysisStatus === "failed" || current === "failed";
@@ -166,11 +173,11 @@ function StageRail({ steps, label, status, onCollapse }: { steps: RailStep[]; la
       {status && <span className="stage-rail-status">{status}</span>}
       {onCollapse && <button type="button" className="ghost-button small" aria-expanded={true} onClick={onCollapse}>Свернуть</button>}
     </div>}
-    <ol className="stage-rail-steps" style={{ "--rail-steps": steps.length } as CSSProperties}>
+    <ol className={["stage-rail-steps", cssClass({ "--rail-steps": steps.length } as CSSProperties)].filter(Boolean).join(" ")} >
       {steps.map((step, index) => (
-        <li key={step.label} className={`stage-rail-step is-${step.state}`} aria-current={step.state === "active" ? "step" : undefined} style={{ "--rail-index": index } as CSSProperties}>
+        <li key={step.label} className={[`stage-rail-step is-${step.state}`, cssClass({ "--rail-index": index } as CSSProperties)].filter(Boolean).join(" ")} aria-current={step.state === "active" ? "step" : undefined} >
           <span className="stage-rail-track" aria-hidden="true">
-            {index < steps.length - 1 && <span className="stage-rail-line"><span className="stage-rail-fill" style={railProgressStyle(step.progress)} /></span>}
+            {index < steps.length - 1 && <span className="stage-rail-line"><span className={["stage-rail-fill", cssClass(railProgressStyle(step.progress))].filter(Boolean).join(" ")}  /></span>}
             <span className="stage-rail-dot">
               {step.state === "done" && <Check size={10} strokeWidth={4} />}
               {step.state === "failed" && <X size={9} strokeWidth={4} />}
@@ -307,7 +314,7 @@ export function InfoCard({
   headerActions?: React.ReactNode;
 }) {
   return (
-    <div className={`info-card ${className}`.trim()} ref={cardRef} style={style}>
+    <div className={[`info-card ${className}`.trim(), cssClass(style)].filter(Boolean).join(" ")} ref={cardRef} >
       <div className={`card-title${headerActions ? " has-actions" : ""}`}>
         <h3>{title}</h3>
         <span className={`status-chip ${statusTone} ${statusThinking ? "thinking-status" : ""}`}>{status}</span>
@@ -435,7 +442,7 @@ export function TranscriptPreview({
           {wordGroups.some((group) => group.speaker) ? wordGroups.map((group) => (
             <div className="transcript-segment word-segment" key={`${group.startIndex}-${group.speaker}`}>
               <div className="segment-meta">
-                <strong className={speakerStyle(group.speaker) ? "has-color" : undefined} style={speakerStyle(group.speaker)}>{transcriptionSpeakerLabel(group.speaker, speakerAssignments)}</strong>
+                <strong className={[speakerStyle(group.speaker) ? "has-color" : undefined, cssClass(speakerStyle(group.speaker))].filter(Boolean).join(" ")} >{transcriptionSpeakerLabel(group.speaker, speakerAssignments)}</strong>
                 <span>{formatSegmentTimeRange(group.words[0]?.start_seconds, group.words.at(-1)?.end_seconds)}</span>
               </div>
               <p>{group.words.map((word, offset) => renderWord(word, group.startIndex + offset, offset === 0))}</p>
@@ -468,7 +475,7 @@ export function TranscriptPreview({
         {segments.map((segment, index) => (
           <div className="transcript-segment" key={`${segment.start_seconds ?? index}-${segment.text}`}>
             <div className="segment-meta">
-              <strong className={speakerStyle(segment.speaker) ? "has-color" : undefined} style={speakerStyle(segment.speaker)}>{transcriptionSpeakerLabel(segment.speaker, speakerAssignments)}</strong>
+              <strong className={[speakerStyle(segment.speaker) ? "has-color" : undefined, cssClass(speakerStyle(segment.speaker))].filter(Boolean).join(" ")} >{transcriptionSpeakerLabel(segment.speaker, speakerAssignments)}</strong>
               <span>{formatSegmentTimeRange(segment.start_seconds, segment.end_seconds)}</span>
             </div>
             <p>{segment.text}</p>

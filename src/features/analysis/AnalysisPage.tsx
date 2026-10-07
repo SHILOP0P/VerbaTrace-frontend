@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   ChevronDown,
   ChevronRight,
@@ -278,8 +279,8 @@ export function AnalysisPage({
                   >
                     {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                     <span
-                      className="folder-color-dot"
-                      style={{ "--folder-color": folder.color || "#ff7a43" } as React.CSSProperties}
+                      className={["folder-color-dot", cssClass({ "--folder-color": folder.color || "#ff7a43" } as React.CSSProperties)].filter(Boolean).join(" ")}
+
                     />
                     <span>
                       <strong title={folder.name}>{folder.name}</strong>
@@ -424,6 +425,9 @@ function analysisResultState(
   tone: "ok" | "warn" | "bad";
   thinking?: boolean;
 } {
+  if (analysis?.status === "stale") {
+    return { label: "Обновите анализ", tone: "warn" };
+  }
   if (analysis?.status === "failed") {
     return { label: "Ошибка анализа", tone: "bad" };
   }

@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent as ReactWheelEvent } from "react";
 import { createPortal } from "react-dom";
@@ -123,7 +124,7 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
     <button className={`date-time-trigger${dateOnly ? " date-time-trigger-date-only" : ""}${selected ? "" : " is-empty"}`} ref={triggerRef} type="button" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-required={required} onClick={() => setOpen((current) => !current)}>
       {dateOnly ? <><span>{selected ? triggerFormat.format(selected) : compact ? "Дата" : "Выберите дату"}</span><CalendarDays size={18}/></> : <><CalendarDays size={18}/><span>{selected ? VALUE_FORMAT.format(selected) : "Выберите дату"}</span><i/><Clock3 size={17}/><span>{selected ? `${pad(selected.getHours())}:${pad(selected.getMinutes())}` : "--:--"}</span></>}
     </button>
-    {open ? createPortal(<div className={`date-time-popover vt-portal${dateOnly ? " date-time-popover-date-only" : ""}`} ref={popoverRef} style={popoverPosition} role="dialog" aria-label={dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения"} onWheel={scrollOwningDialog}>
+    {open ? createPortal(<div className={[`date-time-popover vt-portal${dateOnly ? " date-time-popover-date-only" : ""}`, cssClass(popoverPosition)].filter(Boolean).join(" ")} ref={popoverRef}  role="dialog" aria-label={dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения"} onWheel={scrollOwningDialog}>
       <div className="date-time-month">
         <button type="button" aria-label="Предыдущий месяц" onClick={() => setView(addMonths(view, -1))}><ChevronLeft size={18}/></button>
         <strong aria-live="polite">{MONTH_FORMAT.format(view)}</strong>

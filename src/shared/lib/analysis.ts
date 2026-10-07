@@ -249,6 +249,7 @@ export function analysisV2Result(analysis?: AnalysisResponse): AnalysisV2Result 
 }
 
 export function analysisProgress(analysis?: AnalysisResponse): AnalysisProgress | undefined {
+  if (analysis?.status === "stale") return undefined;
   const raw = analysisRecord(analysis).progress;
   if (!isPlainRecord(raw) || !["inventory", "answers", "validation", "complete"].includes(String(raw.stage))) return undefined;
   const count = (key: string) => Math.max(0, integerValue(raw[key]) ?? 0);

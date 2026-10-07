@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   Ban,
   Building2,
@@ -571,8 +572,8 @@ export function CallDetailPanel({
                         }}
                       >
                         <span
-                          className="folder-color-dot"
-                          style={{ "--folder-color": folder.color || "#ff7a43" } as CSSProperties}
+                          className={["folder-color-dot", cssClass({ "--folder-color": folder.color || "#ff7a43" } as CSSProperties)].filter(Boolean).join(" ")}
+
                         />
                         <span>
                           <strong>{folder.name}</strong>
@@ -735,7 +736,7 @@ export function CallDetailPanel({
         {!call.is_test && !transcriptionOnly && <div className="analysis-card-stack">
           {isAnalysisDone(analysis) && reviewContext && (canEditAnalysis || canDisputeAnalysis || reviewContext.human_review_count > 0) && <div className="quality-review-entry"><div><ClipboardCheck size={20} /><span><strong>{reviewContext.human_review_count > 0 ? `Действует человеческая оценка ${reviewContext.human_review_count}` : "Проверка человеком"}</strong><small>{reviewContext.source_outdated ? "Эта проверка относится к устаревшей версии анализа и доступна только для просмотра." : canEditAnalysis ? `Опубликовано ${reviewContext.human_review_count} из ${reviewContext.human_review_limit} допустимых переоценок.${reviewContext.next_review_requires_different_author ? " Следующую должен выполнить другой проверяющий." : ""}` : canDisputeAnalysis ? "Если выводы или оценки неверны, отправьте анализ своего звонка на независимый пересмотр." : "Доступны просмотр и история оценок."}</small></span></div><div className="quality-review-entry-actions">{canEditAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy} onClick={() => void createQualityReview()}><PenLine size={16} aria-hidden="true" />{qualityReviewBusy ? "Открываю…" : "Исправить анализ"}</button>}{reviewContext.review_uuid && !canEditAnalysis && reviewContext.human_review_count > 0 && <button className="ghost-button" type="button" onClick={() => { window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewContext.review_uuid!)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}>История оценок</button>}{canDisputeAnalysis && <button className="ghost-button" type="button" disabled={qualityReviewBusy || challengeSent} onClick={() => setChallengeOpen(true)}><MessageSquareWarning size={17} />{challengeSent ? "Отправлено на пересмотр" : "Оспорить анализ"}</button>}</div></div>}
           {qualityReviewError && <div className="form-error is-dismissible" role="alert">{qualityReviewError}</div>}
-          <CallWorkOnMistakes callId={call.id} personal={!call.company_uuid} analysisId={isAnalysisDone(analysis) ? analysis?.id : undefined} onOpenItem={openAnalysisItem} />
+          <CallWorkOnMistakes callId={call.id} companyId={call.company_uuid} ownCall={call.subjects?.some(subject => subject.user_uuid === currentUserId)} personal={!call.company_uuid} analysisId={isAnalysisDone(analysis) ? analysis?.id : undefined} onOpenItem={openAnalysisItem} />
           <InfoCard
             title="AI-анализ"
             cardRef={analysisCardRef}
@@ -940,6 +941,9 @@ function analysisCardState(
   call: CallResponse,
   analysis?: AnalysisResponse
 ): CardProcessState {
+  if (analysis?.status === "stale") {
+    return { label: "Обновите анализ", tone: "warn" };
+  }
   if (analysis?.status === "failed") {
     return { label: "Ошибка анализа", tone: "bad" };
   }

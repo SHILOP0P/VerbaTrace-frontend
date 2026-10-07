@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   ArrowLeft,
   Building2,
@@ -289,7 +290,7 @@ function CompanyLimitRow({
         <span>Расшифровка</span>
         <strong>{limitMinutes > 0 ? `${formatMinutes(usedMinutes)} / ${formatMinutes(limitMinutes)}` : "Нет лимита"}</strong>
         <small>{activeSubscription ? "по загруженным звонкам" : "активируйте бизнес-тариф"}</small>
-        <div className="limit-progress-track"><span style={{ width: `${progress}%` }} /></div>
+        <div className="limit-progress-track"><span className={cssClass({ width: `${progress}%` })} /></div>
       </div>
       <span
         className="text-button"
@@ -376,7 +377,7 @@ function LimitLine({
         <span>{value}</span>
       </div>
       <div className="limit-progress-track">
-        <span style={{ width: `${progress}%` }} />
+        <span className={cssClass({ width: `${progress}%` })} />
       </div>
     </div>
   );

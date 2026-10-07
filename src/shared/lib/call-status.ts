@@ -71,6 +71,7 @@ export function callStatusChip(status: CallStatus, analysisStatus?: AnalysisStat
   if (status === "failed") return statusMeta.failed.chip;
   if (status === "awaiting_credits" || status === "cancelled") return statusMeta[status].chip;
   if (analysisStatus === "failed") return "Ошибка анализа";
+  if (analysisStatus === "stale") return "Обновите анализ";
   if (status === "new") return "В очереди";
   if (status === "processing") return "Транскрибируется";
   if (status === "transcribed") return "Анализируется";
@@ -92,6 +93,7 @@ export function callStatusTone(status: CallStatus, analysisStatus?: AnalysisStat
 }
 
 export function activeCallProcess(status: CallStatus, analysisStatus?: AnalysisStatus) {
+  if (analysisStatus === "stale") return null;
   if (status === "processing") return "transcription";
   if (status === "transcribed" && analysisStatus !== "done" && analysisStatus !== "failed") return "analysis";
   if (status === "analyzed" && (analysisStatus === "pending" || analysisStatus === "processing")) return "analysis";

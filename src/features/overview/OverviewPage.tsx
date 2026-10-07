@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   Activity,
   BarChart3,
@@ -8,7 +9,7 @@ import {
   Star
 } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import type {
   AnalyticsOverviewResponse,
   AnalyticsSummary,
@@ -51,12 +52,14 @@ export function OverviewPage({
   calls,
   callsVersion,
   onNavigate,
-  onOpenCall
+  onOpenCall,
+  canMonitor = false
 }: {
   calls: CallResponse[];
   callsVersion: string;
   onNavigate?: (page: AppPage) => void;
   onOpenCall?: OpenCallAt;
+  canMonitor?: boolean;
 }) {
   const workspaceCompanyId = useWorkspaceCompanyId();
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverviewResponse | null>(null);
@@ -88,7 +91,11 @@ export function OverviewPage({
       setRefreshing(true);
       const [overview, summary] = await Promise.all([
         api.getAnalyticsOverview(overviewFilters(workspaceCompanyId)).catch(() => null),
-        api.getAnalyticsSummary(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" }).catch(() => null),
+        api.getAnalyticsCapabilities(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" })
+          .then((capabilities) => {
+            const allowed = capabilities.scope === "personal" ? capabilities.personal_progress_enabled : capabilities.role === "employee" || capabilities.team_analytics_enabled;
+            return allowed ? api.getAnalyticsSummary(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : { scope: "personal" }) : null;
+          }).catch(() => null),
       ]);
       if (!cancelled) {
         setAnalyticsOverview(overview);
@@ -115,13 +122,20 @@ export function OverviewPage({
 
   // The queue counters are cheap and move by the second, so they keep polling.
   useEffect(() => {
+    if (!canMonitor) { setProcessingMonitoring(null); return; }
     let cancelled = false;
+    let pending = false;
+    let denied = false;
 
     async function loadMonitoring() {
-      const monitoring = await api
-        .getProcessingMonitoring(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : undefined)
-        .catch(() => null);
-      if (!cancelled) setProcessingMonitoring(monitoring);
+      if (cancelled || pending || denied) return;
+      pending = true;
+      try {
+        const monitoring = await api.getProcessingMonitoring(workspaceCompanyId ? { company_uuid: workspaceCompanyId } : undefined);
+        if (!cancelled) setProcessingMonitoring(monitoring);
+      } catch (error) {
+        if (error instanceof ApiError && [401, 403, 404].includes(error.status)) denied = true;
+      } finally { pending = false; }
     }
 
     void loadMonitoring();
@@ -131,7 +145,7 @@ export function OverviewPage({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [workspaceCompanyId]);
+  }, [workspaceCompanyId, canMonitor]);
 
   return (
     <section className="dashboard-page app-page">
@@ -152,7 +166,7 @@ export function OverviewPage({
           title="Звонки в обработке"
           value={metricCount(analyticsOverview?.calls_processing)}
           live={(analyticsOverview?.calls_processing ?? 0) > 0}
-          note={runningTasksNote(processingMonitoring?.queue.running ?? 0)}
+          note={processingMonitoring ? runningTasksNote(processingMonitoring.queue.running) : (analyticsOverview?.calls_processing ?? 0) > 0 ? "звонки обрабатываются" : "сейчас ничего не выполняется"}
         />
         <MetricCard loading={!loaded} series="green" icon={<CheckCircle2 size={18} />} title="С анализом" value={metricCount(analyticsOverview?.calls_analyzed)} points={chartSeries.analyzedCalls} note="готовый результат анализа" />
         <MetricCard loading={!loaded} series="teal" icon={<Clock3 size={18} />} title="Средняя длительность" value={avgDuration} points={chartSeries.duration} note="по звонкам в выбранной области" />
@@ -228,7 +242,7 @@ function AnalyticsOverviewInsights({
             <div className="score-distribution-row" key={key}>
               <span>{label}</span>
               <strong>{count}</strong>
-              <i style={{ "--bar": overview?.calls_analyzed ? `${Math.min(100, (count / overview.calls_analyzed) * 100)}%` : "0%" } as React.CSSProperties} />
+              <i className={cssClass({ "--bar": overview?.calls_analyzed ? `${Math.min(100, (count / overview.calls_analyzed) * 100)}%` : "0%" } as React.CSSProperties)} />
             </div>
           ))}
         </div>
@@ -442,7 +456,7 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "n
           </linearGradient>
         </defs>
         {/* Inline, because the older stylesheet sets fill: none on every path. */}
-        {area && <path className="mini-sparkline-area" d={area} style={{ fill: `url(#${gradientId})` }} />}
+        {area && <path className={["mini-sparkline-area", cssClass({ fill: `url(#${gradientId})` })].filter(Boolean).join(" ")} d={area}  />}
         <path
           className="mini-sparkline-line"
           d={path}
@@ -459,11 +473,11 @@ export function MiniSparkline({ points, tone }: { points: ChartPoint[]; tone: "n
       </svg>
       {coordinates.map((point, index) => (
         <span
-          className={`chart-hit ${activeIndex === index ? "active" : ""} ${index <= 1 ? "edge-start" : ""} ${index >= coordinates.length - 2 ? "edge-end" : ""} ${index === coordinates.length - 1 ? "is-last" : ""}`}
-          style={{
+          className={[`chart-hit ${activeIndex === index ? "active" : ""} ${index <= 1 ? "edge-start" : ""} ${index >= coordinates.length - 2 ? "edge-end" : ""} ${index === coordinates.length - 1 ? "is-last" : ""}`, cssClass({
             left: `${point.left}%`,
             top: `${point.top}%`
-          } as React.CSSProperties}
+          } as React.CSSProperties)].filter(Boolean).join(" ")}
+
           tabIndex={0}
           aria-label={`${point.label}: ${point.display}`}
           onBlur={() => setActiveIndex(null)}

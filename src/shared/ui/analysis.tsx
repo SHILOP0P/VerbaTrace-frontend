@@ -1,3 +1,4 @@
+import { cssClass, cssStyle } from "../lib/css-styles";
 import type {
   AnalysisEvidence,
   AnalysisResponse,
@@ -240,8 +241,8 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
     const update = () => {
       const active = filter.querySelector<HTMLElement>("button.active");
       if (!active) return;
-      filter.style.setProperty("--filter-left", `${active.offsetLeft}px`);
-      filter.style.setProperty("--filter-width", `${active.offsetWidth}px`);
+      cssStyle(filter).setProperty("--filter-left", `${active.offsetLeft}px`);
+      cssStyle(filter).setProperty("--filter-width", `${active.offsetWidth}px`);
     };
     update();
     const observer = new ResizeObserver(update);
@@ -259,7 +260,7 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
           {result.overall_score === null && <small className="analysis-score-summary-note">{displayText(result.overall_score_label) || "Разобрана только часть критериев — общий балл не считается."}</small>}
           <span className="analysis-score-summary-count">{scored.length} {pluralizeRu(scored.length, "оценённый пункт", "оценённых пункта", "оценённых пунктов")}</span>
           <div className="analysis-distribution" aria-label="Распределение оценок">
-            {scored.length > 0 && <><i className="good" style={{width:`${distribution.strong/scored.length*100}%`}}/><i className="warning" style={{width:`${distribution.partial/scored.length*100}%`}}/><i className="danger" style={{width:`${distribution.weak/scored.length*100}%`}}/></>}
+            {scored.length > 0 && <><i className={["good", cssClass({width:`${distribution.strong/scored.length*100}%`})].filter(Boolean).join(" ")} /><i className={["warning", cssClass({width:`${distribution.partial/scored.length*100}%`})].filter(Boolean).join(" ")} /><i className={["danger", cssClass({width:`${distribution.weak/scored.length*100}%`})].filter(Boolean).join(" ")} /></>}
           </div>
           <div className="analysis-distribution-legend"><span className="good">Сильные <b>{distribution.strong}</b></span><span className="warning">Частичные <b>{distribution.partial}</b></span><span className="danger">Слабые <b>{distribution.weak}</b></span></div>
         </div>
@@ -419,7 +420,7 @@ function AnalysisV2View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
     <div className="analysis-structured analysis-v2">
       <AnalysisSection title="Резюме">
         <div className="analysis-score-summary">
-          <div className="analysis-score-meter" style={{ "--analysis-score": score.percent } as React.CSSProperties}>
+          <div className={["analysis-score-meter", cssClass({ "--analysis-score": score.percent } as React.CSSProperties)].filter(Boolean).join(" ")} >
             <strong>{score.score === null ? "—" : formatScore(score.percent)}</strong>
             <span>/ 100</span>
           </div>
@@ -602,7 +603,7 @@ function EvidenceItems({ evidence, fallbackQuotes, onActivate }: { evidence: Ana
     const time = matched ? formatEvidenceTime(item.start_seconds!) : "";
     const speaker = item.speaker ? transcriptionSpeakerLabel(item.speaker, speakerAssignments) : "";
     const speakerStyle = item.speaker && speakerKeys.length > 0 ? { "--speaker-color": speakerColor(item.speaker, speakerKeys) } as CSSProperties : undefined;
-    const speakerTag = speaker ? <small className={`evidence-speaker${speakerStyle ? " has-color" : ""}`} style={speakerStyle}>{speaker}</small> : null;
+    const speakerTag = speaker ? <small className={[`evidence-speaker${speakerStyle ? " has-color" : ""}`, cssClass(speakerStyle)].filter(Boolean).join(" ")} >{speaker}</small> : null;
     if (!matched) return <blockquote key={`${item.quote}-${index}`}>{speakerTag}<span>{maskProfanity(item.quote)}</span><small>Точное место не определено</small></blockquote>;
     return (
       <button

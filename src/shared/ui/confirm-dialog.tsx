@@ -13,6 +13,7 @@ type ConfirmDialogProps = {
   confirmLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
+  confirmDisabled?: boolean;
   variant?: "danger" | "default";
   /**
    * Extra controls the decision needs, shown between the message and the
@@ -31,6 +32,7 @@ export function ConfirmDialog({
   confirmLabel = "Подтвердить",
   cancelLabel = "Отмена",
   busy = false,
+  confirmDisabled = false,
   variant = "default",
   children,
   onConfirm,
@@ -42,7 +44,7 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="confirm-dialog-layer"
+      className="confirm-dialog-layer vt-portal"
       role="presentation"
       onPointerDown={(event) => {
         if (!busy && event.target === event.currentTarget) onCancel();
@@ -55,7 +57,7 @@ export function ConfirmDialog({
         aria-label={title}
         onSubmit={(event) => {
           event.preventDefault();
-          if (!busy) onConfirm();
+          if (!busy && !confirmDisabled) onConfirm();
         }}
       >
         <div className="confirm-dialog-icon" aria-hidden="true">
@@ -74,7 +76,7 @@ export function ConfirmDialog({
             <button
               className={`primary-button small ${variant === "danger" ? "danger-confirm" : ""}`}
               type="submit"
-              disabled={busy}
+              disabled={busy || confirmDisabled}
             >
               {busy ? "Выполняю..." : confirmLabel}
             </button>

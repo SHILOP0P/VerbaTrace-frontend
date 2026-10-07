@@ -422,7 +422,9 @@ export interface CallResponse {
   external_call_id?: string | null;
   imported_at?: string | null;
   ingest_error_code?: string | null;
-  has_analysis?: boolean;
+    has_analysis?: boolean;
+    analysis_available?: boolean;
+    transcription_available?: boolean;
   has_actions?: boolean;
   // Only on a single call: how the viewer reaches it and whom it counts for.
   access?: CallAccess;

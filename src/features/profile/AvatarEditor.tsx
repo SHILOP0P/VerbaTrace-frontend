@@ -1,3 +1,4 @@
+import { cssClass, cssStyle } from "../../shared/lib/css-styles";
 import { MousePointer2, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -44,19 +45,19 @@ export function AvatarEditor({ file, busy, onCancel, onSave }: { file: File; bus
     return () => URL.revokeObjectURL(url);
   }, [file]);
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
-    const previousDocumentOverflow = document.documentElement.style.overflow;
-    const previousDocumentOverscrollBehavior = document.documentElement.style.overscrollBehavior;
-    document.body.style.overflow = "hidden";
-    document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.overflow = "hidden";
-    document.documentElement.style.overscrollBehavior = "none";
+    const previousOverflow = cssStyle(document.body).overflow;
+    const previousOverscrollBehavior = cssStyle(document.body).overscrollBehavior;
+    const previousDocumentOverflow = cssStyle(document.documentElement).overflow;
+    const previousDocumentOverscrollBehavior = cssStyle(document.documentElement).overscrollBehavior;
+    cssStyle(document.body).overflow = "hidden";
+    cssStyle(document.body).overscrollBehavior = "none";
+    cssStyle(document.documentElement).overflow = "hidden";
+    cssStyle(document.documentElement).overscrollBehavior = "none";
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.body.style.overscrollBehavior = previousOverscrollBehavior;
-      document.documentElement.style.overflow = previousDocumentOverflow;
-      document.documentElement.style.overscrollBehavior = previousDocumentOverscrollBehavior;
+      cssStyle(document.body).overflow = previousOverflow;
+      cssStyle(document.body).overscrollBehavior = previousOverscrollBehavior;
+      cssStyle(document.documentElement).overflow = previousDocumentOverflow;
+      cssStyle(document.documentElement).overscrollBehavior = previousDocumentOverscrollBehavior;
     };
   }, []);
 
@@ -128,7 +129,7 @@ export function AvatarEditor({ file, busy, onCancel, onSave }: { file: File; bus
             onPointerUp={() => { dragStart.current = null; }}
             onPointerCancel={() => { dragStart.current = null; }}
           >
-            <img ref={imageRef} src={source} alt="Предпросмотр" draggable={false} style={{ transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg) scale(${zoom})` }} />
+            <img ref={imageRef} src={source} alt="Предпросмотр" draggable={false} className={cssClass({ transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg) scale(${zoom})` })} />
           </div>
           <p className="avatar-editor-zoom-hint"><MousePointer2 size={16} />Наведите курсор на фото и прокрутите колесо, чтобы изменить масштаб.</p>
           <div className="avatar-editor-control">

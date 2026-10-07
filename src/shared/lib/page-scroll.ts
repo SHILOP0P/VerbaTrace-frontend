@@ -1,3 +1,4 @@
+import { cssStyle } from "./css-styles";
 /**
  * lockPageScroll stops the page behind an overlay from scrolling and returns
  * the undo.
@@ -9,15 +10,15 @@
  */
 export function lockPageScroll() {
   const root = document.documentElement;
-  const previousRoot = root.style.overflow;
-  const previousBody = document.body.style.overflow;
+  const previousRoot = cssStyle(root).overflow;
+  const previousBody = cssStyle(document.body).overflow;
 
-  root.style.overflow = "hidden";
-  document.body.style.overflow = "hidden";
+  cssStyle(root).overflow = "hidden";
+  cssStyle(document.body).overflow = "hidden";
 
   return () => {
-    root.style.overflow = previousRoot;
-    document.body.style.overflow = previousBody;
+    cssStyle(root).overflow = previousRoot;
+    cssStyle(document.body).overflow = previousBody;
   };
 }
 

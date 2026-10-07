@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import { Info } from "lucide-react";
 import { type CSSProperties, type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -12,7 +13,6 @@ function hintHost() {
   if (portalHost?.isConnected) return portalHost;
   portalHost = document.createElement("span");
   portalHost.className = "app-shell select-menu-portal-root hover-hint-portal-root";
-  portalHost.style.cssText = "all:unset;display:contents;pointer-events:none;";
   document.body.appendChild(portalHost);
   return portalHost;
 }
@@ -70,8 +70,8 @@ export function HoverHint({ label, detail, children, className = "", style, focu
 
   return <span
     ref={anchorRef}
-    className={`hover-hint ${className}`.trim()}
-    style={style}
+    className={[`hover-hint ${className}`.trim(), cssClass(style)].filter(Boolean).join(" ")}
+
     tabIndex={focusable ? 0 : undefined}
     aria-describedby={open ? id : undefined}
     onMouseEnter={() => setOpen(true)}
@@ -84,8 +84,8 @@ export function HoverHint({ label, detail, children, className = "", style, focu
       ref={tipRef}
       id={id}
       role="tooltip"
-      className={`chart-tooltip hover-hint-tooltip${placement ? " is-placed" : ""}${placement?.above ? " is-above" : ""}`}
-      style={{ left: placement?.left ?? 0, top: placement?.top ?? 0, "--hint-arrow": `${placement?.arrow ?? 0}px` } as CSSProperties}
+      className={[`chart-tooltip hover-hint-tooltip${placement ? " is-placed" : ""}${placement?.above ? " is-above" : ""}`, cssClass({ left: placement?.left ?? 0, top: placement?.top ?? 0, "--hint-arrow": `${placement?.arrow ?? 0}px` } as CSSProperties)].filter(Boolean).join(" ")}
+
     >
       <strong>{label}</strong>
       {Array.isArray(detail) ? detail.map((line, index) => <span key={index}>{line}</span>) : detail ? <span>{detail}</span> : null}

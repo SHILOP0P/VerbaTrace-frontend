@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   Building2,
   Check,
@@ -1322,9 +1323,9 @@ export function CallsPage({
                     >
                       <ChevronRight className="call-folder-chevron" size={15} aria-hidden="true" />
                       <span
-                        className="call-folder-icon"
+                        className={["call-folder-icon", cssClass({ "--folder-color": folder.color || "#ff7a43" } as React.CSSProperties)].filter(Boolean).join(" ")}
                         aria-hidden="true"
-                        style={{ "--folder-color": folder.color || "#ff7a43" } as React.CSSProperties}
+
                       >
                         {expanded ? <FolderOpen size={17} /> : <Folder size={17} />}
                       </span>
@@ -1596,7 +1597,7 @@ export function CallsPage({
                   <span>Цвет</span>
                   {/* The folder as it will look in the list. */}
                   <span className="call-folder-preview" aria-hidden="true">
-                    <span className="call-folder-icon" style={{ "--folder-color": folderForm.color || folderPalette[0] } as React.CSSProperties}>
+                    <span className={["call-folder-icon", cssClass({ "--folder-color": folderForm.color || folderPalette[0] } as React.CSSProperties)].filter(Boolean).join(" ")} >
                       <Folder size={16} />
                     </span>
                     <span>{folderForm.name.trim() || "Новая папка"}</span>
@@ -1605,14 +1606,14 @@ export function CallsPage({
                 <div className="call-folder-palette" role="radiogroup" aria-label="Выбор цвета папки">
                   {folderPalette.map((color) => (
                     <button
-                      className={folderForm.color === color ? "active" : ""}
+                      className={[folderForm.color === color ? "active" : "", cssClass({ "--folder-color": color } as React.CSSProperties)].filter(Boolean).join(" ")}
                       key={color}
                       type="button"
                       role="radio"
                       aria-label={`Цвет ${color}`}
                       aria-checked={folderForm.color === color}
                       onClick={() => setFolderForm((current) => ({ ...current, color }))}
-                      style={{ "--folder-color": color } as React.CSSProperties}
+
                     >
                       <Check size={14} strokeWidth={3} aria-hidden="true" />
                     </button>

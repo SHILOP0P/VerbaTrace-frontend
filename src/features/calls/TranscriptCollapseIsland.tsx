@@ -1,3 +1,4 @@
+import { cssStyle } from "../../shared/lib/css-styles";
 import { ChevronUp } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
@@ -65,14 +66,14 @@ export function TranscriptCollapseIsland({ cardRef, onCollapse, label = "Све�
       if (!layout) {
         island.removeAttribute("data-positioned");
         mainToggle.classList.remove("is-island-receiving");
-        mainToggle.style.removeProperty("--island-collision");
+        cssStyle(mainToggle).removeProperty("--island-collision");
         return;
       }
-      island.style.setProperty("--island-left", `${layout.left}px`);
-      island.style.setProperty("--island-bottom", `${window.innerHeight - layout.bottom}px`);
-      island.style.maxWidth = `${layout.maxWidth}px`;
-      island.style.setProperty("--island-collision", String(layout.collision));
-      mainToggle.style.setProperty("--island-collision", String(layout.collision));
+      cssStyle(island).setProperty("--island-left", `${layout.left}px`);
+      cssStyle(island).setProperty("--island-bottom", `${window.innerHeight - layout.bottom}px`);
+      cssStyle(island).maxWidth = `${layout.maxWidth}px`;
+      cssStyle(island).setProperty("--island-collision", String(layout.collision));
+      cssStyle(mainToggle).setProperty("--island-collision", String(layout.collision));
       mainToggle.classList.toggle("is-island-receiving", layout.collision > 0);
       island.setAttribute("data-positioned", "true");
     };
@@ -110,7 +111,7 @@ export function TranscriptCollapseIsland({ cardRef, onCollapse, label = "Све�
       window.visualViewport?.removeEventListener("resize", scheduleUpdate);
       window.visualViewport?.removeEventListener("scroll", scheduleUpdate);
       mainToggle.classList.remove("is-island-receiving");
-      mainToggle.style.removeProperty("--island-collision");
+      cssStyle(mainToggle).removeProperty("--island-collision");
     };
   }, [blockedByVisibleSelector, cardRef]);
 

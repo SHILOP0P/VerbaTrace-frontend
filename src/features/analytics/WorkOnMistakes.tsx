@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import { ArrowRight, CheckCircle2, ChevronDown, History, Repeat2, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
@@ -57,7 +58,7 @@ function openCallItem(callId: string, itemId: string) {
  * criterion in the employee's previous call. It stays silent when the viewer
  * may not see it or the call has not been analysed yet.
  */
-export function CallWorkOnMistakes({ callId, analysisId, personal = false, onOpenItem }: { callId: string; analysisId?: string; personal?: boolean; onOpenItem: (itemId: string) => void }) {
+export function CallWorkOnMistakes({ callId, analysisId, companyId, ownCall = false, personal = false, onOpenItem }: { callId: string; analysisId?: string; companyId?: string | null; ownCall?: boolean; personal?: boolean; onOpenItem: (itemId: string) => void }) {
   const [progress, setProgress] = useState<CallProgress>();
   const [open, setOpen] = useState(false);
 
@@ -65,11 +66,16 @@ export function CallWorkOnMistakes({ callId, analysisId, personal = false, onOpe
     let cancelled = false;
     setProgress(undefined);
     if (!analysisId) return;
-    api.getCallProgress(callId).then((value) => { if (!cancelled) setProgress(value); })
+    api.getAnalyticsCapabilities(companyId ? { company_uuid: companyId } : { scope: "personal" })
+      .then((capabilities) => {
+        if (cancelled || !(companyId ? ownCall || capabilities.team_analytics_enabled && capabilities.role !== "employee" : capabilities.personal_progress_enabled)) return undefined;
+        return api.getCallProgress(callId);
+      })
+      .then((value) => { if (!cancelled) setProgress(value); })
       // A viewer without the right or the plan simply does not get the block.
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [callId, analysisId]);
+  }, [callId, analysisId, companyId, ownCall]);
 
   if (!progress) return null;
   if (!progress.available) {
@@ -95,7 +101,7 @@ export function CallWorkOnMistakes({ callId, analysisId, personal = false, onOpe
       : compared === 0 ? <p className="mistakes-summary-note">Первый звонок с этими критериями — сравнивать пока не с чем.</p>
         : <div className="mistakes-summary">
           <div className="mistakes-bar" aria-hidden="true">
-            {segments.map(([key, , tone]) => counts[key] > 0 ? <i key={key} className={`is-${tone}`} style={{ flexGrow: counts[key] }} /> : null)}
+            {segments.map(([key, , tone]) => counts[key] > 0 ? <i key={key} className={[`is-${tone}`, cssClass({ flexGrow: counts[key] })].filter(Boolean).join(" ")}  /> : null)}
           </div>
           <ul className="mistakes-legend">
             {segments.map(([key, label, tone]) => <li key={key} className={`is-${tone}`}><i />{label} <b>{counts[key]}</b></li>)}

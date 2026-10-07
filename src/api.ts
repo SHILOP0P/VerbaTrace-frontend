@@ -292,6 +292,7 @@ const apiErrorMessages: Record<string, string> = {
     "Этот анализ уже находится на пересмотре",
   quality_review_failed: "Не удалось сохранить изменения анализа",
   call_edit_forbidden: "Вы можете только просматривать этот звонок",
+  failed_to_update_transcription: "Не удалось сохранить транскрипцию. Повторите попытку.",
   personal_progress_access_denied: "Личный прогресс доступен на тарифах Plus и Pro",
   analytics_settings_conflict: "Настройки изменили в другом окне",
   growth_area_not_found: "Зона роста не найдена или скрывать её вам нельзя",
@@ -506,7 +507,13 @@ function normalizeSubscriptionUsage(
   };
 }
 
-function refreshSessionRequest() {
+async function refreshSessionRequest() {
+  const state = await request<{ access_available: boolean; refresh_available: boolean }>(
+    "/auth/session", {}, { retryOnUnauthorized: false },
+  );
+  if (!state.access_available && !state.refresh_available) {
+    throw new ApiError(401, "Сессия отсутствует", "unauthorized");
+  }
   return coordinateRefresh({
     refresh: () =>
       request<AuthResponse>(
@@ -515,6 +522,12 @@ function refreshSessionRequest() {
         { retryOnUnauthorized: false },
       ),
     probe: async () => {
+      if (!state.access_available) {
+        const current = await request<{ access_available: boolean }>(
+          "/auth/session", {}, { retryOnUnauthorized: false },
+        );
+        if (!current.access_available) return null;
+      }
       try {
         return await request<UserResponse>(
           "/auth/me",
@@ -701,10 +714,7 @@ function apiPathFromUrl(pathOrUrl: string) {
 }
 
 export function getCallMediaUrl(call: CallResponse, variant?: "original" | "redacted", accessSession?: string) {
-  // Only the isolated demo document uses locally synthesized recordings.
-  // Product media always goes through our authenticated call endpoint.
-  if (window.location.pathname === "/demo.html" && call.media_url?.startsWith("blob:")) return call.media_url;
-
+  // Product media goes through the authenticated call endpoint.
   const params = new URLSearchParams();
   if (variant) params.set("variant", variant);
   if (accessSession) params.set("access_session", accessSession);
@@ -728,7 +738,6 @@ export function getAdminCallMediaUrl(callId: string) {
 }
 
 export async function downloadCallMedia(call: CallResponse, variant: "original" | "redacted") {
-  if (window.location.pathname === "/demo.html" && call.media_url?.startsWith("blob:")) return requestAssetBlob(call.media_url);
   // A cached playback buffer must not bypass a revoked permission at download.
   const session = await api.createMediaAccessSession(call.id, variant);
   return requestBlob(`/calls/${encodeURIComponent(call.id)}/media/download${queryString({variant, access_session: session.media_access_session_uuid})}`, { method: "POST" });
@@ -1166,6 +1175,12 @@ export const api = {
 
   getAdminCall(callId: string) {
     return request<CallResponse>(`/admin/calls/${encodeURIComponent(callId)}`);
+  },
+  deleteAdminCall(callId: string, reason: string, permanent: boolean) {
+    return request<{ files_pending?: boolean } | void>(`/admin/calls/${encodeURIComponent(callId)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ reason, permanent }),
+    });
   },
 
   listAdminUserCalls(

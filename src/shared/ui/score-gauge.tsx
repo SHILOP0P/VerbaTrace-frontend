@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import type { CSSProperties } from "react";
 import { useDrawProgress } from "../lib/use-draw-progress";
 import { formatScore } from "../lib/analysis";
@@ -40,7 +41,7 @@ export function ScoreGauge({
   const ariaLabel = label ?? (value === null ? "Оценки нет" : `Оценка ${formatScore(value)} из 100`);
 
   return (
-    <div className={`score-gauge tone-${tone}${loading ? " is-loading" : ""}`} style={{ width: size, height: size, "--gauge-size": `${size}px` } as CSSProperties} role="img" aria-label={loading ? "Оценка загружается" : ariaLabel}>
+    <div className={[`score-gauge tone-${tone}${loading ? " is-loading" : ""}`, cssClass({ width: size, height: size, "--gauge-size": `${size}px` } as CSSProperties)].filter(Boolean).join(" ")}  role="img" aria-label={loading ? "Оценка загружается" : ariaLabel}>
       <svg viewBox="0 0 220 220" width={size} height={size} aria-hidden="true">
         <circle className="score-gauge-track" cx="110" cy="110" r={RADIUS} strokeDasharray={`${ARC} ${CIRCUMFERENCE}`} transform="rotate(135 110 110)" />
         {value !== null && !loading && <circle className="score-gauge-value" cx="110" cy="110" r={RADIUS} strokeDasharray={`${drawn} ${CIRCUMFERENCE}`} transform="rotate(135 110 110)" />}

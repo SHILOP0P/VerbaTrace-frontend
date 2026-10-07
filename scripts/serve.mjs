@@ -8,6 +8,17 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const projectDir = fileURLToPath(new URL('../', import.meta.url));
 const mediaTimeout = 45 * 60 * 1000;
+const publicPages = new Map([
+  ['/', 'index.html'], ['/product', 'product.html'], ['/pricing', 'pricing.html'],
+  ['/integrations', 'integrations.html'], ['/login', 'index.html'],
+  ['/register', 'index.html'], ['/reset-password', 'index.html'],
+  ...['privacy', 'terms', 'offer', 'cookies', 'consent', 'details'].map(document => [`/legal/${document}`, 'legal.html'])
+]);
+const legacyPages = new Map([
+  ['/concept.html', '/'], ['/concept-product.html', '/product'],
+  ['/concept-pricing.html', '/pricing'], ['/concept-integrations.html', '/integrations']
+]);
+const documents = new Set(['/index.html', '/app.html', '/product.html', '/pricing.html', '/integrations.html', '/legal.html']);
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -68,18 +79,27 @@ async function staticFile(request, response, distDir, pathname) {
     response.setHeader('Allow', 'GET, HEAD');
     return plain(response, 405, 'Method not allowed');
   }
+  if (legacyPages.has(pathname)) {
+    const query = new URL(request.url, 'http://localhost').search;
+    response.writeHead(308, { Location: legacyPages.get(pathname) + query, 'Cache-Control': 'no-store' });
+    return response.end();
+  }
   if (pathname.includes('\\') || pathname.includes('\0') || pathname.includes(':')
     || pathname.split('/').some(part => part.startsWith('.'))
-    || /^\/(?:src|node_modules|@vite|@id|@fs|@react-refresh)(?:\/|$)/.test(pathname)
+    || /^\/(?:src|scripts|tools|plugins|tests|docs|node_modules|@vite|@id|@fs|@react-refresh)(?:\/|$)/.test(pathname)
     || /\.(?:tsx?|map|gz|br)$/.test(pathname)) return plain(response, 404, 'Not found');
-  let file = resolve(distDir, `.${pathname === '/' ? '/index.html' : pathname}`);
+  const page = publicPages.get(pathname);
+  const workspace = pathname === '/app' || pathname.startsWith('/app/');
+  const asset = pathname.startsWith('/assets/') && Object.hasOwn(mimeTypes, extname(pathname));
+  if (workspace && extname(pathname)) return plain(response, 404, 'Not found');
+  if (!page && !workspace && !documents.has(pathname) && !asset) return plain(response, 404, 'Not found');
+  let file = resolve(distDir, page ?? (workspace ? 'app.html' : `.${pathname}`));
   let sourceStat;
   try { sourceStat = await stat(file); } catch { /* A page route can use the SPA entry. */ }
   if (!sourceStat?.isFile()) {
     if (extname(pathname) || /^\/(?:assets|basis|draco)(?:\/|$)/.test(pathname)
       || !String(request.headers.accept ?? '').includes('text/html')) return plain(response, 404, 'Not found');
-    file = resolve(distDir, 'index.html');
-    sourceStat = await stat(file);
+    return plain(response, 404, 'Not found');
   }
   // A link inside dist must never make workspace files public.
   if (!(await realpath(file)).startsWith(distDir + sep)) return plain(response, 404, 'Not found');

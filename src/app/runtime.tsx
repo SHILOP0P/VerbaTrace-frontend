@@ -26,7 +26,7 @@ export type ThemePreference = AppTheme | "system";
 export type ThemeToggleEvent = React.MouseEvent<HTMLButtonElement>;
 
 export type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => { finished: Promise<void>; };
+  startViewTransition?: (callback: () => void) => { finished: Promise<void>; skipTransition(): void; };
 };
 
 export function getSystemTheme(): AppTheme {

@@ -1,3 +1,4 @@
+import { cssStyle } from "../lib/css-styles";
 import { PointerEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -86,11 +87,11 @@ export function CustomScrollbar({
     }
     // The thumb is positioned against the list's parent; give it a box to
     // anchor to only when it has none, and hand the style back afterwards.
-    const previousPosition = parent.style.position;
-    if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
+    const previousPosition = cssStyle(parent).position;
+    if (getComputedStyle(parent).position === "static") cssStyle(parent).position = "relative";
     setHost(parent);
     return () => {
-      parent.style.position = previousPosition;
+      cssStyle(parent).position = previousPosition;
     };
   }, [alignToViewport, targetRef]);
 
@@ -104,8 +105,8 @@ export function CustomScrollbar({
     let activeTransitions = 0;
     const hide = (thumb: HTMLDivElement) => {
       metricsRef.current = hiddenMetrics;
-      thumb.style.opacity = "0";
-      thumb.style.pointerEvents = "none";
+      cssStyle(thumb).opacity = "0";
+      cssStyle(thumb).pointerEvents = "none";
     };
     const measure = () => {
       const thumb = thumbRef.current;
@@ -120,10 +121,10 @@ export function CustomScrollbar({
         const left = target.offsetLeft + target.offsetWidth - rightOffset;
         const top = target.offsetTop + inset + travel * (target.scrollTop / maxScroll);
         metricsRef.current = { visible: true, height, trackHeight };
-        thumb.style.height = `${height}px`;
-        thumb.style.opacity = "1";
-        thumb.style.pointerEvents = "auto";
-        thumb.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+        cssStyle(thumb).height = `${height}px`;
+        cssStyle(thumb).opacity = "1";
+        cssStyle(thumb).pointerEvents = "auto";
+        cssStyle(thumb).transform = `translate3d(${left}px, ${top}px, 0)`;
         return;
       }
 
@@ -142,10 +143,10 @@ export function CustomScrollbar({
       const top = visibleTop + inset + travel * (target.scrollTop / maxScroll);
 
       metricsRef.current = { visible: true, height, trackHeight };
-      thumb.style.height = `${height}px`;
-      thumb.style.opacity = "1";
-      thumb.style.pointerEvents = "auto";
-      thumb.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+      cssStyle(thumb).height = `${height}px`;
+      cssStyle(thumb).opacity = "1";
+      cssStyle(thumb).pointerEvents = "auto";
+      cssStyle(thumb).transform = `translate3d(${left}px, ${top}px, 0)`;
     };
 
     const update = () => {

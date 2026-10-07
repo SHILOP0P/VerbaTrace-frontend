@@ -11,7 +11,6 @@ import type {
   DepartmentResponse,
   Invitation,
   NotificationResponse,
-  SessionState,
   Subscription,
   TranscriptionResponse,
   UserResponse,
@@ -26,7 +25,6 @@ import {
 import { callIdFromLocation, pageUrl } from "./app/location";
 import { useTheme } from "./app/use-theme";
 import { loadOrganizationContext, loadWorkspaceContext } from "./app/workspace-loader";
-import { Landing } from "./features/landing/Landing";
 import { TextBlockSkeleton } from "./shared/ui/loading";
 import { PageLoadBoundary } from "./shared/ui/PageLoadBoundary";
 import {
@@ -78,7 +76,6 @@ const callsRefreshIntervalMs = 5_000;
 function App() {
   const { session, ready: authReady, setAuthenticatedUser, clearSession } = useAuth();
   const [adminCapabilities, setAdminCapabilities] = useState<AdminCapabilitiesResponse | null>(null);
-  const [showPublicLanding, setShowPublicLanding] = useState(true);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [page, setPage] = useState<AppPage>(() => pageFromPath(window.location.pathname));
   const [selectedCompanyId, setSelectedCompanyId] = useState(() => companyIdFromPath(window.location.pathname));
@@ -102,7 +99,7 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!session) {
+    if (!session || !["helper", "admin", "superadmin"].includes(session.user.role)) {
       setAdminCapabilities(null);
       return;
     }
@@ -114,24 +111,17 @@ function App() {
         if (!cancelled) setAdminCapabilities(null);
       });
     return () => { cancelled = true; };
-  }, [session]);
+  }, [session?.user.id, session?.user.role]);
 
   useEffect(() => {
     if (!authReady) return;
     const requestedAppPage = window.location.pathname.startsWith("/app");
     setWorkspaceReady(true);
     if (session) {
-      setShowPublicLanding(!requestedAppPage);
       setLoadingWorkspace(true);
       return;
     }
-    setShowPublicLanding(true);
-    if (requestedAppPage) {
-      window.history.replaceState({}, "", "/");
-      setPage(pageFromPath("/"));
-      setSelectedCompanyId("");
-      setSelectedDepartmentId("");
-    }
+    if (requestedAppPage) window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`);
   }, [authReady, session]);
 
   useEffect(() => {
@@ -302,11 +292,11 @@ function App() {
       [callId]: true
     }));
 
-    Promise.allSettled([
-      api.getCall(callId),
-      api.getTranscription(callId),
-      api.getAnalysis(callId)
-    ])
+    api.getCall(callId).then((call) => Promise.allSettled([
+      Promise.resolve(call),
+      call.transcription_available === false ? Promise.resolve(null) : api.getTranscription(callId),
+      call.analysis_available === false ? Promise.resolve(null) : api.getAnalysis(callId)
+    ]))
       .then(([callResult, transcriptionResult, analysisResult]) => {
         if (cancelled) return;
 
@@ -314,20 +304,23 @@ function App() {
           setCalls((current) => current.map((item) => item.id === callId ? callResult.value : item));
         }
 
-        if (transcriptionResult.status === "fulfilled") {
+        if (transcriptionResult.status === "fulfilled" && transcriptionResult.value) {
+          const transcription = transcriptionResult.value;
           setTranscriptions((current) => ({
             ...current,
-            [callId]: transcriptionResult.value
+            [callId]: transcription
           }));
         }
 
-        if (analysisResult.status === "fulfilled") {
+        if (analysisResult.status === "fulfilled" && analysisResult.value) {
+          const analysis = analysisResult.value;
           setAnalyses((current) => ({
             ...current,
-            [callId]: analysisResult.value
+            [callId]: analysis
           }));
         }
       })
+      .catch(() => { /* The calls refresh retains the visible last state. */ })
       .finally(() => {
         if (cancelled) return;
 
@@ -397,12 +390,14 @@ function App() {
       if (refreshing) return;
       refreshing = true;
       try {
+		const call = await api.getCall(callId);
 		const [analysisResult, callResult] = await Promise.allSettled([
-		  api.getAnalysis(callId),
-		  api.getCall(callId)
+		  call.analysis_available === false ? Promise.resolve(null) : api.getAnalysis(callId),
+		  Promise.resolve(call)
 		]);
-		if (!cancelled && analysisResult.status === "fulfilled") {
-		  setAnalyses((current) => ({ ...current, [callId]: analysisResult.value }));
+		if (!cancelled && analysisResult.status === "fulfilled" && analysisResult.value) {
+		  const analysis = analysisResult.value;
+		  setAnalyses((current) => ({ ...current, [callId]: analysis }));
 		}
 		if (!cancelled && callResult.status === "fulfilled") {
 		  setCalls((current) => current.map((item) => item.id === callId ? callResult.value : item));
@@ -414,7 +409,6 @@ function App() {
   }, [session, selectedCall?.id, selectedCall?.status, selectedCall?.transcription_only, analyses[selectedCall?.id ?? ""]?.status]);
 
   function navigate(nextPage: AppPage) {
-    setShowPublicLanding(false);
     setPage(nextPage);
     setSelectedCompanyId("");
     setSelectedDepartmentId("");
@@ -422,7 +416,6 @@ function App() {
   }
 
   function openQualityReview(reviewId: string) {
-    setShowPublicLanding(false);
     setPage("qualityReview");
     window.history.pushState({}, "", `/app/quality-reviews/${encodeURIComponent(reviewId)}`);
   }
@@ -445,7 +438,6 @@ function App() {
   }
 
   function openCallPage(callId: string, nextPage: AppPage = "calls") {
-    setShowPublicLanding(false);
     setPage(nextPage);
     setSelectedCompanyId("");
     setSelectedDepartmentId("");
@@ -454,7 +446,6 @@ function App() {
   }
 
   function openTranscriptionComparison(callId: string, revision?: number) {
-    setShowPublicLanding(false);
     setSelectedCallId(callId);
     setPage("transcriptionCompare");
     const query = new URLSearchParams({ call: callId });
@@ -463,21 +454,18 @@ function App() {
   }
 
   function openTranscriptionEditor(callId: string) {
-    setShowPublicLanding(false);
     setSelectedCallId(callId);
     setPage("transcriptionEdit");
     window.history.pushState({}, "", `/app/calls/transcription-edit?call=${encodeURIComponent(callId)}`);
   }
 
   function openInstructionComparison(instructionId: string, versionIds: string[]) {
-    setShowPublicLanding(false);
     setPage("instructionCompare");
     const query = new URLSearchParams({ versions: versionIds.join(",") });
     window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(instructionId)}/compare?${query}`);
   }
 
   function openCompany(companyId: string) {
-    setShowPublicLanding(false);
     setPage("settingsCompanies");
     setSelectedCompanyId(companyId);
     setSelectedDepartmentId("");
@@ -516,7 +504,6 @@ function App() {
   }
 
   function openDepartment(companyId: string, departmentId: string) {
-    setShowPublicLanding(false);
     setPage("settingsCompanies");
     setSelectedCompanyId(companyId);
     setSelectedDepartmentId(departmentId);
@@ -525,13 +512,6 @@ function App() {
       "",
       `/app/settings/companies/${encodeURIComponent(companyId)}/departments/${encodeURIComponent(departmentId)}`
     );
-  }
-
-  function applySession(nextSession: SessionState) {
-    setAuthenticatedUser(nextSession.user);
-    setWorkspaceReady(true);
-    setLoadingWorkspace(true);
-    navigate("overview");
   }
 
   function updateSessionUser(user: UserResponse) {
@@ -545,8 +525,7 @@ function App() {
     clearSession();
     clearWorkspaceState();
     setWorkspaceReady(true);
-    setShowPublicLanding(true);
-    window.history.pushState({}, "", "/");
+    window.location.assign("/");
     setPage("calls");
   }
 
@@ -557,23 +536,12 @@ function App() {
     clearSession();
     clearWorkspaceState();
     setWorkspaceReady(true);
-    setShowPublicLanding(true);
-    window.history.pushState({}, "", "/");
+    window.location.assign("/");
     setPage("calls");
   }
 
   function openLanding() {
-    setShowPublicLanding(true);
-    window.history.pushState({}, "", "/");
-  }
-
-  function getStarted() {
-    if (session) {
-      navigate("overview");
-      return;
-    }
-
-    setShowPublicLanding(true);
+    window.location.assign("/");
   }
 
   function clearWorkspaceState() {
@@ -596,8 +564,7 @@ function App() {
     clearSession();
     clearWorkspaceState();
     setWorkspaceReady(true);
-    setShowPublicLanding(true);
-    window.history.replaceState({}, "", "/");
+    window.location.replace("/");
     setPage("calls");
   }
 
@@ -657,28 +624,18 @@ function App() {
 
   if (!authReady) {
     return (
-      <main className="landing preflight-screen" aria-label="Проверка сессии">
-        <div className="landing-bg" />
+      <main className="preflight-screen" aria-label="Проверка сессии">
+        {pageLoading}
       </main>
     );
   }
 
-  if (!session || showPublicLanding) {
-    return (
-      <Landing
-        session={session}
-        theme={activeTheme}
-        onAuth={applySession}
-        onGetStarted={getStarted}
-        onToggleTheme={toggleTheme}
-      />
-    );
-  }
+  if (!session) return <main className="preflight-screen" aria-label="Переход к входу">{pageLoading}</main>;
 
   if (!workspaceReady) {
     return (
-      <main className="landing preflight-screen" aria-label="Проверка сессии">
-        <div className="landing-bg" />
+      <main className="preflight-screen" aria-label="Проверка сессии">
+        {pageLoading}
       </main>
     );
   }
@@ -722,6 +679,7 @@ function App() {
           <OverviewPage
             calls={calls}
             callsVersion={calls.map((call) => `${call.id}:${call.status}:${call.created_at}`).join("|")}
+            canMonitor={Boolean(adminCapabilities?.permissions.includes("admin.monitoring.read"))}
             onNavigate={navigate}
             onOpenCall={openCallAt}
           />
@@ -837,7 +795,7 @@ function App() {
 
       {page === "notifications" && <NotificationsPage onOpen={openNotificationTarget} />}
 
-      {page === "action" && <ActionDetailPage actionId={decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "")} onBack={() => navigate("actions")} onOpenEvidence={(action,evidence)=>{setShowPublicLanding(false);setPage("calls");setSelectedCompanyId("");setSelectedDepartmentId("");setSelectedCallId(action.call_uuid);const query=new URLSearchParams({call:action.call_uuid});if(typeof evidence.word_start_index==="number")query.set("evidence_start",String(evidence.word_start_index));if(typeof evidence.word_end_index==="number")query.set("evidence_end",String(evidence.word_end_index));if(typeof evidence.start_seconds==="number")query.set("evidence_time",String(evidence.start_seconds));if(typeof evidence.end_seconds==="number")query.set("evidence_end_time",String(evidence.end_seconds));window.history.pushState({},"",`/app/calls?${query}`)}} />}
+      {page === "action" && <ActionDetailPage actionId={decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "")} onBack={() => navigate("actions")} onOpenEvidence={(action,evidence)=>{setPage("calls");setSelectedCompanyId("");setSelectedDepartmentId("");setSelectedCallId(action.call_uuid);const query=new URLSearchParams({call:action.call_uuid});if(typeof evidence.word_start_index==="number")query.set("evidence_start",String(evidence.word_start_index));if(typeof evidence.word_end_index==="number")query.set("evidence_end",String(evidence.word_end_index));if(typeof evidence.start_seconds==="number")query.set("evidence_time",String(evidence.start_seconds));if(typeof evidence.end_seconds==="number")query.set("evidence_end_time",String(evidence.end_seconds));window.history.pushState({},"",`/app/calls?${query}`)}} />}
 
       {page === "qualityReviews" && <QualityReviewsPage onOpen={openQualityReview} />}
 
@@ -851,8 +809,8 @@ function App() {
 
       {page === "instructionCreate" && <NewInstructionPage session={session} companies={companies} departments={departments} departmentMembers={departmentMembers} onCancel={() => navigate("settingsInstructions")} onCreated={(instruction) => setInstructions((current) => [instruction, ...current])} />}
 
-      {page === "monitoring" && !adminCapabilities && <AccessDeniedPage />}
-      {page === "monitoring" && adminCapabilities && <MonitoringPage calls={calls} onBack={() => {
+      {page === "monitoring" && !adminCapabilities?.permissions.includes("admin.monitoring.read") && <AccessDeniedPage />}
+      {page === "monitoring" && adminCapabilities?.permissions.includes("admin.monitoring.read") && <MonitoringPage calls={calls} onBack={() => {
         const from = new URLSearchParams(window.location.search).get("from");
         const section = from === "companies" || from === "actions" || from === "users" ? from : "users";
         navigate("admin");

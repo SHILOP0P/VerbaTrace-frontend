@@ -124,6 +124,12 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   </div>;
   const settingsCard = settingsOpen && canSetUp ? <AnalyticsSettingsCard companyId={workspace || undefined} onClose={() => setSettingsOpen(false)} /> : null;
 
+  const allowed = capabilities.scope === "personal" ? capabilities.personal_progress_enabled : profileUserId === "me" || capabilities.role === "employee" || capabilities.team_analytics_enabled;
+  if (!allowed) return <section className="app-page analytics-page"><EmptyState icon={<Lock size={28} />}
+    title={capabilities.scope === "personal" ? "Личный прогресс доступен на тарифах Plus и Pro" : "Командная аналитика не входит в тариф"}
+    text="Общий балл и счётчики остаются на «Обзоре»."
+    action={<button className="primary-button" type="button" onClick={() => onNavigate("settingsTariffs")}>Перейти к тарифам</button>} /></section>;
+
   if (ownOnly || profileUserId) {
     return <section className="app-page analytics-page">
       {!ownOnly ? <button className="ghost-button small analytics-back" type="button" onClick={backToTeam}><ArrowLeft size={16} />К команде</button> : null}

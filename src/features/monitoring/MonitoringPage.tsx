@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import {
   Activity,
   ArrowLeft,
@@ -5,7 +6,7 @@ import {
   RotateCcw,
   Workflow
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../../api";
 import type { CallResponse } from "../../types";
 
@@ -13,12 +14,16 @@ export function MonitoringPage({ calls, onBack }: { calls: CallResponse[]; onBac
   const [monitoring, setMonitoring] = useState<Awaited<ReturnType<typeof api.getProcessingMonitoring>> | null>(null);
   const [restricted, setRestricted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const denied = useRef(false);
   const callsQueueKey = calls.map((call) => `${call.id}:${call.status}`).join("|");
 
   useEffect(() => {
     let cancelled = false;
+    let loadingRequest = false;
 
     async function loadMonitoring(showLoading: boolean) {
+      if (denied.current || loadingRequest) return;
+      loadingRequest = true;
       if (showLoading) setLoading(true);
       try {
         const response = await api.getProcessingMonitoring();
@@ -26,8 +31,12 @@ export function MonitoringPage({ calls, onBack }: { calls: CallResponse[]; onBac
         setMonitoring(response);
         setRestricted(false);
       } catch (error) {
-        if (!cancelled && error instanceof ApiError && error.status === 403) setRestricted(true);
+        if (!cancelled && error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+          denied.current = true;
+          setRestricted(true);
+        }
       } finally {
+        loadingRequest = false;
         if (!cancelled) setLoading(false);
       }
     }
@@ -144,7 +153,7 @@ function PipelineStep({
         <small>{status}</small>
       </div>
       <div className="pipeline-track" aria-hidden="true">
-        <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+        <span className={cssClass({ width: `${Math.min(100, Math.max(0, progress))}%` })} />
       </div>
     </div>
   );

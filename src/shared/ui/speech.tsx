@@ -1,3 +1,4 @@
+import { cssClass } from "../lib/css-styles";
 import { AudioLines } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { AnalyticsSpeech, CallSpeech } from "../../types";
@@ -43,15 +44,15 @@ export function CallSpeechBlock({ speech, hideShare = false }: { speech?: CallSp
     {!hideShare && <div className="speech-share">
       <span className="speech-share-label">Доля речи в разговоре <InfoHint label="Доля речи" text={speechHints.talk_share} /></span>
       <div className="speech-share-bar" role="img" aria-label={speech.speakers.map((speaker) => `${name(speaker)}: ${formatShare(speaker.talk_share)}`).join(", ")}>
-        {speech.speakers.map((speaker) => <HoverHint key={speaker.speaker_key} focusable={false} className="speech-share-segment" style={{ ...color(speaker), flexGrow: Math.max(speaker.talk_share, 0.01) }}
+        {speech.speakers.map((speaker) => <HoverHint key={speaker.speaker_key} focusable={false} className={["speech-share-segment", cssClass({ ...color(speaker), flexGrow: Math.max(speaker.talk_share, 0.01) })].filter(Boolean).join(" ")}
           label={`${name(speaker)} — ${formatShare(speaker.talk_share)}`} detail={`время речи ${formatSeconds(speaker.talk_seconds)}`} />)}
       </div>
       <ul className="speech-share-legend">
-        {speech.speakers.map((speaker) => <li key={speaker.speaker_key} style={color(speaker)}><i />{name(speaker)} <b>{formatShare(speaker.talk_share)}</b></li>)}
+        {speech.speakers.map((speaker) => <li key={speaker.speaker_key} className={cssClass(color(speaker))}><i />{name(speaker)} <b>{formatShare(speaker.talk_share)}</b></li>)}
       </ul>
     </div>}
     <ul className="speech-speakers">
-      {speech.speakers.map((speaker) => <li key={speaker.speaker_key} className={speaker.is_subject ? "is-subject" : ""} style={color(speaker)}>
+      {speech.speakers.map((speaker) => <li key={speaker.speaker_key} className={[speaker.is_subject ? "is-subject" : "", cssClass(color(speaker))].filter(Boolean).join(" ")} >
         <strong><i className="speech-speaker-dot" />{name(speaker)}{speaker.is_subject ? <em>сотрудник</em> : null}</strong>
         <dl>
           <div><dt>Самый длинный монолог <InfoHint label="Самый длинный монолог" text={speechHints.longest_monologue} /></dt><dd>{formatSeconds(speaker.longest_monologue_seconds)}</dd></div>

@@ -1,31 +1,24 @@
 @media (max-width: 1180px) {
-  .landing-header,
   .app-header {
     padding: 0 24px;
   }
 
-  .landing-header {
-    width: min(100% - 32px, 1720px);
-  }
-
-  .landing-header nav,
   .app-header nav {
     gap: 20px;
   }
 
-  .landing-hero,
   .calls-layout,
-  .upload-layout,
-  .analysis-layout,
-  .deep-analysis-grid,
-  .deep-analysis-content-grid,
-  .instructions-layout,
-  .invitations-layout,
-  .overview-layout,
-  .companies-hero,
-  .company-workspace-grid,
-  .profile-grid,
-  .company-grid {
+.upload-layout,
+.analysis-layout,
+.deep-analysis-grid,
+.deep-analysis-content-grid,
+.instructions-layout,
+.invitations-layout,
+.overview-layout,
+.companies-hero,
+.company-workspace-grid,
+.profile-grid,
+.company-grid {
     grid-template-columns: 1fr;
   }
 
@@ -48,12 +41,11 @@
   }
 
   .benefit-grid,
-  .landing-showcase-grid,
-  .metrics-row,
-  .analytics-insight-grid,
-  .report-format-grid,
-  .tariff-grid,
-  .workflow-grid {
+.metrics-row,
+.analytics-insight-grid,
+.report-format-grid,
+.tariff-grid,
+.workflow-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -128,21 +120,10 @@
     overflow-x: clip;
   }
 
-  .landing {
-    --landing-header-offset: 10px;
-    --landing-header-space: 178px;
-  }
-
-  .landing-header,
   .app-header {
     height: auto;
     flex-wrap: wrap;
     padding: 18px;
-  }
-
-  .landing-header {
-    width: calc(100% - 20px);
-    border-radius: 24px;
   }
 
   .workspace-frame {
@@ -187,7 +168,6 @@
     clip: auto;
   }
 
-  .landing-header nav,
   .app-header nav {
     order: 3;
     width: 100%;
@@ -195,12 +175,10 @@
     justify-content: flex-start;
   }
 
-  .landing-actions,
   .profile-block {
     margin-left: auto;
   }
 
-  .landing-hero,
   .workspace {
     width: 100%;
   }
@@ -222,21 +200,20 @@
   }
 
   .detail-grid,
-  .analysis-content-grid,
-  .analytics-insight-grid,
-  .deep-analysis-grid,
-  .deep-analysis-content-grid,
-  .preview-grid,
-  .analysis-kv-grid,
-  .analysis-columns,
-  .benefit-grid,
-  .landing-showcase-grid,
-  .workflow-grid,
-  .security-section,
-  .metrics-row,
-  .report-format-grid,
-  .tariff-grid,
-  .form-grid.two {
+.analysis-content-grid,
+.analytics-insight-grid,
+.deep-analysis-grid,
+.deep-analysis-content-grid,
+.preview-grid,
+.analysis-kv-grid,
+.analysis-columns,
+.benefit-grid,
+.workflow-grid,
+.security-section,
+.metrics-row,
+.report-format-grid,
+.tariff-grid,
+.form-grid.two {
     grid-template-columns: 1fr;
   }
 
@@ -334,8 +311,7 @@
     display: none;
   }
 
-  .benefits,
-  .landing-section {
+  .benefits {
     width: 100%;
     margin-top: 0;
     padding-right: 18px;
@@ -348,11 +324,6 @@
 
   .benefit {
     min-height: auto;
-  }
-
-  .landing-showcase-card {
-    min-height: auto;
-    padding: 18px;
   }
 
   .showcase-visual {

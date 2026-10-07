@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import { AlertTriangle, ChevronDown, ClipboardCheck, Link2, ListChecks, RefreshCw, Save, Split, Undo2 } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
@@ -201,7 +202,7 @@ function PendingState({ card }: { card: InstructionScorecard }) {
 // get ticked off: what the compile actually does, rather than a bare spinner.
 function AssemblingCriteria() {
   return <div className="scorecard-assembling" aria-hidden="true">
-    {[0, 1, 2, 3].map((row) => <span key={row} style={{ "--row": row } as CSSProperties}>
+    {[0, 1, 2, 3].map((row) => <span key={row} className={cssClass({ "--row": row } as CSSProperties)}>
       <svg viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="4"/><path d="m4.5 8.4 2.3 2.3 4.7-5"/></svg>
       <i/>
     </span>)}

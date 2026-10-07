@@ -7,6 +7,7 @@ export class AuthorizedEventStream {
   private readonly listeners = new Map<string, Set<StreamListener>>();
   private closed = false;
   private retryTimer: number | undefined;
+  private retryDelay = 2_000;
 
   constructor(private readonly url: string, private readonly refreshTokens: RefreshTokens) {
     void this.connect(true);
@@ -26,10 +27,12 @@ export class AuthorizedEventStream {
 
   private scheduleReconnect() {
     if (this.closed || this.retryTimer !== undefined) return;
+    const delay = this.retryDelay;
+    this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
     this.retryTimer = window.setTimeout(() => {
       this.retryTimer = undefined;
       if (!this.closed) void this.connect(true);
-    }, 2_000);
+    }, delay);
   }
 
   private emit(type: string, event: Event) {
@@ -39,18 +42,30 @@ export class AuthorizedEventStream {
   private async connect(retryOnUnauthorized: boolean): Promise<void> {
     try {
       const response = await fetch(this.url, { credentials: "include", signal: this.controller.signal });
+      if (this.closed) return;
       if (response.status === 401 && retryOnUnauthorized) {
-        await this.refreshTokens();
+        try {
+          await this.refreshTokens();
+        } catch {
+          this.close();
+          this.emit("error", new Event("error"));
+          return;
+        }
         if (!this.closed) await this.connect(false);
         return;
       }
       if (!response.ok || !response.body) {
+        // Permission and missing-resource responses cannot be repaired by a
+        // timer. Stop every consumer of this shared stream implementation.
+        const permanent = response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status);
+        if (permanent) this.close();
         this.emit("error", new Event("error"));
         this.scheduleReconnect();
         return;
       }
 
       const reader = response.body.getReader();
+      this.retryDelay = 2_000;
       const decoder = new TextDecoder();
       let buffer = "";
       let eventType = "message";

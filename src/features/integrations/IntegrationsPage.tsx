@@ -185,6 +185,7 @@ export function IntegrationsPage({
     "sandbox",
   );
   const [busy, setBusy] = useState(false);
+  const [apiAllowed, setApiAllowed] = useState(false);
   const [message, setMessage] = useState("");
   const [createdKey, setCreatedKey] = useState<CreatedIntegrationKey | null>(
     null,
@@ -209,8 +210,17 @@ export function IntegrationsPage({
   useEffect(() => {
     let alive = true;
     setMessage("");
-    api
-      .listDeveloperApplications(ownerType, ownerId)
+    setApiAllowed(false);
+    const subscription = ownerType === "company" && ownerId ? api.getCompanySubscription(ownerId) : api.getSubscription();
+    subscription.then((value) => {
+      if (!alive) return { applications: [] as DeveloperApplication[] };
+      setApiAllowed(value.plan.api_access_enabled);
+      if (!value.plan.api_access_enabled) {
+        if (alive) setMessage("Доступ к API не входит в выбранный тариф.");
+        return { applications: [] as DeveloperApplication[] };
+      }
+      return api.listDeveloperApplications(ownerType, ownerId);
+    })
       .then((value) => {
         if (alive) {
           setApps(value.applications);
@@ -290,7 +300,7 @@ export function IntegrationsPage({
     };
   }, [keyApp]);
   async function createApp() {
-    if (!name.trim()) return;
+    if (!name.trim() || !apiAllowed || busy) return;
     setBusy(true);
     setMessage("");
     try {
@@ -421,7 +431,7 @@ export function IntegrationsPage({
           <button
             className="primary-button"
             type="button"
-            disabled={busy || !name.trim()}
+            disabled={busy || !name.trim() || !apiAllowed}
             onClick={() => void createApp()}
           >
             {busy ? "Создаю…" : "Создать приложение"}

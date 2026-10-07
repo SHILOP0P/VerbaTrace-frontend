@@ -1,3 +1,4 @@
+import { cssClass } from "../../shared/lib/css-styles";
 import { ArrowLeft, Check, ChevronDown, GitCompareArrows, Plus, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -332,7 +333,7 @@ export function TranscriptionComparePage({
     {loading ? <div className="transcription-compare-loading">Загружаю версии…</div> : <>
       <section className="compare-selection-panel" aria-label="Выбранные версии">
         <div className="compare-selected-versions">
-          {selected.map((revision) => <span ref={(element) => { if (element) chipRefs.current.set(revision, element); else chipRefs.current.delete(revision); }} className="compare-version-chip" style={{ "--version-color": versionColor(revision) } as CSSProperties} key={revision}>
+          {selected.map((revision) => <span ref={(element) => { if (element) chipRefs.current.set(revision, element); else chipRefs.current.delete(revision); }} className={["compare-version-chip", cssClass({ "--version-color": versionColor(revision) } as CSSProperties)].filter(Boolean).join(" ")}  key={revision}>
             <i />Версия {revision}
             {selected.length > 2 && <button type="button" aria-label={`Убрать версию ${revision}`} onClick={() => updateSelectedWithAnimation(selected.filter((item) => item !== revision))}><X size={14} /></button>}
           </span>)}
@@ -351,7 +352,7 @@ export function TranscriptionComparePage({
         </div>
       </section>
 
-      <section ref={boardRef} className={`compare-version-board${lanes.length === 1 ? " is-single" : lanes.length === 2 ? " is-pair" : ""}`} style={{ "--compare-column-count": lanes.length } as CSSProperties}>
+      <section ref={boardRef} className={[`compare-version-board${lanes.length === 1 ? " is-single" : lanes.length === 2 ? " is-pair" : ""}`, cssClass({ "--compare-column-count": lanes.length } as CSSProperties)].filter(Boolean).join(" ")} >
         {lanes.map((versions, laneIndex) => <div className={`compare-version-lane${dropTarget?.lane === laneIndex ? " is-drop-target" : ""}${dropTarget?.kind === "column" && dropTarget.lane === laneIndex ? ` is-column-${dropTarget.placement}` : ""}`} key={laneIndex} onDragOver={(event) => updateDropTarget(event, laneIndex as CompareLane)} onDrop={(event) => dropVersion(event, laneIndex as CompareLane)}>
           {draggingRevision !== null && selected.length > 2 && lanes.length < selected.length && <div
             className={`compare-column-drop-zone is-before${dropTarget?.kind === "column" && dropTarget.index === laneIndex ? " is-active" : ""}`}
@@ -376,7 +377,7 @@ export function TranscriptionComparePage({
               : selectedVersions[globalIndex + 1]?.content.words ?? [];
             return <Fragment key={version.content.revision}>
               {dropTarget?.kind === "lane" && dropTarget.lane === laneIndex && dropTarget.index === lanePosition && <div className="compare-drop-marker" />}
-              <article data-revision={version.content.revision} ref={(element) => { if (element) cardRefs.current.set(version.content.revision, element); else cardRefs.current.delete(version.content.revision); }} className={`compare-version-card${draggingRevision === version.content.revision ? " is-dragging" : ""}`} style={{ "--version-color": versionColor(version.content.revision) } as CSSProperties}>
+              <article data-revision={version.content.revision} ref={(element) => { if (element) cardRefs.current.set(version.content.revision, element); else cardRefs.current.delete(version.content.revision); }} className={[`compare-version-card${draggingRevision === version.content.revision ? " is-dragging" : ""}`, cssClass({ "--version-color": versionColor(version.content.revision) } as CSSProperties)].filter(Boolean).join(" ")} >
                 <header onPointerDown={(event) => startPointerDrag(event, version.content.revision)} onPointerMove={movePointerDrag} onPointerUp={endPointerDrag} onPointerCancel={endPointerDrag}><div><span className="version-dot" /><strong>Версия {version.content.revision}</strong>{version.summary.is_current && <em>Текущая</em>}</div><time>{formatDate(version.summary.created_at)}</time></header>
                 <VersionTranscript words={version.content.words} referenceWords={referenceWords} speakerAssignments={speakerAssignments} />
               </article>
@@ -389,7 +390,7 @@ export function TranscriptionComparePage({
 
       <section className="compare-change-log">
         <div className="compare-section-heading"><div><span className="eyebrow">Хронология</span><h2>Что и где изменилось</h2></div><small>Каждая версия сравнивается с предыдущей выбранной</small></div>
-        {changes.length === 0 ? <div className="empty-state compact">Добавьте ещё одну версию для сравнения.</div> : changes.map((change) => <article className="compare-change-step" style={{ "--version-color": versionColor(change.to.content.revision) } as CSSProperties} key={change.to.content.revision}>
+        {changes.length === 0 ? <div className="empty-state compact">Добавьте ещё одну версию для сравнения.</div> : changes.map((change) => <article className={["compare-change-step", cssClass({ "--version-color": versionColor(change.to.content.revision) } as CSSProperties)].filter(Boolean).join(" ")}  key={change.to.content.revision}>
           <header><span className="version-dot" /><div><strong>Версия {change.from.content.revision} → {change.to.content.revision}</strong><time>{formatDate(change.to.summary.created_at)}</time></div><b>{change.ranges.length} {change.ranges.length === 1 ? "изменение" : "изменений"}</b></header>
           {change.ranges.length === 0 ? <p className="compare-no-changes">Текст и говорящие совпадают.</p> : <div className="compare-change-ranges">
             {change.ranges.map((range) => <div className={`compare-change-range is-${range.kind}`} key={`${range.startIndex}-${range.endIndex}`}>

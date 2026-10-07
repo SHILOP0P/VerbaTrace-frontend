@@ -1,3 +1,4 @@
+import { cssClass, cssStyle } from "../lib/css-styles";
 import { Download, Pause, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
@@ -228,7 +229,7 @@ function CallVideoPlayer({ call, seekTarget, words = emptyTranscriptWords, onAct
       />
       {error && <div className="call-video-placeholder" role="status">{error}</div>}
       {!error && <div className="call-video-controls">
-        <input className="video-progress" type="range" min={0} max={Math.max(duration, 1)} step="0.1" value={Math.min(currentTime, Math.max(duration, 1))} onChange={(event) => seek(Number(event.target.value))} aria-label="Позиция видео" aria-valuetext={`${formatDuration(currentTime)} из ${formatDuration(duration)}`} style={{ "--media-progress": `${duration > 0 ? currentTime / duration * 100 : 0}%` } as CSSProperties} />
+        <input className={["video-progress", cssClass({ "--media-progress": `${duration > 0 ? currentTime / duration * 100 : 0}%` } as CSSProperties)].filter(Boolean).join(" ")} type="range" min={0} max={Math.max(duration, 1)} step="0.1" value={Math.min(currentTime, Math.max(duration, 1))} onChange={(event) => seek(Number(event.target.value))} aria-label="Позиция видео" aria-valuetext={`${formatDuration(currentTime)} из ${formatDuration(duration)}`}  />
         <div className="video-control-row">
           <div className="video-control-primary">
             <button type="button" className="video-play-button" onClick={togglePlayback} aria-label={playing ? "Пауза" : "Воспроизвести"}>{playing ? <Pause size={18} /> : <Play size={18} />}</button>
@@ -436,7 +437,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   function scrubTo(clientX: number, final: boolean) {
     const nextTime = pointerTime(clientX);
     if (nextTime === null) return;
-    playerRef.current?.style.setProperty("--audio-progress", `${effectiveDuration > 0 ? (nextTime / effectiveDuration) * 100 : 0}%`);
+    cssStyle(playerRef.current)?.setProperty("--audio-progress", `${effectiveDuration > 0 ? (nextTime / effectiveDuration) * 100 : 0}%`);
     scrubTimeRef.current = nextTime;
     if (final) {
       if (scrubFrameRef.current !== null) cancelAnimationFrame(scrubFrameRef.current);
@@ -573,7 +574,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   // --audio-progress variable.
   const waveLayers = useMemo(() => {
     const bars = displayedWaveform.map((peak, index) => (
-      <span style={{ "--bar-height": `${Math.max(8, peak * 100)}%` } as React.CSSProperties} key={`${index}-${peak.toFixed(3)}`} />
+      <span className={cssClass({ "--bar-height": `${Math.max(8, peak * 100)}%` } as React.CSSProperties)} key={`${index}-${peak.toFixed(3)}`} />
     ));
     return <>
       <div className="audio-wave-layer">{bars}</div>
@@ -587,8 +588,8 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
         {runs.map((run, index) => (
           <span
             key={`${run.speaker}-${run.start}-${index}`}
-            className="audio-lane-run"
-            style={{ left: percent(run.start), width: percent(run.end - run.start), "--run-color": speakerColor(run.speaker, speakerKeys) } as React.CSSProperties}
+            className={["audio-lane-run", cssClass({ left: percent(run.start), width: percent(run.end - run.start), "--run-color": speakerColor(run.speaker, speakerKeys) } as React.CSSProperties)].filter(Boolean).join(" ")}
+
           />
         ))}
       </span>
@@ -612,8 +613,8 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
   return (
     <div
       ref={playerRef}
-      className={`dashboard-audio-player custom-audio-player${hasLane ? " has-lane" : ""} ${showAudioSkeleton ? "audio-loading-state" : ""} ${audioError ? "audio-error-state" : ""}`}
-      style={{ "--audio-progress": `${progressPercent}%` } as React.CSSProperties}
+      className={[`dashboard-audio-player custom-audio-player${hasLane ? " has-lane" : ""} ${showAudioSkeleton ? "audio-loading-state" : ""} ${audioError ? "audio-error-state" : ""}`, cssClass({ "--audio-progress": `${progressPercent}%` } as React.CSSProperties)].filter(Boolean).join(" ")}
+
     >
       <button
         className="audio-play"
@@ -722,7 +723,7 @@ export function CallAudioPlayer({ call, seekTarget, words = emptyTranscriptWords
             <div className="audio-lane-summary">
               <ul className="audio-lane-legend" aria-label="Кто говорит">
                 {legendSpeakers.map((speaker) => (
-                  <li key={speaker.key} style={{ "--run-color": speakerColor(speaker.key, speakerKeys) } as React.CSSProperties}>
+                  <li key={speaker.key} className={cssClass({ "--run-color": speakerColor(speaker.key, speakerKeys) } as React.CSSProperties)}>
                     <i />{speaker.name}{speaker.share !== null && <b>{Math.round(speaker.share * 100)}%</b>}
                   </li>
                 ))}

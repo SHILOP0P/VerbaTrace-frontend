@@ -123,12 +123,13 @@ function AnalysisTimeline({
   const labels = ["Загрузка", "Транскрипция", "Поиск вопросов", "Разбор ответов", "Проверка и итог"];
   const finished = analysisStatus === "done" || (current === "analyzed" && !analysisStatus);
   const failed = analysisStatus === "failed" || current === "failed";
+  const waitingForAnalysis = current === "transcribed" && !analysisStatus && !progress;
   const active = finished ? 5 : progress ? ({ inventory: 2, answers: 3, validation: 4, complete: 4 }[progress.stage]) : current === "new" ? 0 : current === "processing" || (current === "failed" && !analysisStatus) ? 1 : 2;
   const questions = progress ? `${progress.questions_found} ${pluralizeRu(progress.questions_found, "вопрос", "вопроса", "вопросов")}` : "";
   const transcribed = transcriptionSeconds ? formatStageDuration(transcriptionSeconds) : "готово";
 
   const steps: RailStep[] = labels.map((label, index) => {
-    const state: RailState = index < active ? "done" : index === active ? failed ? "failed" : "active" : "pending";
+    const state: RailState = index < active ? "done" : index === active && !waitingForAnalysis ? failed ? "failed" : "active" : "pending";
     let meta = state === "done" ? "готово" : state === "pending" ? "ожидает" : state === "failed" ? "не завершено" : "идёт…";
     let fraction: number | undefined;
     if (index === 0) meta = state === "done" ? acceptedAt ? acceptedLabel(acceptedAt) : "принят" : state === "active" ? "в очереди" : meta;
@@ -158,7 +159,7 @@ function AnalysisTimeline({
 
   const failedStep = steps.find((step) => step.state === "failed");
   return <div className="stage-rail-wrap">
-    <StageRail steps={steps} label="Этапы обработки звонка" status={failed ? "Обработка остановилась" : !finished ? `Идёт ${labels[Math.min(active, 4)].toLocaleLowerCase("ru")}` : undefined} onCollapse={finished ? () => setExpanded(false) : undefined} />
+    <StageRail steps={steps} label="Этапы обработки звонка" status={failed ? "Обработка остановилась" : waitingForAnalysis ? "Транскрипция готова" : !finished ? `Идёт ${labels[Math.min(active, 4)].toLocaleLowerCase("ru")}` : undefined} onCollapse={finished ? () => setExpanded(false) : undefined} />
     {failedStep && analysisStatus === "failed" && <div className="stage-rail-failure" role="note">
       <span className="stage-rail-failure-icon" aria-hidden="true"><X size={15} strokeWidth={2.6} /></span>
       <span className="stage-rail-failure-text"><strong>Анализ не завершился на этапе «{failedStep.label}»</strong><small>Повторный запуск проходит анализ целиком и списывает кредиты заново.</small></span>

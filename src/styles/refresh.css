@@ -5077,6 +5077,66 @@ html[data-theme] .app-shell .quality-review-entry small {
   to { opacity: 0; transform: translateY(6px) scale(0.94); }
 }
 
+/* The instructions page scrolls inside the workspace. Its last card keeps the
+   same distance from the screen edge as the shared navigation islands. */
+.app-shell { --vt-navigation-edge-gap: 16px; }
+
+/* Icons inherit the button colour, not the profile's muted text colour. */
+html[data-theme] .app-shell .profile-block :is(.vt-theme-window, .assistant-tool-icon) {
+  color: inherit;
+  max-width: none;
+}
+/* A checkbox keeps the same orange in every context, including confirmation. */
+html[data-theme] .app-shell input[type="checkbox"] {
+  accent-color: var(--vt-accent-fill);
+}
+html[data-theme] .app-shell input[type="checkbox"]:checked {
+  border-color: var(--vt-accent-fill);
+  background-color: var(--vt-accent-fill);
+}
+html[data-theme] .app-shell :is(.checkbox-row, .integration-checkbox, .call-filter-check) input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin: 0;
+  border: 1.5px solid color-mix(in srgb, var(--vt-text-3) 70%, var(--vt-s1));
+  border-radius: 6px;
+  background: var(--vt-s1);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color 180ms, border-color 180ms, box-shadow 180ms;
+}
+html[data-theme] .app-shell :is(.checkbox-row, .integration-checkbox, .call-filter-check) input[type="checkbox"]:checked {
+  border-color: var(--vt-accent-fill);
+  background: var(--vt-accent-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23fffaf5' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.8' d='m3.25 8 3.05 3.05 6.45-6.45'/%3E%3C/svg%3E") center / 15px no-repeat;
+  box-shadow: none;
+}
+html[data-theme] .app-shell input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--vt-accent-text);
+  box-shadow: 0 0 0 3px var(--vt-accent-soft);
+}
+html[data-theme] .app-shell input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--vt-accent-text);
+  outline-offset: 3px;
+}
+html[data-theme] .app-shell input[type="checkbox"]:disabled {
+  opacity: .5;
+  cursor: default;
+}
+.app-shell .instructions-page {
+  padding-bottom: var(--vt-navigation-edge-gap);
+  scroll-padding-bottom: var(--vt-navigation-edge-gap);
+}
+@media (max-width: 1024px) {
+  .app-shell { --vt-navigation-edge-gap: max(16px, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 760px) {
+  .app-shell { --vt-navigation-edge-gap: max(10px, env(safe-area-inset-bottom)); }
+}
+
 /* ---------------------------------------------------------------------------
  * Companies: the card says what the company is and how it is doing, the list
  * of people says who runs what, and the limits sit in fields that match their

@@ -37,6 +37,7 @@ import { OwnershipOffersPanel } from "./OwnershipOffersPanel";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
 import { AnalysisPersonalizationCard } from "../analysis-context/AnalysisPersonalizationCard";
 import { CreditUsagePanel } from "../tariffs/CreditUsagePanel";
+import { FolderCriteriaEditor } from "../instructions/FolderCriteriaEditor";
 
 export function CompaniesPage({
   session,
@@ -719,6 +720,8 @@ export function DepartmentWorkspace({
         description="Добавляется к контексту компании только при анализе звонков этого отдела."
         editable={isManager || members.some((member) => member.user_uuid === session.user.id && member.role === "department_leader")}
       />
+
+      <section className="company-card glass"><FolderCriteriaEditor departmentId={department.id} /></section>
 
       <section className="company-card glass">
         <div className="panel-heading">

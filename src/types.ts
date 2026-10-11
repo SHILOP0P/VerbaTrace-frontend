@@ -6,7 +6,6 @@ export type AppPage =
   | "transcriptionEdit"
   | "transcriptionCompare"
   | "instructionHistory"
-  | "instructionCompare"
   | "instruction"
   | "instructionCreate"
   | "qualityReviews"
@@ -601,6 +600,7 @@ export interface TranscriptionSegmentResponse {
 }
 
 export interface AnalysisResponse {
+	criterion_edit_permissions?:Record<string,boolean>;
   id: string;
   call_uuid: string;
   status: "pending" | "processing" | "done" | "failed" | "stale" | string;
@@ -629,109 +629,6 @@ export interface AppliedInstruction {
   original_filename?: string;
   instruction_deleted: boolean;
   created_at: string;
-}
-
-export interface AnalysisV2Question {
-  question: string;
-  manager_answer: string;
-  answer_status:
-    "answered" | "partially_answered" | "not_answered" | "unclear" | string;
-  evidence_quotes: string[];
-  evidence: AnalysisEvidence[];
-}
-
-export interface AnalysisV2CriteriaResult {
-  code:
-    | "greeting"
-    | "needs_discovery"
-    | "question_quality"
-    | "answer_quality"
-    | "solution_relevance"
-    | "objection_handling"
-    | "pricing_clarity"
-    | "tone_professionalism"
-    | "next_step_quality"
-    | "outcome_clarity"
-    | "custom_instruction_match"
-    | string;
-  title: string;
-  topic: string;
-  status: CriteriaStatus | string;
-  points_awarded: number;
-  points_max: number;
-  score: number;
-  quote: string;
-  evidence_quotes: string[];
-  evidence: AnalysisEvidence[];
-  issue: string;
-  explanation: string;
-  recommendation: string;
-  effective_source?: "ai" | "human_review_1" | "human_review_2" | string;
-}
-
-export interface AnalysisV2Result {
-  schema_version: 2;
-  summary: string;
-  topics: string[];
-  dialogue_tone: {
-    overall: string;
-    manager: string;
-    client: string;
-    evidence_quotes: string[];
-    evidence: AnalysisEvidence[];
-  };
-  client_questions: AnalysisV2Question[];
-  question_coverage: {
-    status:
-      | "answered"
-      | "partially_answered"
-      | "not_answered"
-      | "no_questions"
-      | "unclear"
-      | string;
-    summary: string;
-    unanswered_questions: string[];
-  };
-  manager_quality: {
-    strengths: string[];
-    issues: string[];
-    recommendations: string[];
-  };
-  call_outcome: string;
-  score: number;
-  score_scale: number;
-  score_breakdown: {
-    points_awarded: number;
-    points_possible: number;
-    applicable_criteria_count: number;
-    total_criteria_count: number;
-  };
-  criteria_results: AnalysisV2CriteriaResult[];
-  customer_objections: string[];
-  risks: string[];
-  next_steps: string[];
-  next_step: string;
-  next_step_quality: {
-    has_next_step: boolean | null;
-    specific: boolean | null;
-    has_deadline: boolean | null;
-    has_responsible_person: boolean | null;
-  };
-  business_outcome: {
-    status: BusinessOutcomeStatus | string;
-    summary: string;
-    lost_reason: LostReason | string;
-  };
-  customer_signals: {
-    intent: SignalLevel | string;
-    urgency: SignalLevel | string;
-    budget_discussed: boolean | null;
-    decision_maker_present: boolean | null;
-  };
-  issue_codes: string[];
-  evidence_quotes: string[];
-  evidence: AnalysisEvidence[];
-  confidence: AnalysisConfidence | string;
 }
 
 export interface CreateReportRequest {
@@ -902,21 +799,6 @@ export interface AnalysisInstruction {
   updated_at: string;
 }
 
-export interface AnalysisInstructionVersion {
-  id: string;
-  instruction_id: string;
-  version: number;
-  title: string;
-  scope: InstructionScope;
-  original_filename: string;
-  mime_type: string;
-  size_bytes: number;
-  status: "draft" | "published" | "retired" | string;
-  created_by_user_uuid: string;
-  created_at: string;
-  published_at: string;
-}
-
 export type ScorecardStatus = "not_compiled" | "queued" | "compiling" | "ready" | "failed";
 export type CriterionChangeKind = "new" | "unchanged" | "reworded";
 export type ScorecardEditableField = "title" | "weight" | "is_critical" | "enabled";
@@ -966,6 +848,94 @@ export interface InstructionScorecard {
   error: { code: string; message: string } | null;
   confirmed_at: string | null;
   created_at: string | null;
+}
+
+export interface InstructionDraft {
+  draft_uuid:string;
+  instruction_uuid:string;
+  content:string;
+  original_filename:string;
+  mime_type:string;
+  criteria:ScorecardCriterion[];
+  inactive_criteria:ScorecardCriterion[];
+  status:"draft"|"queued"|"compiling"|"ready"|"failed";
+  lock_version:number;
+  error:string|null;
+  last_used_at:string;
+  check?:InstructionCheckResult;
+}
+
+export interface InstructionCheckResult {
+  call_uuid:string;
+  transcription_revision:number;
+  outdated_transcription:boolean;
+  status:"queued"|"running"|"done"|"failed"|"superseded";
+  error?:string;
+  result:Record<string,unknown>|null;
+  expires_at:string;
+}
+
+export interface DraftCheckEstimate {
+  estimated_credits:number;
+  criterion_count:number;
+  estimated_requests:number;
+  input_hash:string;
+}
+
+export interface CriterionChoice {
+  criterion:ScorecardCriterion;
+  instruction_uuid:string;
+  instruction_title:string;
+  scorecard_uuid:string;
+  scope:"personal"|"company"|"department";
+  active:boolean;
+  selected:boolean;
+  protected:boolean;
+  inherited:boolean;
+  protected_by?:string|null;
+}
+
+export interface CriterionCatalogue {
+	can_edit?:boolean;
+  items:CriterionChoice[];
+  can_select:boolean;
+  mandatory:boolean;
+  can_request:boolean;
+  limit:number;
+}
+
+export interface FolderCriteriaRequest {
+  department_uuid?:string|null;
+  request_uuid:string;
+  folder_uuid:string;
+  folder_name:string;
+  company_uuid:string;
+  requested_by_uuid:string;
+  recipient_uuid:string;
+  criterion_keys:string[];
+  status:"pending"|"approved"|"rejected"|"outdated";
+  can_decide:boolean;
+}
+
+export interface ReferenceTarget {
+  scope:"personal"|"company"|"department"|"folder";
+  user_uuid:string|null;
+  company_uuid:string|null;
+  department_uuid:string|null;
+  folder_uuid:string|null;
+  name:string;
+  available:boolean;
+}
+
+export interface ReferenceAssignment extends Omit<ReferenceTarget,"available"> {
+  assignment_uuid:string;
+  assigned_by_uuid:string|null;
+  can_edit:boolean;
+}
+
+export interface ReferenceAssignmentsResponse {
+  assignments:ReferenceAssignment[];
+  targets:ReferenceTarget[];
 }
 
 export interface ScorecardCriterionEdit {
@@ -1438,14 +1408,12 @@ export interface CreateCallFolderRequest {
   name: string;
   description?: string | null;
   color?: string | null;
-  instruction_uuids?: string[];
 }
 
 export interface UpdateCallFolderRequest {
   name?: string;
   description?: string | null;
   color?: string | null;
-  instruction_uuids?: string[];
 }
 
 export interface AssignCallToFolderRequest {
@@ -1727,6 +1695,8 @@ export type QualityReviewDecision =
   "confirmed" | "overridden" | "not_applicable" | "unscored";
 
 export interface QualityReviewCriterion {
+	quote: string;
+	is_correct: boolean;
   criterion_uuid: string;
   criterion_key: string;
   title: string;
@@ -1913,9 +1883,9 @@ export interface AnalysisV3Item {
   improvement_kind: "grounded_answer" | "advice" | "clarification_needed" | "not_needed";
   improvement: string | null; evidence: AnalysisEvidence[]; instruction_sources: string[]; instruction_titles: string[];
   // Set on requirement cards scored by an instruction's scorecard.
-  criterion_key?: string; scorecard_uuid?: string; is_critical?: boolean;
+  criterion_key?: string; scorecard_uuid?: string; is_critical?: boolean; inactive?:boolean; requirement?:string; applicability?:string; depth?:string; human_quote?:string;
 }
-export type AnalysisScorecardMode = "fixed" | "partial" | "adhoc" | "none";
+export type AnalysisScorecardMode = "fixed" | "none";
 export interface AnalysisV3Recommendation {
   id: string; title: string; action: string; reason: string; expected_result: string; item_ids: string[];
   affects_score: boolean; importance: number; impact: number | null; repetition: number;

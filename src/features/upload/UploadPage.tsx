@@ -1,3 +1,5 @@
+import {CriterionPicker} from "../instructions/CriterionPicker";
+import type {CriterionCatalogue} from "../../types";
 import {
   BriefcaseBusiness,
   CircleAlert,
@@ -16,7 +18,6 @@ import {
 import { DragEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../../api";
 import type {
-  AnalysisInstruction,
   AppPage,
   CallFolderResponse,
   CallResponse,
@@ -31,7 +32,7 @@ import type {
 import { isCompanyManager } from "../../shared/lib/access";
 import { callScopeLabel } from "../../shared/lib/formatters";
 import { FileDropZone, SelectControl } from "../../shared/ui/primitives";
-import { availableInstructionsForContext, InstructionChoiceList, instructionContextHint, InstructionMiniList, StepItem } from "../instructions/instruction-components";
+import { StepItem } from "../instructions/instruction-components";
 
 const maxBatchFiles = 10;
 const mediaAccept = ".mp3,.wav,.m4a,.ogg,.mp4,.mov,.webm,.mkv,audio/*,video/mp4,video/quicktime,video/webm,video/x-matroska";
@@ -58,7 +59,6 @@ export function UploadPage({
   session,
   companies,
   departments,
-  instructions,
   loading,
   onNavigate,
   onUploaded
@@ -67,7 +67,6 @@ export function UploadPage({
   companies: CompanyResponse[];
   departments: DepartmentResponse[];
   departmentMembers: DepartmentMemberResponse[];
-  instructions: AnalysisInstruction[];
   loading: boolean;
   onNavigate: (page: AppPage) => void;
   onUploaded: (call: CallResponse, open: boolean) => void;
@@ -86,7 +85,18 @@ export function UploadPage({
   const [folderId, setFolderId] = useState("");
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [folderError, setFolderError] = useState("");
-  const [selectedInstructionIds, setSelectedInstructionIds] = useState<string[]>([]);
+  const [catalogue,setCatalogue]=useState<CriterionCatalogue>();
+  const [criterionKeys,setCriterionKeys]=useState<string[]>([]);
+  const [catalogueLoading,setCatalogueLoading]=useState(true);
+  const [catalogueError,setCatalogueError]=useState("");
+  useEffect(()=>{
+    let cancelled=false;setCatalogueLoading(true);setCatalogueError("");
+    const filters={company_uuid:scope==="personal"?undefined:companyId,department_uuid:scope==="department"?departmentId:undefined,folder_uuid:folderId||undefined};
+    if((scope!=="personal"&&!companyId)||(scope==="department"&&!departmentId)){setCatalogueLoading(false);setCatalogue(undefined);return}
+    api.getCriterionCatalogue(filters).then(value=>{if(cancelled)return;setCatalogue(value);const defaults=value.items.filter(item=>item.active&&item.selected).map(item=>item.criterion.criterion_key);if(defaults.length>40){setCriterionKeys([]);setCatalogueError(value.can_select?"Выберите не больше 40 критериев.":"Набор содержит больше 40 критериев. Руководитель должен изменить настройки.")}else setCriterionKeys(defaults)}).catch(cause=>{if(!cancelled)setCatalogueError(cause instanceof Error?cause.message:"Критерии недоступны.")}).finally(()=>{if(!cancelled)setCatalogueLoading(false)});
+    return()=>{cancelled=true};
+  },[scope,companyId,departmentId,folderId]);
+
   const [contacts, setContacts] = useState<UserResponse[]>([]);
   const [selectedContactId, setSelectedContactId] = useState("");
   const [speakerHints, setSpeakerHints] = useState<SpeakerHint[]>([]);
@@ -121,17 +131,6 @@ export function UploadPage({
   );
   const selectableCompanies = scope === "department" ? companiesWithAccessibleDepartments : managedCompanies;
   const availableDepartments = accessibleDepartments.filter((department) => department.company_uuid === companyId);
-  const availableInstructions = availableInstructionsForContext(
-    instructions,
-    scope,
-    companyId,
-    departmentId
-  );
-  const availableInstructionKey = availableInstructions.map((instruction) => instruction.id).join("|");
-  const selectedInstructions = availableInstructions.filter((instruction) =>
-    selectedInstructionIds.includes(instruction.id)
-  );
-
   useEffect(() => {
     if (!availableCallScopes.includes(scope)) {
       setScope("personal");
@@ -162,17 +161,7 @@ export function UploadPage({
     }
   }, [availableDepartments, departmentId, scope]);
 
-  useEffect(() => {
-    setSelectedInstructionIds((current) => {
-      const availableIds = availableInstructions.map((instruction) => instruction.id);
-      const available = new Set(availableIds);
-      const preserved = current.filter((id) => available.has(id));
-
-      return preserved;
-    });
-  }, [availableInstructionKey]);
-
-  useEffect(() => {
+useEffect(() => {
     const filters = folderFiltersForUpload(scope, companyId, departmentId);
     if (!filters) {
       setCallFolders([]);
@@ -218,14 +207,6 @@ export function UploadPage({
     });
     return () => { cancelled = true; };
   }, []);
-
-  function toggleInstruction(instructionId: string) {
-    setSelectedInstructionIds((current) =>
-      current.includes(instructionId)
-        ? current.filter((id) => id !== instructionId)
-        : [...current, instructionId]
-    );
-  }
 
   function addSpeakerHint(user?: UserResponse) {
     const id = user?.id ?? session.user.id;
@@ -356,13 +337,14 @@ export function UploadPage({
       return;
     }
 
+    if(processingMode === "analyze" && (catalogueLoading || !catalogue || catalogueError)){setError(catalogueError||"Дождитесь загрузки критериев.");return}
     setBusy(true);
     try {
       const sharedInput = {
         processingMode: processingMode as "transcribe" | "analyze",
         companyUuid: scope === "company" || scope === "department" ? companyId : undefined,
         departmentUuid: scope === "department" ? departmentId : undefined,
-        useCustomInstructions: selectedInstructionIds.length > 0,
+        criterionKeys: processingMode === "analyze" ? criterionKeys : undefined,
         folderUuid: folderId || undefined,
         speakerHints: speakerHints.map(({ id, name, username, role, note }) => ({
           userId: id,
@@ -575,23 +557,6 @@ export function UploadPage({
           </small>
           {folderError && <div className="form-error compact">{folderError}</div>}
         </div>
-        {folderId && (
-          <div className="folder-instruction-summary">
-            <div className="folder-instruction-summary-heading">
-              <span><FileText size={19}/></span>
-              <div><strong>Инструкции папки</strong><small>Будут применены автоматически вместе с выбранными дополнительными инструкциями.</small></div>
-            </div>
-            {(callFolders.find((folder) => folder.id === folderId)?.instructions ?? []).length > 0 ? (
-              <div className="folder-instruction-chips">
-                {callFolders.find((folder) => folder.id === folderId)?.instructions.map((instruction) => (
-                  <span key={instruction.id}><FileText size={15}/><strong>{instruction.title}</strong></span>
-                ))}
-              </div>
-            ) : (
-              <small>К этой папке инструкции не прикреплены.</small>
-            )}
-          </div>
-        )}
         <section className="speaker-hints">
           <div className="speaker-hints-heading">
             <div>
@@ -643,36 +608,24 @@ export function UploadPage({
         <div className="context-note">
           <CircleAlert size={18} />
           <span>
-            Выбранный контекст определяет, кто сможет просматривать звонок и какая инструкция
-            будет использована для анализа.
+            Выбранный контекст определяет, кто сможет просматривать звонок и какие критерии
+            будут использованы для анализа.
           </span>
         </div>
         <div className="instruction-preview">
           <FileText size={21} />
           <div>
-            <strong>Инструкции для выбранного контекста</strong>
-            <small>{instructionContextHint(scope)}</small>
+            <strong>Критерии для анализа</strong>
+            <small>Выберите критерии или используйте обязательный набор папки.</small>
           </div>
           <button className="ghost-button small" type="button" onClick={() => onNavigate("settingsInstructions")}>
             <Pencil size={15} />
             Изменить инструкцию
           </button>
         </div>
-        <InstructionChoiceList
-          instructions={availableInstructions}
-          selectedInstructionIds={selectedInstructionIds}
-          companies={companies}
-          departments={departments}
-          loading={loading}
-          onToggle={toggleInstruction}
-        />
-        <InstructionMiniList
-          title="Выбрано для анализа"
-          instructions={selectedInstructions}
-          companies={companies}
-          departments={departments}
-          emptyText="Инструкции не выбраны."
-        />
+        {catalogueLoading?<p role="status">Загружаем критерии…</p>:catalogue&&<CriterionPicker catalogue={catalogue} selected={criterionKeys} disabled={busy} onChange={setCriterionKeys}/>}
+        {catalogueError&&<p className="field-error" role="alert">{catalogueError}</p>}
+
         {error && <div className="form-error">{error}</div>}
         <p className="upload-processing-hint">«Транскрибировать» — получить текст разговора. «Анализировать» — получить текст и анализ по выбранным инструкциям. Транскрипция доступна на всех тарифах; анализ можно запустить позже.</p>
         <p className="upload-processing-hint">Важный или нетиповой разговор? Выберите «Транскрибировать», поправьте роли участников и запустите анализ вручную.</p>

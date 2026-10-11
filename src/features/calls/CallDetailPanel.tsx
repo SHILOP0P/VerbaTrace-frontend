@@ -65,6 +65,8 @@ import { CreateActionDialog } from "../actions/ActionsPage";
 import { TranscriptCollapseIsland } from "./TranscriptCollapseIsland";
 import { CallWorkOnMistakes } from "../analytics/WorkOnMistakes";
 import { CallSpeechBlock } from "../../shared/ui/speech";
+import { ReferenceCallEditor } from "./ReferenceCallEditor";
+import { AnalysisCriterionPicker } from "./AnalysisCriterionPicker";
 
 type CardProcessState = {
   label: string;
@@ -135,6 +137,10 @@ export function CallDetailPanel({
   const [rerunReason, setRerunReason] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [folderMenuOpen, setFolderMenuOpen] = useState(false);
+  const [referenceEditing, setReferenceEditing] = useState(false);
+  const [referenceMarked,setReferenceMarked] = useState(false);
+  const [criteriaSelectionOpen, setCriteriaSelectionOpen] = useState(false);
+  const [excludingCriterion,setExcludingCriterion] = useState("");
   const [activeWordIndex, setActiveWordIndex] = useState(-1);
   const [seekTarget, setSeekTarget] = useState<MediaSeekTarget | null>(null);
   const [localTranscription, setLocalTranscription] = useState(transcription);
@@ -155,6 +161,7 @@ export function CallDetailPanel({
   const [actionDecisionMessage, setActionDecisionMessage] = useState("");
   const [noActionRequired, setNoActionRequired] = useState(false);
   const [noActionConfirmOpen, setNoActionConfirmOpen] = useState(false);
+  useEffect(()=>{let cancelled=false;setReferenceMarked(false);if(call&&!call.is_test)void api.getReferenceAssignments(call.id).then(value=>{if(!cancelled)setReferenceMarked(value.assignments.length>0)}).catch(()=>undefined);return()=>{cancelled=true}},[call?.id,referenceEditing]);
   const [linkedAction, setLinkedAction] = useState<CallAction>();
   const [appliedInstructions, setAppliedInstructions] = useState<AppliedInstruction[]>([]);
   const [instructionsLoading, setInstructionsLoading] = useState(false);
@@ -259,15 +266,17 @@ export function CallDetailPanel({
     } finally { setQualityReviewBusy(false); }
   }
 
-  async function runAnalysis() {
+  async function runAnalysis(criterionKeys?:string[]) {
     if (!call || analysisBusy) return;
+    if (criterionKeys === undefined) { setCriteriaSelectionOpen(true); return; }
     setAnalysisBusy(true);
     setAnalysisRunError("");
     setChallengeOpen(false);
     setChallengeReason("");
     setChallengeSent(false);
     try {
-      const result = await api.analyzeCall(call.id);
+      const result = await api.analyzeCall(call.id,criterionKeys);
+      setCriteriaSelectionOpen(false);
       onAnalysisReady?.(call.id, result);
     } catch (cause) {
       // Re-running the analysis of a company call belongs to the leader, the
@@ -586,6 +595,12 @@ export function CallDetailPanel({
               )}
             </div>
           )}
+          {!call.is_test && (
+            <details className="call-more-menu">
+              <summary className="ghost-button small" aria-label="Действия со звонком">⋯</summary>
+              <button className="ghost-button small" type="button" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); setReferenceEditing(true); }}>Эталонный звонок</button>
+            </details>
+          )}
           {onDeleteCall && canEditCall && !call.is_test && !transcriptionOnly && (
             <button className="ghost-button small call-analysis-button" type="button" onClick={() => void runAnalysis()} disabled={analysisBusy}>
               <WandSparkles size={16} />
@@ -608,6 +623,9 @@ export function CallDetailPanel({
           )}
         </div>
       </div>
+      {referenceEditing && <ReferenceCallEditor key={call.id} callId={call.id} onClose={() => setReferenceEditing(false)} />}
+      {criteriaSelectionOpen && <AnalysisCriterionPicker key={call.id} callId={call.id} busy={analysisBusy} onClose={()=>setCriteriaSelectionOpen(false)} onStart={keys=>void runAnalysis(keys)}/>}
+      {analysis && analysisV3Result(analysis)?.items.some(item=>item.inactive&&item.criterion_key&&analysis.criterion_edit_permissions?.[item.criterion_key]) && <section className="reference-call-editor"><h3>Неактивные критерии</h3><p className="muted">Удалённые из этого анализа оценки больше не восстановятся при возвращении критерия в инструкцию.</p>{analysisV3Result(analysis)?.items.filter(item=>item.inactive&&item.criterion_key&&analysis.criterion_edit_permissions?.[item.criterion_key]).map(item=><div className="instruction-draft-section-title" key={item.id}><span>{item.title}</span><button className="ghost-button small danger-button" type="button" disabled={Boolean(excludingCriterion)} onClick={()=>{setExcludingCriterion(item.criterion_key!);void api.excludeAnalysisCriterion(analysis.id,item.criterion_key!).then(()=>api.getAnalysis(call.id)).then(value=>onAnalysisReady?.(call.id,value)).catch(cause=>setAnalysisRunError(cause instanceof Error?cause.message:"Не удалось удалить критерий.")).finally(()=>setExcludingCriterion(""))}}>{excludingCriterion===item.criterion_key?"Удаляем…":"Удалить из анализа"}</button></div>)}</section>}
       {call.status === "awaiting_credits" && (
         <div className="call-waiting-notice" role="note">
           <strong>Звонок ждёт кредитов</strong>
@@ -643,6 +661,7 @@ export function CallDetailPanel({
         <div className="selected-call-main">
           <div className="selected-call-title">
             <strong>{call.title}</strong>
+            {referenceMarked&&<small className="call-reference-badge">Эталонный звонок</small>}
             <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analysis?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />
           </div>
           <div className="selected-call-meta">
@@ -772,7 +791,7 @@ export function CallDetailPanel({
                 <span><strong id="applied-instructions-title">Применённые инструкции</strong><small>Правила, по которым был сформирован этот анализ</small></span>
                 <b>{instructionsLoading ? "…" : appliedInstructions.length}</b>
               </div>
-              {instructionsError ? <p className="applied-instructions-error" role="alert">{instructionsError}</p> : instructionsLoading ? <div className="applied-instructions-skeleton" aria-label="Загрузка инструкций" /> : appliedInstructions.length === 0 ? <p className="applied-instructions-empty">Для этого анализа инструкции не применялись.</p> : <div className="applied-instructions-list">{appliedInstructions.map((instruction) => <button type="button" key={instruction.version_id} onClick={() => { window.history.pushState({}, "", `/app/calls/${encodeURIComponent(call.id)}/analyses/${encodeURIComponent(analysis.id)}/instructions/${encodeURIComponent(instruction.version_id)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}><span><strong>{instruction.title}</strong><small>Версия {instruction.version} · {instructionScopeLabel(instruction.scope)}{instruction.instruction_deleted ? " · удалена из настроек" : ""}</small></span><ChevronRight size={17} aria-hidden="true" /></button>)}</div>}
+              {instructionsError ? <p className="applied-instructions-error" role="alert">{instructionsError}</p> : instructionsLoading ? <div className="applied-instructions-skeleton" aria-label="Загрузка инструкций" /> : appliedInstructions.length === 0 ? <p className="applied-instructions-empty">Для этого анализа инструкции не применялись.</p> : <div className="applied-instructions-list">{appliedInstructions.map((instruction) => <button type="button" key={instruction.version_id} onClick={() => { window.history.pushState({}, "", `/app/calls/${encodeURIComponent(call.id)}/analyses/${encodeURIComponent(analysis.id)}/instructions/${encodeURIComponent(instruction.version_id)}`); window.dispatchEvent(new PopStateEvent("popstate")); }}><span><strong>{instruction.title}</strong><small>{instructionScopeLabel(instruction.scope)}{instruction.instruction_deleted ? " · удалена из настроек" : ""}</small></span><ChevronRight size={17} aria-hidden="true" /></button>)}</div>}
             </section>
           )}
           {analysis && isAnalysisDone(analysis) && reviewContext && <AnalysisComments callId={call.id} analysisId={analysis.id} comments={reviewContext.comments ?? []} canComment={reviewContext.capabilities.can_comment_analysis} onChange={(comments)=>setReviewContext((current)=>current?{...current,comments}:current)} criterionTitles={analysisCriterionTitles(displayedAnalysis)} />}
@@ -898,7 +917,7 @@ function applyEffectiveAnalysis(analysis: AnalysisResponse | undefined, effectiv
     const items = source.items.map((value) => {
       if (!value || typeof value !== "object" || Array.isArray(value)) return value;
       const item = value as Record<string, unknown>;
-      const key = typeof item.id === "string" ? item.id : "";
+      const key = typeof item.criterion_key === "string" ? item.criterion_key : typeof item.id === "string" ? item.id : "";
       const replacement = criteriaByKey.get(key);
       if (!replacement) return value;
       const max = replacement.score_max && replacement.score_max > 0 ? replacement.score_max : 100;
@@ -906,35 +925,7 @@ function applyEffectiveAnalysis(analysis: AnalysisResponse | undefined, effectiv
     });
     return {...analysis,result_json:{...source,overall_score:effective.total_score,score:effective.total_score,score_scale:100,effective_source:effective.source,items}};
   }
-  const criteria = Array.isArray(source.criteria_results)
-    ? source.criteria_results.map((value) => {
-      if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-      const item = value as Record<string, unknown>;
-      const key = typeof item.code === "string" ? item.code : "";
-      const replacement = criteriaByKey.get(key);
-      if (!replacement) return value;
-      const max = replacement.score_max && replacement.score_max > 0 ? replacement.score_max : 100;
-      const normalized = replacement.effective_score === undefined ? undefined : replacement.effective_score / max * 100;
-      return {
-        ...item,
-        status: replacement.not_applicable ? "not_applicable" : item.status,
-        points_awarded: replacement.effective_score,
-        points_max: replacement.score_max,
-        score: normalized,
-        effective_source: replacement.effective_source
-      };
-    })
-    : source.criteria_results;
-  return {
-    ...analysis,
-    result_json: {
-      ...source,
-      score: effective.total_score,
-      score_scale: 100,
-      effective_source: effective.source,
-      criteria_results: criteria
-    }
-  };
+  return analysis;
 }
 
 function analysisCardState(
@@ -953,7 +944,7 @@ function analysisCardState(
     const label = { inventory: "Находим вопросы", answers: `Готово ${progress.items_done} из ${progress.items_total}`, validation: "Проверяем и подводим итог", complete: "Сохраняем итог" }[progress.stage];
     return { label, tone: "warn", thinking: true };
   }
-  if (call.status === "transcribed" || analysis?.status === "pending" || analysis?.status === "processing") {
+  if (analysis?.status === "pending" || analysis?.status === "processing") {
     return { label: "Производится анализ транскрипции", tone: "warn", thinking: true };
   }
 

@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Building2,
   Download,
   FileText,
@@ -33,8 +32,7 @@ export function InstructionsPage({
   companies,
   departments,
   departmentMembers,
-  loading,
-  onBackToSettings
+  loading
 }: {
   session: SessionState;
   instructions: AnalysisInstruction[];
@@ -42,7 +40,6 @@ export function InstructionsPage({
   departments: DepartmentResponse[];
   departmentMembers: DepartmentMemberResponse[];
   loading: boolean;
-  onBackToSettings: () => void;
 }) {
   const [localInstructions, setLocalInstructions] = useState(instructions);
   const managedCompanies = useMemo(
@@ -141,12 +138,6 @@ export function InstructionsPage({
 
   return (
     <section className="instructions-page app-page settings-subpage-layout">
-      <div className="settings-back-row">
-        <button className="ghost-button small" type="button" onClick={onBackToSettings}>
-          <ArrowLeft size={16} />
-          Назад
-        </button>
-      </div>
       <header className="instructions-page-head">
         <div className="app-page-heading settings-heading">
           <span className="settings-heading-icon" aria-hidden="true">
@@ -317,20 +308,7 @@ export function InstructionRow({
         <button className="icon-button" type="button" aria-label="Скачать инструкцию" disabled={busy} onClick={() => void download()}>
           <Download size={16} />
         </button>
-        <label className="icon-button" aria-label="Заменить файл">
-          <Upload size={16} />
-          <input
-            type="file"
-            accept=".md,.pdf,.docx,.xlsx,text/markdown,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (!file) return;
-              void run(async () => onInstructionChanged(await api.replaceInstructionFile(instruction.id, file)), "Не удалось заменить файл");
-            }}
-          />
-        </label>
+        <button className="icon-button" type="button" aria-label="Изменить в черновике" onClick={() => { window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(instruction.id)}?draft=true`); window.dispatchEvent(new PopStateEvent("popstate")); }}><Upload size={16} /></button>
         <button className="icon-button instruction-delete" type="button" aria-label="Удалить инструкцию" disabled={busy} onClick={() => setConfirmDelete(true)}>
           <Trash2 size={16} />
         </button>

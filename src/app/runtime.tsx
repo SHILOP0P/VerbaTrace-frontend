@@ -46,7 +46,6 @@ export const pageRoutes: Record<AppPage, string> = {
   transcriptionEdit: "/app/calls/transcription-edit",
   transcriptionCompare: "/app/calls/transcription-compare",
   instructionHistory: "/app/calls/instruction-history",
-  instructionCompare: "/app/instructions/compare",
   instruction: "/app/instructions",
   instructionCreate: "/app/instructions/new",
   qualityReviews: "/app/quality-reviews",
@@ -117,11 +116,6 @@ export const settingsRoutes: Array<{ page: AppPage; label: string; description: 
     description: "Организации, отделы, участники и роли доступа."
   },
   {
-    page: "settingsInstructions",
-    label: "Инструкции",
-    description: "Правила и критерии для AI-анализа звонков."
-  },
-  {
     page: "settingsPrivacy",
     label: "Защита данных",
     description: "Русские смысловые маркеры, доступ к оригиналу и очищенные записи."
@@ -166,7 +160,6 @@ export function pageFromPath(pathname: string): AppPage {
   if (/^\/app\/calls\/[^/]+\/analyses\/[^/]+\/instructions\/[^/]+$/.test(pathname)) return "instructionHistory";
   if (pathname === "/app/instructions/new") return "instructionCreate";
   if (/^\/app\/analytics\/employees\/[^/]+$/.test(pathname) || pathname === "/app/analytics/me") return "teamAnalyticsEmployee";
-  if (/^\/app\/instructions\/[^/]+\/compare$/.test(pathname)) return "instructionCompare";
   if (/^\/app\/instructions\/[^/]+$/.test(pathname)) return "instruction";
   if (/^\/app\/admin\/(?:users|companies|actions|audit|restore)$/.test(pathname)) return "admin";
   if (pathname === "/app/companies/new") return "companyCreate";

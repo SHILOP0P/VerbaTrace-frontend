@@ -1,3 +1,5 @@
+import type {FolderCriteriaRequest,ReferenceAssignmentsResponse,ReferenceTarget} from "./types";
+import type {InstructionDraft,InstructionCheckResult,DraftCheckEstimate,CriterionCatalogue,ScorecardCriterion} from "./types";
 import type {
   NotificationSubscription,
   CallProgress,
@@ -17,7 +19,6 @@ import type {
   AdminSubscriptionResponse,
   AdminUsersResponse,
   AnalysisInstruction,
-  AnalysisInstructionVersion,
   AnalysisPersonalization,
   AnalysisPersonalizationScope,
   AnalysisResponse,
@@ -921,6 +922,8 @@ export const api = {
         criterion_key: string;
         title?: string;
         custom?: boolean;
+	      quote?:string;
+	      is_correct?:boolean;
         human_score?: number;
         not_applicable?: boolean;
         comment: string;
@@ -1346,6 +1349,7 @@ export const api = {
     has_actions?: boolean;
     has_processing_error?: boolean;
     favorite_only?: boolean;
+	  reference_only?: boolean;
     include_upload_fallback?: boolean;
     sort?: "occurred_at" | "created_at" | "duration";
     order?: "asc" | "desc";
@@ -1374,7 +1378,7 @@ export const api = {
     companyUuid?: string;
     departmentUuid?: string;
     processingMode?: "transcribe" | "analyze";
-    useCustomInstructions?: boolean;
+    criterionKeys?:string[];
     folderUuid?: string;
     speakerHints?: Array<{
       userId: string;
@@ -1388,17 +1392,12 @@ export const api = {
     const body = new FormData();
     if (input.title?.trim()) body.append("title", input.title.trim());
     body.append("media", input.media);
+    if (input.criterionKeys) body.append("criterion_keys",JSON.stringify(input.criterionKeys));
     body.append("processing_mode", input.processingMode ?? "analyze");
     if (input.companyUuid) body.append("company_uuid", input.companyUuid);
     if (input.departmentUuid)
       body.append("department_uuid", input.departmentUuid);
     if (input.folderUuid) body.append("folder_uuid", input.folderUuid);
-    if (typeof input.useCustomInstructions === "boolean") {
-      body.append(
-        "use_custom_instructions",
-        String(input.useCustomInstructions),
-      );
-    }
     if (input.speakerHints?.length)
       body.append("speaker_hints", JSON.stringify(input.speakerHints));
     if (input.diarizationRoles?.length)
@@ -1525,16 +1524,6 @@ export const api = {
       {
         method: "PATCH",
         body: JSON.stringify(input),
-      },
-    );
-  },
-
-  replaceCallFolderInstructions(folderId: string, instructionUuids: string[]) {
-    return request<CallFolderResponse>(
-      `/call-folders/${encodeURIComponent(folderId)}/instructions`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ instruction_uuids: instructionUuids }),
       },
     );
   },
@@ -2614,7 +2603,7 @@ export const api = {
     return request<AnalysisResponse>(`/calls/${callId}/analysis`);
   },
 
-  analyzeCall(callId: string) {
+  analyzeCall(callId: string,criterionKeys?:string[]) {
     return request<AnalysisResponse>(`/calls/${callId}/analysis`, {
       method: "POST",
     });
@@ -2919,36 +2908,12 @@ export const api = {
     );
   },
 
-  replaceInstructionFile(id: string, file: File) {
-    const body = new FormData();
-    body.append("file", file);
-    return request<AnalysisInstruction>(
-      `/instructions/${encodeURIComponent(id)}/file`,
-      {
-        method: "PUT",
-        body,
-      },
-    );
-  },
-
   downloadInstruction(idOrDownloadUrl: string) {
     const path =
       idOrDownloadUrl.startsWith("/") || idOrDownloadUrl.startsWith("/api/v1/")
         ? apiPathFromUrl(idOrDownloadUrl)
         : `/instructions/${encodeURIComponent(idOrDownloadUrl)}/download`;
     return requestBlob(path);
-  },
-
-  listInstructionVersions(id: string) {
-    return request<{ items: AnalysisInstructionVersion[] }>(
-      `/instructions/${encodeURIComponent(id)}/versions`,
-    );
-  },
-
-  getInstructionVersionFile(id: string, versionId: string) {
-    return requestBlob(
-      `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/file`,
-    );
   },
 
   // Employees of the call's company who may be marked as its speakers; only
@@ -2966,24 +2931,54 @@ export const api = {
     );
   },
 
+  getInstructionDraft(id:string,touch=false) {
+    return request<InstructionDraft>(`/instructions/${encodeURIComponent(id)}/draft${touch?"?touch=1":""}`);
+  },
+  getInstructionDraftFile(id: string) {
+    return requestBlob(`/instructions/${encodeURIComponent(id)}/draft/file`);
+  },
+  saveInstructionDraft(id:string,lockVersion:number,content:string) {
+    return request<InstructionDraft>(`/instructions/${encodeURIComponent(id)}/draft`,{method:"PUT",body:JSON.stringify({lock_version:lockVersion,content})});
+  },
+  saveInstructionDraftFile(id:string,lockVersion:number,file:File) {
+    const body=new FormData();body.append("lock_version",String(lockVersion));body.append("file",file);
+    return request<InstructionDraft>(`/instructions/${encodeURIComponent(id)}/draft/file`,{method:"PUT",body});
+  },
+  saveDraftCriteria(id:string,lockVersion:number,criteria:ScorecardCriterion[]) {
+    return request<InstructionDraft>(`/instructions/${encodeURIComponent(id)}/draft/criteria`,{method:"PATCH",body:JSON.stringify({lock_version:lockVersion,criteria})});
+  },
+  compileInstructionDraft(id:string,lockVersion:number) {
+    return request<InstructionDraft>(`/instructions/${encodeURIComponent(id)}/draft/compile`,{method:"POST",body:JSON.stringify({lock_version:lockVersion})});
+  },
+  deleteInstructionDraft(id:string) {return request(`/instructions/${encodeURIComponent(id)}/draft`,{method:"DELETE"});},
+  touchInstructionDraft(id:string) {return request(`/instructions/${encodeURIComponent(id)}/draft/touch`,{method:"POST"});},
+  applyInstructionDraft(id:string,lockVersion:number) {
+    return request<InstructionScorecard>(`/instructions/${encodeURIComponent(id)}/draft/apply`,{method:"POST",body:JSON.stringify({lock_version:lockVersion,ready:true})});
+  },
+  estimateDraftCheck(id:string,lockVersion:number,callId:string,keys:string[]) {
+    return request<DraftCheckEstimate>(`/instructions/${encodeURIComponent(id)}/draft/check-estimate`,{method:"POST",body:JSON.stringify({lock_version:lockVersion,call_uuid:callId,criterion_keys:keys})});
+  },
+  startDraftCheck(id:string,lockVersion:number,callId:string,keys:string[],inputHash:string,idempotencyKey:string) {
+    return request<InstructionCheckResult>(`/instructions/${encodeURIComponent(id)}/draft/check`,{method:"POST",body:JSON.stringify({lock_version:lockVersion,call_uuid:callId,criterion_keys:keys,input_hash:inputHash,idempotency_key:idempotencyKey})});
+  },
+  getDraftCheck(id:string) {return request<InstructionCheckResult|null>(`/instructions/${encodeURIComponent(id)}/draft/check`);},
+  getCriterionCatalogue(filters:{company_uuid?:string;department_uuid?:string;folder_uuid?:string;call_uuid?:string}) {
+    return request<CriterionCatalogue>(`/criteria${queryString(filters)}`);
+  },
+  getFolderCriteria(id:string) {return request<CriterionCatalogue>(`/call-folders/${encodeURIComponent(id)}/criteria`);},
+  getDepartmentCriteria(id:string) {return request<CriterionCatalogue>(`/departments/${encodeURIComponent(id)}/criteria`);},
+  replaceDepartmentCriteria(id:string,keys:string[]) {return request<CriterionCatalogue>(`/departments/${encodeURIComponent(id)}/criteria`,{method:"PUT",body:JSON.stringify({criterion_keys:keys})});},
+  requestDepartmentCriteria(id:string,keys:string[]) {return request<FolderCriteriaRequest>(`/departments/${encodeURIComponent(id)}/criteria-change-requests`,{method:"POST",body:JSON.stringify({criterion_keys:keys})});},
+  replaceFolderCriteria(id:string,keys:string[]) {return request<CriterionCatalogue>(`/call-folders/${encodeURIComponent(id)}/criteria`,{method:"PUT",body:JSON.stringify({criterion_keys:keys})});},
+  requestFolderCriteria(id:string,keys:string[]) {return request<FolderCriteriaRequest>(`/call-folders/${encodeURIComponent(id)}/criteria-change-requests`,{method:"POST",body:JSON.stringify({criterion_keys:keys})});},
+  getCriteriaRequest(id:string) {return request<FolderCriteriaRequest>(`/criteria-change-requests/${encodeURIComponent(id)}`);},
+  decideCriteriaRequest(id:string,approve:boolean) {return request<FolderCriteriaRequest>(`/criteria-change-requests/${encodeURIComponent(id)}/decision`,{method:"POST",body:JSON.stringify({approve})});},
+  getReferenceAssignments(id:string) {return request<ReferenceAssignmentsResponse>(`/calls/${encodeURIComponent(id)}/reference-assignments`);},
+  replaceReferences(id:string,targets:Array<Pick<ReferenceTarget,"scope"|"user_uuid"|"company_uuid"|"department_uuid"|"folder_uuid">>) {return request<ReferenceAssignmentsResponse>(`/calls/${encodeURIComponent(id)}/reference-assignments`,{method:"PUT",body:JSON.stringify({targets})});},
+  excludeAnalysisCriterion(id:string,key:string) {return request(`/analyses/${encodeURIComponent(id)}/criteria/${encodeURIComponent(key)}`,{method:"DELETE"});},
   getInstructionScorecard(id: string) {
     return request<InstructionScorecard>(
       `/instructions/${encodeURIComponent(id)}/scorecard`,
-    );
-  },
-
-  getInstructionVersionScorecard(id: string, versionId: string) {
-    return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/scorecard`,
-    );
-  },
-
-  // Starts the compile of the latest version at once instead of after the
-  // quiet period; does nothing when the version already has a scorecard.
-  ensureInstructionScorecard(id: string) {
-    return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/scorecard/ensure`,
-      { method: "POST" },
     );
   },
 
@@ -2996,39 +2991,8 @@ export const api = {
     },
   ) {
     return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/scorecard`,
+      `/instructions/${encodeURIComponent(id)}/criteria/defaults`,
       { method: "PATCH", body: JSON.stringify(input) },
-    );
-  },
-
-  recompileInstructionScorecard(id: string) {
-    return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/scorecard/recompile`,
-      { method: "POST" },
-    );
-  },
-
-  confirmInstructionScorecard(
-    id: string,
-    input: { scorecard_uuid: string; lock_version: number },
-  ) {
-    return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/scorecard/confirm`,
-      { method: "POST", body: JSON.stringify(input) },
-    );
-  },
-
-  linkScorecardCriterion(id: string, criterionKey: string, canonicalKey: string) {
-    return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/scorecard/criteria/${encodeURIComponent(criterionKey)}/same-as`,
-      { method: "POST", body: JSON.stringify({ canonical_key: canonicalKey }) },
-    );
-  },
-
-  splitScorecardCriterion(id: string, criterionKey: string) {
-    return request<InstructionScorecard>(
-      `/instructions/${encodeURIComponent(id)}/scorecard/criteria/${encodeURIComponent(criterionKey)}/split`,
-      { method: "POST" },
     );
   },
 

@@ -19,7 +19,6 @@ import type {
 } from "../../types";
 
 import {
-  businessOutcomeLabels,
   enumLabel,
   formatScore
 } from "../../shared/lib/analysis";
@@ -517,7 +516,7 @@ function buildOverviewChartSeries(overview: AnalyticsOverviewResponse | null) {
     totalCalls: countChartPoints(charts?.calls_by_day, "загрузок"),
     analyzedCalls: analyzedChartPoints(charts?.analyzed_by_day),
     duration: durationChartPoints(charts?.duration_by_day),
-    quality: qualityChartPoints(charts?.score_by_day, charts?.quality_by_day)
+    quality: qualityChartPoints(charts?.score_by_day)
   };
 }
 
@@ -632,26 +631,8 @@ function durationChartPoints(points: Array<{ date: string; average_duration_seco
   }));
 }
 
-function qualityChartPoints(
-  scorePoints: Array<{ date: string; average_score: number }> | undefined,
-  legacyPoints: Array<{ date: string; average_quality_score: number }> | undefined
-): ChartPoint[] {
-  if (scorePoints && scorePoints.length > 0) {
-    return scorePoints.map((point) => ({
-      label: chartDateLabel(point.date),
-      value: point.average_score,
-      display: `${formatScore(point.average_score)} / 100`
-    }));
-  }
-
-  return (legacyPoints ?? []).map((point) => {
-    const normalized = point.average_quality_score * 20;
-    return {
-      label: chartDateLabel(point.date),
-      value: normalized,
-      display: `${formatScore(normalized)} / 100`
-    };
-  });
+function qualityChartPoints(scorePoints: Array<{ date:string; average_score:number }> | undefined): ChartPoint[] {
+  return (scorePoints ?? []).map(point=>({label:chartDateLabel(point.date),value:point.average_score,display:`${formatScore(point.average_score)} / 100`}));
 }
 
 function smoothPath(points: Array<ChartPoint & { x: number; y: number }>) {

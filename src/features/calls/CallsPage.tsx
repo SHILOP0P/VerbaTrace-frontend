@@ -1,3 +1,4 @@
+import {FolderCriteriaEditor} from "../instructions/FolderCriteriaEditor";
 import { cssClass } from "../../shared/lib/css-styles";
 import {
   Building2,
@@ -28,7 +29,6 @@ import { createPortal } from "react-dom";
 import { api } from "../../api";
 import type {
   AnalysisResponse,
-  AnalysisInstruction,
   AppPage,
   CallFolderResponse,
   CallResponse,
@@ -197,6 +197,7 @@ export function CallsPage({
   const [durationMax, setDurationMax] = useState(initialURLFilters.durationMax);
   const [analysisFilter, setAnalysisFilter] = useState<"all" | "yes" | "no">(initialURLFilters.analysis);
   const [actionsFilter, setActionsFilter] = useState<"all" | "yes" | "no">(initialURLFilters.actions);
+  const [referenceOnly, setReferenceOnly] = useState(new URLSearchParams(window.location.search).get("reference_only") === "true");
   const [processingErrorOnly, setProcessingErrorOnly] = useState(initialURLFilters.processingError);
   const [sortFilter, setSortFilter] = useState<"occurred_at" | "created_at" | "duration">(initialURLFilters.sort);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(initialURLFilters.order);
@@ -246,9 +247,6 @@ export function CallsPage({
   const [folderCallsLoading, setFolderCallsLoading] = useState(false);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Record<string, boolean>>({});
   const [folderForm, setFolderForm] = useState<FolderFormState>(() => emptyFolderForm());
-  const [folderInstructionOptions, setFolderInstructionOptions] = useState<AnalysisInstruction[]>([]);
-  const [folderInstructionsLoading, setFolderInstructionsLoading] = useState(false);
-  const [folderInstructionsError, setFolderInstructionsError] = useState("");
   const [openFolderMenuId, setOpenFolderMenuId] = useState("");
   const [openCallMenuId, setOpenCallMenuId] = useState("");
   const [editingCall, setEditingCall] = useState<CallResponse | null>(null);
@@ -331,6 +329,7 @@ export function CallsPage({
     has_actions: actionsFilter === "all" ? undefined : actionsFilter === "yes",
     has_processing_error: processingErrorOnly || undefined,
     favorite_only: favoriteOnly || undefined,
+    reference_only: referenceOnly || undefined,
     include_upload_fallback: true,
     sort: sortFilter,
     order: sortOrder
@@ -383,40 +382,7 @@ export function CallsPage({
     finally { setCallBusyId(""); }
   }
 
-  useEffect(() => {
-    if (!folderEditorOpen) return;
-    let cancelled = false;
-    const companyUuid = folderForm.scope === "personal" ? undefined : folderForm.company_uuid || undefined;
-    const departmentUuid = folderForm.scope === "department" ? folderForm.department_uuid || undefined : undefined;
-
-    if ((folderForm.scope === "company" && !companyUuid) || (folderForm.scope === "department" && (!companyUuid || !departmentUuid))) {
-      setFolderInstructionOptions([]);
-      setFolderInstructionsError("");
-      setFolderInstructionsLoading(false);
-      return;
-    }
-
-    setFolderInstructionsLoading(true);
-    setFolderInstructionsError("");
-    api.listInstructions({
-      scope: folderForm.scope,
-      company_uuid: companyUuid,
-      department_uuid: departmentUuid
-    }).then((items) => {
-      if (!cancelled) setFolderInstructionOptions(items.filter((item) => item.is_active));
-    }).catch((error) => {
-      if (!cancelled) {
-        setFolderInstructionOptions([]);
-        setFolderInstructionsError(error instanceof Error ? error.message : "Не удалось загрузить инструкции.");
-      }
-    }).finally(() => {
-      if (!cancelled) setFolderInstructionsLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [folderEditorOpen, folderForm.company_uuid, folderForm.department_uuid, folderForm.scope]);
-  const managerOptions = filterOptions?.managers ?? [];
+const managerOptions = filterOptions?.managers ?? [];
   const connectionOptions = filterOptions?.connections ?? [];
   const participantOptions = Array.from(
     new Map(
@@ -458,6 +424,7 @@ export function CallsPage({
     Boolean(occurredFrom || occurredTo || durationMin || durationMax) ||
     analysisFilter !== "all" ||
     actionsFilter !== "all" ||
+    referenceOnly ||
     processingErrorOnly ||
     favoriteOnly ||
     sortFilter !== "occurred_at" ||
@@ -477,6 +444,7 @@ export function CallsPage({
     Boolean(durationMin || durationMax),
     analysisFilter !== "all",
     actionsFilter !== "all",
+    referenceOnly,
     processingErrorOnly,
     favoriteOnly,
     sortFilter !== "occurred_at" || sortOrder !== "desc"
@@ -496,6 +464,7 @@ export function CallsPage({
   if (analysisFilter !== "all") activeFilterChips.push({ key: "analysis", label: analysisFilter === "yes" ? "С анализом" : "Без анализа", clear: () => setAnalysisFilter("all") });
   if (actionsFilter !== "all") activeFilterChips.push({ key: "actions", label: actionsFilter === "yes" ? "С действиями" : "Без действий", clear: () => setActionsFilter("all") });
   if (processingErrorOnly) activeFilterChips.push({ key: "errors", label: "Только ошибки", clear: () => setProcessingErrorOnly(false) });
+  if (referenceOnly) activeFilterChips.push({ key: "reference", label: "Только эталонные", clear: () => setReferenceOnly(false) });
   if (favoriteOnly) activeFilterChips.push({ key: "favorite", label: "Только избранные", clear: () => setFavoriteOnly(false) });
   if (sortFilter !== "occurred_at" || sortOrder !== "desc") activeFilterChips.push({ key: "sort", label: `Сортировка: ${{ occurred_at: "время разговора", created_at: "время импорта", duration: "длительность" }[sortFilter]}, ${sortOrder === "desc" ? "по убыванию" : "по возрастанию"}`, clear: () => { setSortFilter("occurred_at"); setSortOrder("desc"); } });
   const selectedCallActionFolderId = selectedCall ? callFolderActionByCall[selectedCall.id] || "" : "";
@@ -519,6 +488,7 @@ export function CallsPage({
     setDurationMax("");
     setAnalysisFilter("all");
     setActionsFilter("all");
+    setReferenceOnly(false);
     setProcessingErrorOnly(false);
     setFavoriteOnly(false);
     setSortFilter("occurred_at");
@@ -579,7 +549,6 @@ export function CallsPage({
       name: folder.name,
       description: folder.description ?? "",
       color: folder.color ?? folderPalette[0]
-      ,instruction_uuids: folder.instructions?.map((instruction) => instruction.id) ?? []
     });
     setFolderEditorOpen(true);
   }
@@ -604,7 +573,7 @@ export function CallsPage({
     try {
       if (editingFolderId) {
         await api.updateCallFolder(editingFolderId, payload.value as UpdateCallFolderRequest);
-        await api.replaceCallFolderInstructions(editingFolderId, folderForm.instruction_uuids);
+
       } else {
         await api.createCallFolder(payload.value as CreateCallFolderRequest);
       }
@@ -995,6 +964,7 @@ export function CallsPage({
       has_actions: actionsFilter === "all" ? undefined : actionsFilter,
       has_processing_error: processingErrorOnly ? "true" : undefined,
       favorite_only: favoriteOnly ? "true" : undefined,
+      reference_only: referenceOnly ? "true" : undefined,
       sort: sortFilter === "occurred_at" ? undefined : sortFilter,
       order: sortOrder === "desc" ? undefined : sortOrder,
     };
@@ -1003,7 +973,7 @@ export function CallsPage({
       else url.searchParams.set(key, value);
     }
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder]);
+  }, [searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, referenceOnly, processingErrorOnly, favoriteOnly, sortFilter, sortOrder]);
 
   useEffect(() => {
     if (filterValidationError) {
@@ -1043,7 +1013,7 @@ export function CallsPage({
 	  controller.abort();
       window.clearTimeout(timer);
     };
-  }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, callsRefreshKey, restoredCallsToken]);
+  }, [filterValidationError, searchQuery, statusFilter, effectiveScopeFilter, managerFilter, periodFilter, companyFilter, departmentFilter, participantFilter, sourceFilter, connectionFilter, occurredFrom, occurredTo, durationMin, durationMax, analysisFilter, actionsFilter, referenceOnly, processingErrorOnly, favoriteOnly, sortFilter, sortOrder, callsRefreshKey, restoredCallsToken]);
 
   // Calls sorted by time are split by day, so a long list has landmarks; a
   // list sorted by length has no order in time to show.
@@ -1244,6 +1214,7 @@ export function CallsPage({
             {filtersChanged && <button className="text-button" type="button" onClick={resetFilters}>Сбросить всё</button>}
           </div>
           <div className="call-filter-grid">
+            <label className="checkbox-row"><input type="checkbox" checked={referenceOnly} onChange={event => setReferenceOnly(event.target.checked)} />Только эталонные звонки</label>
             <label><span>Статус</span><SelectControl aria-label="Статус" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as CallStatus | "all")}><option value="all">Все статусы</option><option value="new">Новые</option><option value="processing">В обработке</option><option value="awaiting_credits">Ждут кредитов</option><option value="cancelled">Обработка отменена</option><option value="transcribed">Расшифрованы</option><option value="analyzed">Анализ готов</option><option value="failed">Ошибки</option></SelectControl></label>
             {companies.length > 0 && <label><span>Сотрудник</span><SelectControl aria-label="Сотрудник" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value)}><option value="all">Все сотрудники</option>{participantOptions.map((member) => <option key={member.user_uuid} value={member.user_uuid}>{[member.full_surname, member.full_name].filter(Boolean).join(" ") || member.username || "Пользователь"}</option>)}</SelectControl></label>}
             {companies.length > 0 && <label><span>Компания</span><SelectControl aria-label="Компания" value={companyFilter} onChange={(event) => { const companyId = event.target.value; setCompanyFilter(companyId); setDepartmentFilter("all"); setConnectionFilter("all"); }}><option value="all">Все компании</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</SelectControl></label>}
@@ -1289,7 +1260,7 @@ export function CallsPage({
             ))}
           </div>
         )}
-        <section className="call-folder-panel">
+        {!searchQuery.trim() && <><section className="call-folder-panel">
           <div className="call-folder-heading">
             <div>
               <strong>Папки</strong>
@@ -1405,12 +1376,14 @@ export function CallsPage({
           }}
         />
         <p className="muted-title">Без папки</p>
+        </>}
+        {searchQuery.trim() && <p className="muted-title" role="status">{filtersLoading ? "Ищем звонки…" : `Найдено: ${filteredCalls.length}`}</p>}
         <div className="call-list">
-          {(loading || filtersLoading || folderCallsLoading) && <CallListSkeleton count={4} />}
-          {!loading && !filtersLoading && !folderCallsLoading &&
-            renderSidebarCallRows(callsWithoutVisibleFolder.filter((call) => !favoriteOnly || favoriteCallIds.includes(call.id)))}
-          {!loading && !filtersLoading && !folderCallsLoading && callsWithoutVisibleFolder.length === 0 && (
-            <div className="empty-state">{calls.length === 0 ? "Звонков пока нет." : "Звонков без папки по фильтрам нет."}</div>
+          {(loading || filtersLoading || (!searchQuery.trim() && folderCallsLoading)) && <CallListSkeleton count={4} />}
+          {!loading && !filtersLoading && (searchQuery.trim() || !folderCallsLoading) &&
+            renderSidebarCallRows((searchQuery.trim() ? filteredCalls : callsWithoutVisibleFolder).filter((call) => !favoriteOnly || favoriteCallIds.includes(call.id)))}
+          {!loading && !filtersLoading && (searchQuery.trim() || !folderCallsLoading) && (searchQuery.trim() ? filteredCalls : callsWithoutVisibleFolder).length === 0 && (
+            <div className="empty-state">{searchQuery.trim() ? "По запросу ничего не найдено." : calls.length === 0 ? "Звонков пока нет." : "Звонков без папки по фильтрам нет."}</div>
           )}
         </div>
         {nextCallsCursor && !filtersLoading && (
@@ -1620,35 +1593,8 @@ export function CallsPage({
                   ))}
                 </div>
               </div>
-              <fieldset className="call-folder-instructions">
-                <legend>Инструкции папки</legend>
-                <small>Они автоматически применятся к каждому новому звонку в этой папке.</small>
-                {folderInstructionsLoading ? (
-                  <div className="instruction-empty compact" role="status">Загружаю инструкции...</div>
-                ) : folderInstructionsError ? (
-                  <div className="form-error compact" role="alert">{folderInstructionsError}</div>
-                ) : folderInstructionOptions.length === 0 ? (
-                  <div className="instruction-empty compact">Для выбранной области нет активных инструкций.</div>
-                ) : (
-                  <div className="call-folder-instruction-options" aria-label={`Доступные инструкции: ${folderInstructionOptions.length}`}>
-                    {folderInstructionOptions.map((instruction) => (
-                      <label className={`checkbox-row${folderForm.instruction_uuids.includes(instruction.id) ? " is-checked" : ""}`} key={instruction.id}>
-                        <input
-                          type="checkbox"
-                          checked={folderForm.instruction_uuids.includes(instruction.id)}
-                          onChange={() => setFolderForm((current) => ({
-                            ...current,
-                            instruction_uuids: current.instruction_uuids.includes(instruction.id)
-                              ? current.instruction_uuids.filter((id) => id !== instruction.id)
-                              : [...current.instruction_uuids, instruction.id]
-                          }))}
-                        />
-                        <span>{instruction.title || instruction.original_filename}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </fieldset>
+              {editingFolderId?<FolderCriteriaEditor folderId={editingFolderId} onSaved={()=>void refreshFolders()}/>:<p className="muted">Сначала создайте папку, затем задайте её обязательные критерии в редакторе.</p>}
+
               <div className="call-folder-form-actions">
                 <button className="ghost-button small" type="button" onClick={cancelFolderEdit}>
                   Отмена
@@ -1753,7 +1699,6 @@ type FolderFormState = {
   name: string;
   description: string;
   color: string;
-  instruction_uuids: string[];
 };
 
 const folderPalette = [
@@ -1821,7 +1766,6 @@ function emptyFolderForm(): FolderFormState {
     name: "",
     description: "",
     color: folderPalette[0]
-    ,instruction_uuids: []
   };
 }
 
@@ -1847,7 +1791,6 @@ function buildFolderPayload(
         name,
         description: description || null,
         color: color || null
-        ,instruction_uuids: form.instruction_uuids
       }
     };
   }
@@ -1869,7 +1812,6 @@ function buildFolderPayload(
       name,
       description: description || null,
       color: color || null
-      ,instruction_uuids: form.instruction_uuids
     }
   };
 }

@@ -49,7 +49,6 @@ const ContactsPage = lazy(() => import("./features/contacts/ContactsPage").then(
 const InstructionsPage = lazy(() => import("./features/instructions/InstructionsPage").then(m => ({ default: m.InstructionsPage })));
 const InstructionHistoryPage = lazy(() => import("./features/instructions/InstructionHistoryPage").then(m => ({ default: m.InstructionHistoryPage })));
 const AnalyticsPage = lazy(() => import("./features/analytics/AnalyticsPage").then(m => ({ default: m.AnalyticsPage })));
-const InstructionComparePage = lazy(() => import("./features/instructions/InstructionComparePage").then(m => ({ default: m.InstructionComparePage })));
 const NewInstructionPage = lazy(() => import("./features/instructions/NewInstructionPage").then(m => ({ default: m.NewInstructionPage })));
 const InvitationsPage = lazy(() => import("./features/invitations/InvitationsPage").then(m => ({ default: m.InvitationsPage })));
 const MonitoringPage = lazy(() => import("./features/monitoring/MonitoringPage").then(m => ({ default: m.MonitoringPage })));
@@ -69,6 +68,7 @@ const AdminPage = lazy(() => import("./features/admin/AdminPage").then(m => ({ d
 const QualityReviewsPage = lazy(() => import("./features/quality-reviews/QualityReviewsPage").then(m => ({ default: m.QualityReviewsPage })));
 const QualityReviewPage = lazy(() => import("./features/quality-reviews/QualityReviewPage").then(m => ({ default: m.QualityReviewPage })));
 const SupportAccessDecisionDialog = lazy(() => import("./features/support-access/SupportAccessDecisionDialog").then(m => ({ default: m.SupportAccessDecisionDialog })));
+const CriteriaRequestDialog = lazy(() => import("./features/instructions/CriteriaRequestDialog").then(m => ({ default: m.CriteriaRequestDialog })));
 const pageLoading = <section role="status" aria-label="Загрузка раздела"><TextBlockSkeleton rows={4} /></section>;
 
 const callsRefreshIntervalMs = 5_000;
@@ -94,7 +94,8 @@ function App() {
   const [selectedCallId, setSelectedCallId] = useState<string>(() => callIdFromLocation());
   const [loadingWorkspace, setLoadingWorkspace] = useState(() => Boolean(session));
   const [loadingCallDetails, setLoadingCallDetails] = useState<Record<string, boolean>>({});
-	const [supportAccessRequestId,setSupportAccessRequestId]=useState("");
+  const [supportAccessRequestId,setSupportAccessRequestId]=useState("");
+  const [criteriaRequestId, setCriteriaRequestId] = useState("");
   const { theme: activeTheme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -459,12 +460,6 @@ function App() {
     window.history.pushState({}, "", `/app/calls/transcription-edit?call=${encodeURIComponent(callId)}`);
   }
 
-  function openInstructionComparison(instructionId: string, versionIds: string[]) {
-    setPage("instructionCompare");
-    const query = new URLSearchParams({ versions: versionIds.join(",") });
-    window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(instructionId)}/compare?${query}`);
-  }
-
   function openCompany(companyId: string) {
     setPage("settingsCompanies");
     setSelectedCompanyId(companyId);
@@ -473,6 +468,7 @@ function App() {
   }
 
   function openNotificationTarget(notification: NotificationResponse) {
+	if (notification.entity_type === "folder_criteria_request" && notification.entity_uuid) { setCriteriaRequestId(notification.entity_uuid); return; }
 	if(notification.entity_type==="support_access_request"&&notification.entity_uuid){setSupportAccessRequestId(notification.entity_uuid);return}
 	if(notification.entity_type==="action_external_sync"&&notification.entity_uuid){api.getActionExternalSyncRequest(notification.entity_uuid).then((sync)=>{window.history.pushState({},"",`/app/actions/${encodeURIComponent(sync.action_uuid)}`);window.dispatchEvent(new PopStateEvent("popstate"))}).catch(()=>navigate("actions"));return}
     if (notification.entity_type === "call" && notification.entity_uuid) {
@@ -745,7 +741,6 @@ function App() {
           companies={companies}
           departments={departments}
           departmentMembers={departmentMembers}
-          instructions={instructions}
           loading={loadingWorkspace}
           onNavigate={navigate}
           onUploaded={(call, open) => {
@@ -801,11 +796,10 @@ function App() {
 
       {page === "qualityReview" && <QualityReviewPage reviewId={decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "")} onBack={() => navigate("qualityReviews")} />}
 
-      {page === "instructionHistory" && (() => { const parts = window.location.pathname.split("/"); const callId = decodeURIComponent(parts[3] ?? ""); const analysisId = decodeURIComponent(parts[5] ?? ""); const versionId = decodeURIComponent(parts[7] ?? ""); return <InstructionHistoryPage analysisId={analysisId} versionId={versionId} session={session} companies={companies} departmentMembers={departmentMembers} onCompare={openInstructionComparison} onBack={() => { window.history.pushState({}, "", `/app/calls?call=${encodeURIComponent(callId)}`); window.dispatchEvent(new PopStateEvent("popstate")); }} />; })()}
+      {page === "instructionHistory" && (() => { const parts = window.location.pathname.split("/"); const callId = decodeURIComponent(parts[3] ?? ""); const analysisId = decodeURIComponent(parts[5] ?? ""); const versionId = decodeURIComponent(parts[7] ?? ""); return <InstructionHistoryPage analysisId={analysisId} versionId={versionId} session={session} companies={companies} departmentMembers={departmentMembers} onBack={() => { window.history.pushState({}, "", `/app/calls?call=${encodeURIComponent(callId)}`); window.dispatchEvent(new PopStateEvent("popstate")); }} />; })()}
 
-      {page === "instruction" && <InstructionHistoryPage instructionId={decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "")} session={session} companies={companies} departmentMembers={departmentMembers} onCompare={openInstructionComparison} onBack={() => navigate("settingsInstructions")} />}
+      {page === "instruction" && <InstructionHistoryPage instructionId={decodeURIComponent(window.location.pathname.split("/").at(-1) ?? "")} session={session} companies={companies} departmentMembers={departmentMembers} onBack={() => navigate("settingsInstructions")} />}
 
-      {page === "instructionCompare" && (() => { const id = decodeURIComponent(window.location.pathname.split("/")[3] ?? ""); return <InstructionComparePage instructionId={id} onBack={() => { window.history.pushState({}, "", `/app/instructions/${encodeURIComponent(id)}`); window.dispatchEvent(new PopStateEvent("popstate")); }} />; })()}
 
       {page === "instructionCreate" && <NewInstructionPage session={session} companies={companies} departments={departments} departmentMembers={departmentMembers} onCancel={() => navigate("settingsInstructions")} onCreated={(instruction) => setInstructions((current) => [instruction, ...current])} />}
 
@@ -832,7 +826,6 @@ function App() {
           departments={departments}
           departmentMembers={departmentMembers}
           loading={loadingWorkspace}
-          onBackToSettings={() => navigate("settings")}
         />
       )}
 
@@ -945,7 +938,8 @@ function App() {
       {page === "settingsIntegrations" && <IntegrationsPage session={session} companies={companies} departments={departments} onBack={() => navigate("settings")} />}
       </Suspense>
       </PageLoadBoundary>
-	  {supportAccessRequestId?<Suspense fallback={null}><SupportAccessDecisionDialog requestId={supportAccessRequestId} currentUserId={session.user.id} onClose={()=>setSupportAccessRequestId("")}/></Suspense>:null}
+      {supportAccessRequestId?<Suspense fallback={null}><SupportAccessDecisionDialog requestId={supportAccessRequestId} currentUserId={session.user.id} onClose={()=>setSupportAccessRequestId("")}/></Suspense>:null}
+      {criteriaRequestId && <Suspense fallback={null}><CriteriaRequestDialog id={criteriaRequestId} onClose={() => setCriteriaRequestId("")} /></Suspense>}
     </AuthenticatedShell>
     </Suspense>
     </PageLoadBoundary>

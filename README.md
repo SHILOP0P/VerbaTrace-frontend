@@ -1,7 +1,7 @@
 # VerbaTrace Frontend
 
-React/TypeScript-интерфейс VerbaTrace. Приложение работает поверх backend API из
-соседнего репозитория `C:\projects\VerbaTrace` и покрывает звонки, транскрипцию и
+React/TypeScript-интерфейс VerbaTrace. Приложение работает поверх
+[backend API](https://github.com/SHILOP0P/VerbaTrace-backend) и покрывает звонки, транскрипцию и
 анализ, инструкции и их версии, Human QA, действия, компании/отделы, тарифы и
 credits, developer integrations, администрирование и профиль. Рабочее окно
 ассистента объединяет поиск по звонкам и отдельный режим исследования.
@@ -25,8 +25,9 @@ HTTP-клиент по умолчанию использует текущий or
 другой адрес API во время сборки; `API_TARGET` меняет адрес серверного прокси
 во время запуска и не требует пересборки.
 
+Выполните из корня репозитория:
+
 ```powershell
-Set-Location C:\projects\VerbaTrace-frontend
 npm.cmd ci
 npm.cmd run start
 ```
@@ -149,10 +150,6 @@ task-flow. Аренда номера и телефонный трафик Bitrix
 иконки: текущая уходит влево, следующая появляется справа; сохраняется волновая
 смена темы и системный `prefers-reduced-motion`.
 
-Старый лендинг, сцена офиса, ресурсы, демонстрационные экраны и инструменты
-сохранены вне проекта: `C:\projects\old frontend by VerbaTrace`. Архив содержит
-снимок исходников и сборки до замены; `snapshot-manifest.json` содержит SHA-256.
-`retired-active-files` содержит перенесённые из рабочего проекта файлы.
 Старые адреса `/concept*.html` перенаправляются на публичные страницы.
 
 В футере находятся ссылки на `/legal/privacy`, `/legal/terms`, `/legal/offer`,

@@ -10,8 +10,8 @@ export function ThemeToggle({ theme, onClick }: { theme: "light" | "dark"; onCli
   useLayoutEffect(() => {
     if (previous.current === theme) return;
     previous.current = theme;
-    const incoming = theme === "dark" ? sun.current : moon.current;
-    const outgoing = theme === "dark" ? moon.current : sun.current;
+    const incoming = theme === "light" ? sun.current : moon.current;
+    const outgoing = theme === "light" ? moon.current : sun.current;
     if (!incoming || !outgoing) return;
     const oldStyle = getComputedStyle(outgoing);
     const incomingStyle = getComputedStyle(incoming);
@@ -37,8 +37,8 @@ export function ThemeToggle({ theme, onClick }: { theme: "light" | "dark"; onCli
   }, []);
   return <button className="vt-theme-toggle" type="button" onClick={onClick} aria-label={theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}>
     <span className="vt-theme-window" aria-hidden="true">
-      <Sun ref={sun} className="vt-theme-glyph" data-active={theme === "dark"} size={19} strokeWidth={1.8} />
-      <Moon ref={moon} className="vt-theme-glyph" data-active={theme === "light"} size={19} strokeWidth={1.8} />
+      <Sun ref={sun} className="vt-theme-glyph" data-active={theme === "light"} size={19} strokeWidth={1.8} />
+      <Moon ref={moon} className="vt-theme-glyph" data-active={theme === "dark"} size={19} strokeWidth={1.8} />
     </span>
   </button>;
 }

@@ -1,5 +1,76 @@
-import { ButtonHTMLAttributes, ReactNode, useEffect, useId, useRef, useState } from "react";
+import { ButtonHTMLAttributes, ReactNode, type RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { cssClass } from "../../shared/lib/css-styles";
+import type { AssistantMode } from "../../types";
+
+export function AssistantPanelIndicator({ root, value }: { root: RefObject<HTMLElement | null>; value: string | null }) {
+ const [position, setPosition] = useState({ left: 0, top: 0, width: 0, height: 0 });
+ useLayoutEffect(() => {
+  const node = root.current;
+  if (!node) return;
+  const measure = () => {
+   const selected = node.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
+   const next = selected ? { left: selected.offsetLeft, top: selected.offsetTop, width: selected.offsetWidth, height: selected.offsetHeight } : { left: 0, top: 0, width: 0, height: 0 };
+   setPosition(previous => previous.left === next.left && previous.top === next.top && previous.width === next.width && previous.height === next.height ? previous : next);
+  };
+  measure();
+  const observer = new ResizeObserver(measure);
+  observer.observe(node);
+  return () => observer.disconnect();
+ }, [root, value]);
+ return <span aria-hidden="true" className={"assistant-panel-thumb " + cssClass({ width: position.width, height: position.height, transform: `translate(${position.left}px,${position.top}px)` })}/>;
+}
+
+export function AssistantModeSwitch({ value, disabled, onChange }: { value: AssistantMode; disabled: boolean; onChange: (value: AssistantMode) => void }) {
+ const root = useRef<HTMLDivElement>(null);
+ const [position, setPosition] = useState({ left: 0, width: 0 });
+ useLayoutEffect(() => {
+  const node = root.current;
+  if (!node) return;
+  const measure = () => {
+   const selected = node.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+   if (!selected) return;
+   const next = { left: selected.offsetLeft, width: selected.offsetWidth };
+   setPosition(previous => previous.left === next.left && previous.width === next.width ? previous : next);
+  };
+  measure();
+  const observer = new ResizeObserver(measure);
+  observer.observe(node);
+  return () => observer.disconnect();
+ }, [value]);
+ return <div ref={root} className="assistant-mode-switch" role="group" aria-label="Режим работы">
+  <span aria-hidden="true" className={"assistant-mode-thumb " + cssClass({ width: position.width, transform: `translateX(${position.left}px)` })}/>
+  {(["search", "research"] as const).map(mode => <button type="button" key={mode} aria-pressed={value === mode} disabled={disabled} onClick={() => onChange(mode)}>{mode === "search" ? "Поиск" : "Исследование"}</button>)}
+ </div>;
+}
+
+// Keep the content mounted for the closing motion, then remove it completely.
+// Overflow is released after opening so the export menu can extend above it.
+export function AssistantCollapse({ open, id, children }: { open: boolean; id: string; children: ReactNode }) {
+ const root = useRef<HTMLDivElement>(null);
+ const [mounted, setMounted] = useState(open);
+ const [expanded, setExpanded] = useState(open);
+ const [settled, setSettled] = useState(open);
+ useLayoutEffect(() => {
+  setSettled(false);
+  if (open) setMounted(true);
+  else setExpanded(false);
+ }, [open]);
+ useLayoutEffect(() => {
+  if (!mounted) return;
+  if (open) {
+   root.current?.getBoundingClientRect();
+   setExpanded(true);
+  }
+  const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 240;
+  const timer = window.setTimeout(() => { setSettled(open); if (!open) setMounted(false); }, duration);
+  return () => window.clearTimeout(timer);
+ }, [open, mounted]);
+ if (!mounted) return null;
+ return <div ref={root} id={id} className={["assistant-collapse", expanded ? "is-open" : "", settled ? "is-settled" : ""].join(" ")} aria-hidden={!open} inert={!open}>
+  <div className="assistant-collapse-contents">{children}</div>
+ </div>;
+}
 
 export function ToolButton({label,children,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{label:string;children:ReactNode}) {
  return <button type="button" {...props} aria-label={label} className={`assistant-tool ${props.className??""}`}><span className="assistant-tool-icon">{children}</span></button>;

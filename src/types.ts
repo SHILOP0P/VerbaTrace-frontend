@@ -1901,17 +1901,27 @@ export interface AnalysisV3Result {
   scorecard_mode?: AnalysisScorecardMode;
 }
 
-export interface AssistantCapabilities { search_enabled:boolean; chat_enabled:boolean; aggregate_enabled:boolean; export_enabled:boolean; company_uuid:string; role:string; department_uuids:string[]; reason_code?:string }
+export interface AssistantCapabilities { schema_version?:number; search_enabled:boolean; chat_enabled:boolean; aggregate_enabled:boolean; export_enabled:boolean; company_uuid:string; role:string; department_uuids:string[]; reason_code?:string }
 export interface ContentSearchItem { chunk_uuid:string; call_uuid:string; title:string; quote:string; speaker?:string; start_seconds?:number; end_seconds?:number; created_at:string; updated_at:string; transcription_revision:number; score:number; retrieval_mode:string; source_kind:"transcription"|"analysis" }
-export interface ContentSearchResponse { items:ContentSearchItem[]; retrieval_mode:string; evaluated_calls:number; index_ready_calls:number; warnings:string[] }
-export interface AssistantSource { id:string; call_uuid:string; call_title:string; quote:string; start_seconds?:number; end_seconds?:number; transcription_revision:number; source_kind:"transcription"|"analysis" }
-export interface AssistantBlock { type:string; text?:string; artifact_id?:string; data?:{labels?:string[]} }
+export interface ContentSearchResponse { items:ContentSearchItem[]; retrieval_mode:string; evaluated_calls:number; index_ready_calls:number; warnings:string[];next_cursor?:string;snapshot_at?:string }
+export interface AssistantSource { id:string; call_uuid:string; call_title:string; quote:string; start_seconds?:number; end_seconds?:number; word_start_index?:number;word_end_index?:number;origin?:string;transcription_revision:number; source_kind:"transcription"|"analysis" }
+export interface AssistantBlock { type:string; text?:string; artifact_id?:string; data?:Partial<ContentSearchResponse & AssistantExport> & {labels?:string[];source_ids?:string[];calculation_ids?:string[];artifact_ids?:string[]} }
 export interface AssistantArtifactRow { call_uuid:string; label:string; count:number; percentage:number }
 export interface AssistantArtifact { id:string; message_uuid:string; type:"chart"|"table"; title:string; schema_version:number; data:{kind:string;basis:string;total:number;evaluated_calls:number;indexed_calls:number;items:AssistantArtifactRow[]}; created_at:string }
-export interface AssistantMessage { id:string; chat_uuid:string; sequence:number; role:"user"|"assistant"; status:string; text:string; blocks?:AssistantBlock[]; sources:AssistantSource[]; artifacts?:AssistantArtifact[]; created_at:string; completed_at?:string }
-export interface AssistantChat { id:string; company_uuid:string; title:string; response_detail:"brief"|"auto"|"detailed"; created_at:string; updated_at:string }
-export interface AssistantRun { id:string; chat_uuid:string; state:string; request_received_at:string; data_snapshot_at?:string; assistant_message?:AssistantMessage; error_code?:string }
-export interface AssistantDraft { text:string; context:{items?:Array<{kind:"call"|"folder"|"chat";id:string;label:string;callIds?:string[]}>;period?:{from:string;to:string}|null}; lock_version:number; updated_at:string }
+export interface AssistantMessage { id:string; chat_uuid:string; sequence:number; role:"user"|"assistant"; status:string; text:string; editable?:boolean; replaces_message_uuid?:string; blocks?:AssistantBlock[]; sources:AssistantSource[]; artifacts?:AssistantArtifact[]; research?:AssistantResearchData; created_at:string; completed_at?:string }
+export interface AssistantChat { id:string; company_uuid:string; title:string; preview?:string;mode?:AssistantMode;active_run_uuid?:string;response_detail:"brief"|"auto"|"detailed"; created_at:string; updated_at:string }
+export interface AssistantRun { id:string; chat_uuid:string; schema_version?:number;mode?:AssistantMode;command?:string;stage?:string;state:string;pause_requested?:boolean;progress?:{selected_calls:number;checked_calls:number;checked_parts?:number;total_parts?:number};user_request?:AssistantUserRequest;request_received_at:string; data_snapshot_at?:string; assistant_message?:AssistantMessage; error_code?:string }
+export interface AssistantDraft { text:string; context:{mode?:AssistantMode;creation_key?:string;items?:Array<{kind:"call"|"folder";id:string;label:string}>;period?:{from:string;to:string}|null}; lock_version:number; updated_at:string }
+export type AssistantMode="search"|"research";
+export interface AssistantUserRequest {request_uuid:string;delivery?:"form"|"chat";kind:"clarification"|"mode_switch"|"exclusion";message:string;questions:Array<{id:string;title:string;options:string[]}>;calls:Array<{call_uuid:string;title:string;reason:string;reason_code?:string}>;artifact_options?:Record<string,string>;remaining_calls?:number}
+export interface AssistantMetric {id:string;label:string;value:number|null;numerator:number|null;denominator:number|null;unit:string}
+export interface AssistantDataRow {call_uuid:string;label:string;group:string;date:string;x:number|null;y:number|null;outcome:string;source_ids:string[]}
+export interface AssistantContentEvidence {source_id:string;quote:string;start_seconds?:number;end_seconds?:number}
+export interface AssistantContentCase {id:string;call_uuid:string;call_title:string;topic:string;question:string;actual:string;expected:string;explanation:string;kind:string;initial_status:string;final_status:string;correction:string;basis:string;evidence:AssistantContentEvidence[];correction_evidence:AssistantContentEvidence[];reference_ids:string[]}
+export interface AssistantCalculation {id:string;unit:string;method:string;period:string;selected_calls:number;checked_calls:number;matched_calls:number;not_matched_calls:number;uncertain_calls:number;not_applicable_calls:number;excluded_calls:number;metrics:AssistantMetric[];rows:AssistantDataRow[];data_hash:string;content?:{case_count:number;complete:boolean;data_hash:string;references:Array<{id:string;url:string;title:string}>}}
+export interface AssistantGraphic {id:string;version_uuid:string;title:string;description:string;calculation_id:string;view:{kind:string;x_label:string;y_label:string;color:string;group_by:string};calculation:AssistantCalculation;created_at:string;svg?:string;content_binding?:{metric:string;group_by:string}}
+export interface AssistantResearchData {schema_version:number;claims:Array<{id:string;text:string;source_ids:string[];calculation_id:string}>;calculations:AssistantCalculation[];graphics:AssistantGraphic[];selection?:{run_uuid?:string;call_uuids?:string[];excluded_call_uuids?:string[];snapshot_at?:string}}
+export interface AssistantExport {id:string;state:string;format:string;content:string;filename?:string;error_code?:string;created_at:string}
 
 export interface SupportAccessJournalEntry {
   id: string;

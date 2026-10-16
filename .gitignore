@@ -4,6 +4,7 @@ node_modules/
 # Production build
 dist/
 dist-ssr/
+/.build-*/
 
 # Local environment
 .env
@@ -60,3 +61,11 @@ Thumbs.db
 !**/.spec-kit/**/
 ![rR][eE][aA][dD][mM][eE]
 ![rR][eE][aA][dD][mM][eE].*
+
+# Local chat attachments, specifications, and acceptance artifacts (including READMEs).
+/.codex-remote-attachments/
+**/docs/verification/
+**/specs/
+**/specifications/
+**/.specify/
+**/.spec-kit/

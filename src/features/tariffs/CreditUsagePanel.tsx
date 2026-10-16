@@ -1,9 +1,8 @@
-import { Activity, ArrowDownLeft, ArrowUpRight, FlaskConical, RefreshCw, TrendingDown, WalletCards } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, FlaskConical, TrendingDown, WalletCards } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../../api";
-import type { CompanyResponse, CreditDashboardResponse, CreditWalletEntry, SandboxWalletDashboard, SessionState } from "../../types";
+import type { CompanyResponse, CreditDashboardResponse, SandboxWalletDashboard, SessionState } from "../../types";
 import { creditForecast } from "../../shared/lib/credits";
-import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { SelectControl } from "../../shared/ui/primitives";
 import { CreditActivityChart } from "./CreditActivityChart";
 import { CreditLimitRing } from "./CreditLimitRing";
@@ -118,9 +117,8 @@ export function CreditUsagePanel({ session, companies, companyId, embeddedHeader
         {forecast && <section className="credit-forecast credit-summary-card" aria-label="Прогноз расхода"><header><span><TrendingDown size={17}/></span><div><strong>Прогноз расхода</strong><small>По текущему темпу</small></div></header><dl><div><dt>Потрачено</dt><dd>{forecast.used.toLocaleString("ru-RU")}</dd></div><div><dt>В среднем за день</dt><dd>{forecast.daily.toLocaleString("ru-RU")}</dd></div><div><dt>Останется к сбросу</dt><dd>{forecast.atReset.toLocaleString("ru-RU")}</dd></div><div><dt>Лимита хватит</dt><dd>{forecast.depletion}</dd></div></dl></section>}
         {integrationAccess && <section className="credit-sandbox-wallet credit-summary-card" aria-label="Тестовый кошелёк"><header><span><FlaskConical size={17}/></span><div><strong>Тестовый кошелёк</strong><small>{sandboxWalletError ? "Не удалось загрузить баланс" : sandboxWallet?.application_name ?? "Тестовое приложение не создано"}</small></div></header><p><strong>{sandboxWalletError ? "—" : (sandboxWallet?.balance_credits ?? 0).toLocaleString("ru-RU")}</strong>{!sandboxWalletError && <span>кредитов</span>}</p><small>{sandboxWalletError ? "Обновите страницу или проверьте интеграцию" : "Не влияет на основной лимит"}</small></section>}
       </div>
-      {companyId && data.can_manage_visibility && <label className="credit-visibility-setting"><input type="checkbox" checked={data.visible_to_members !== false} disabled={visibilitySaving} onChange={(event) => void updateVisibility(event.target.checked)} /><span><strong>Показывать лимиты участникам</strong><small>По умолчанию сотрудники компании видят лимиты, активность и историю. Отключите, чтобы скрыть весь раздел от участников.</small></span></label>}
+      {companyId && data.can_manage_visibility && <label className="credit-visibility-setting"><input type="checkbox" checked={data.visible_to_members !== false} disabled={visibilitySaving} onChange={(event) => void updateVisibility(event.target.checked)} /><span><strong>Показывать лимиты участникам</strong><small>По умолчанию сотрудники компании видят лимиты и активность. Отключите, чтобы скрыть весь раздел от участников.</small></span></label>}
       <CreditActivityChart key={scope} activity={data.activity} />
-      <div className={`credit-wallet-histories${integrationAccess ? " has-sandbox" : ""}`}><WalletHistory title="История кредитов" entries={data.wallet_entries} timeZone={session.user.timezone}/>{integrationAccess ? <WalletHistory title="История тестового кошелька" entries={sandboxWallet?.entries ?? []} timeZone={session.user.timezone} sandbox/> : <div className="credit-history-reserved" aria-hidden="true"/>}</div>
     </>}
   </section>;
 }
@@ -130,94 +128,7 @@ function CreditDashboardSkeleton() {
     <div className="credit-dashboard-skeleton-summary"><span className="credit-dashboard-skeleton-ring"/><span/><span/></div>
     <div className="credit-dashboard-skeleton-toolbar"><span/><span/></div>
     <div className="credit-dashboard-skeleton-grid">{Array.from({ length: 126 }).map((_, index)=><span key={index}/>)}</div>
-    <div className="credit-dashboard-skeleton-history"><span/><span/></div>
   </div>;
-}
-
-function WalletHistory({ title, entries, timeZone, sandbox = false }: { title: string; entries: CreditWalletEntry[]; timeZone?: string | null; sandbox?: boolean }) {
-  const resolvedTimeZone = validTimeZone(timeZone) ? timeZone! : Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const listRef = useRef<HTMLDivElement>(null);
-  const scrollable = entries.length > 8;
-  return <section className={`credit-wallet-history${sandbox ? " is-sandbox" : ""}`}>
-    <header><h3>{sandbox && <FlaskConical size={17}/>} {title}</h3><span>{timeZoneLabel(resolvedTimeZone)}</span></header>
-    {scrollable && <CustomScrollbar targetRef={listRef} rightOffset={6} />}
-    {entries.length === 0 ? <p className="credit-history-empty">{sandbox ? "Операций с тестовыми кредитами пока нет." : "Операций с кредитами пока нет."}</p> : <div ref={listRef} className={`credit-wallet-entry-list${scrollable ? " is-scrollable custom-scroll-target" : ""}`}>{entries.map((entry) => {
-      const kind = walletEntryKind(entry);
-      const Icon = kind === "credit" ? ArrowDownLeft : kind === "debit" ? ArrowUpRight : RefreshCw;
-      return <div className="credit-wallet-entry-group" key={entry.transaction_uuid}><article className={`credit-wallet-entry is-${kind}`}>
-        <span className="credit-wallet-entry-icon" aria-hidden="true"><Icon size={17}/></span>
-        <time dateTime={entry.created_at}>{formatWalletDateTime(entry.created_at, resolvedTimeZone)}</time>
-        <strong>{entry.credits>0?"+":""}{entry.credits.toLocaleString("ru-RU")}</strong>
-        <small>{walletReason(entry.reason, sandbox)}</small>
-      </article></div>;
-    })}</div>}
-  </section>;
-}
-
-function walletEntryKind(entry: CreditWalletEntry): "credit" | "debit" | "adjustment" {
-  if (entry.reason === "sandbox wallet set" || entry.reason === "sandbox wallet reset" || entry.credits === 0) return "adjustment";
-  return entry.credits > 0 ? "credit" : "debit";
-}
-
-function validTimeZone(timeZone?: string | null) {
-  if (!timeZone) return false;
-  try { new Intl.DateTimeFormat("ru-RU", { timeZone }).format(); return true; } catch { return false; }
-}
-
-function formatWalletDateTime(value: string, timeZone: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Дата не указана";
-  return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone }).format(date);
-}
-
-function timeZoneLabel(timeZone: string) {
-  const names: Record<string, string> = {
-    "Europe/Kaliningrad": "Калининград",
-    "Europe/Moscow": "Москва",
-    "Europe/Samara": "Самара",
-    "Asia/Yekaterinburg": "Екатеринбург",
-    "Asia/Omsk": "Омск",
-    "Asia/Krasnoyarsk": "Красноярск",
-    "Asia/Irkutsk": "Иркутск",
-    "Asia/Yakutsk": "Якутск",
-    "Asia/Vladivostok": "Владивосток",
-    "Asia/Magadan": "Магадан",
-    "Asia/Kamchatka": "Камчатка",
-    "UTC": "всемирное время",
-    "Europe/London": "Лондон",
-    "Europe/Berlin": "Берлин",
-    "Asia/Dubai": "Дубай",
-    "Asia/Almaty": "Алматы",
-    "Asia/Tashkent": "Ташкент",
-    "Asia/Tokyo": "Токио",
-    "America/New_York": "Нью-Йорк",
-    "America/Los_Angeles": "Лос-Анджелес"
-  };
-  return `Время: ${names[timeZone] ?? localizedUtcOffset(timeZone)}`;
-}
-
-function localizedUtcOffset(timeZone: string) {
-  try {
-    const part = new Intl.DateTimeFormat("ru-RU", { timeZone, timeZoneName: "shortOffset" }).formatToParts(new Date()).find((item) => item.type === "timeZoneName")?.value;
-    return part?.replace("GMT", "UTC") ?? "по часовому поясу профиля";
-  } catch {
-    return "по часовому поясу профиля";
-  }
-}
-
-function walletReason(reason: string, sandbox: boolean) {
-  if (!sandbox && reason === "transcription") return "Транскрибация звонка";
-  if (!sandbox && reason === "analysis") return "Анализ звонка";
-  if (!sandbox && reason === "scorecard_compile") return "Подготовка критериев";
-  if (!sandbox && reason === "deep_analysis") return "Глубокий анализ звонка";
-  if (!sandbox && reason === "assistant_generation") return "Ответ помощника по звонкам";
-  if (!sandbox && reason === "sandbox wallet add") return "Тестовое пополнение основного кошелька";
-  if (!sandbox && reason === "mock payment checkout") return "Тестовое пополнение основного кошелька";
-  if (!sandbox) return reason;
-  if (reason === "sandbox wallet add") return "Пополнение тестового кошелька";
-  if (reason === "sandbox wallet set") return "Изменение тестового баланса";
-  if (reason === "sandbox wallet reset") return "Сброс тестового баланса";
-  return "Операция с тестовыми кредитами";
 }
 
 function pendingQueueNote(data: CreditDashboardResponse) {

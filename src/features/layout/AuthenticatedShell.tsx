@@ -18,7 +18,7 @@ import {
   X
 } from "lucide-react";
 import type { CSSProperties } from "react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, openAuthorizedEventStream } from "../../api";
 import type {
   AppPage,
@@ -43,7 +43,9 @@ import { pluralizeRu } from "../../shared/lib/plans";
 import { CustomScrollbar, PageScrollbar } from "../../shared/ui/custom-scrollbar";
 import { notificationPresentation } from "../../shared/ui/notification-presentation";
 import { ToolButton } from "../assistant/AssistantControls";
-const AssistantWorkspace = lazy(() => import("../assistant/AssistantWorkspace").then(m => ({ default: m.AssistantWorkspace })));
+import { useAssistantAccess } from "../assistant/useAssistantAccess";
+import { AssistantWorkspace } from "../assistant/AssistantWorkspace";
+import { AssistantBoundary } from "../assistant/AssistantBoundary";
 
 /* The bottom island holds as many sections as its width fits and the rest wait
    in «Ещё» — it does not stretch four buttons across a tablet. The numbers are
@@ -107,6 +109,7 @@ export function AuthenticatedShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [assistantOpen,setAssistantOpen]=useState(false);
   const [assistantMounted, setAssistantMounted] = useState(false);
+  const assistantAccess = useAssistantAccess(companies);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -666,7 +669,7 @@ export function AuthenticatedShell({
             )}
             {notificationsOpen && <CustomScrollbar targetRef={notificationListRef} className="notifications-scroll-thumb" />}
           </div>
-          <ToolButton label="Поиск и помощник по звонкам" className={`icon-button assistant-header-launcher ${assistantOpen?"active":""}`} aria-expanded={assistantOpen} onClick={()=>{setAssistantMounted(true);setAssistantOpen(v=>!v)}}><SearchCheck size={20}/></ToolButton>
+          {assistantAccess.loaded && assistantAccess.allowed.length > 0 && <ToolButton label="Поиск и помощник по звонкам" className={`icon-button assistant-header-launcher ${assistantOpen?"active":""}`} aria-expanded={assistantOpen} onClick={()=>{setAssistantMounted(true);setAssistantOpen(v=>!v)}}><SearchCheck size={20}/></ToolButton>}
           <ThemeToggle theme={theme} onClick={onToggleTheme} />
           <div className="header-popover-wrap" ref={profilePopoverRef}>
             <button
@@ -838,7 +841,7 @@ export function AuthenticatedShell({
           </div>
         )}
       </div>
-      {assistantMounted && <Suspense fallback={null}><AssistantWorkspace open={assistantOpen} setOpen={setAssistantOpen} companies={companies} companyId={selectedCompanyId} onOpenCall={onOpenCall} /></Suspense>}
+      {assistantMounted && assistantAccess.allowed.length > 0 && <AssistantBoundary open={assistantOpen} onClose={() => setAssistantOpen(false)}><AssistantWorkspace open={assistantOpen} setOpen={setAssistantOpen} companies={companies} companyId={selectedCompanyId} allowedScopes={assistantAccess.allowed} onAccessRefresh={assistantAccess.refresh} onOpenCall={onOpenCall} /></AssistantBoundary>}
     </div>
   );
 }

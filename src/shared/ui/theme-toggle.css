@@ -1,5 +1,6 @@
 .vt-theme-toggle {display:grid;place-items:center;flex:0 0 auto;width:42px;height:42px;padding:0;border:1px solid var(--vt-line-mid);border-radius:12px;color:var(--vt-text);background:var(--vt-s1);cursor:pointer;transition:color .3s,background-color .3s,border-color .3s;}
 .vt-theme-toggle:hover {background:var(--vt-s2);color:var(--vt-accent-text);}
+.app-header .vt-theme-toggle,.app-header .vt-theme-toggle:hover {border:0;background:transparent;}
 .vt-theme-toggle:focus-visible {outline:2px solid var(--vt-accent-text);outline-offset:3px;}
 .vt-theme-window {position:relative;display:block;width:100%;height:100%;border-radius:inherit;overflow:clip;view-transition-name:vt-theme-icon;}
 .vt-theme-toggle .vt-theme-glyph {position:absolute;inset:0;margin:auto;opacity:0;transform-origin:50% calc(50% + 24px);transform:rotate(90deg);transition:none;}

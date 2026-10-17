@@ -48,12 +48,7 @@ export function InstructionDraftEditor({ instructionId, title, onApplied, onClos
     }).catch(cause => { if (!cancelled) setError(message(cause)); });
     return () => { cancelled = true; };
   }, [instructionId]);
-  useEffect(() => {
-    if (!draft || draft.original_filename.toLowerCase().endsWith(".md")) return;
-    let cancelled = false;
-    api.getInstructionDraftFile(instructionId).then(value => { if (!cancelled) setBlob(value); }).catch(cause => { if (!cancelled) setError(message(cause)); });
-    return () => { cancelled = true; };
-  }, [instructionId, draft?.original_filename, draft?.content, draft?.lock_version]);
+
   useEffect(() => {
     if (!compiling && !checking) return;
     let cancelled = false;

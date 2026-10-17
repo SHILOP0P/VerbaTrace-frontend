@@ -26,6 +26,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Local server security regression
+        run: npm run test:server
+
+      - name: Dependency vulnerabilities
+        run: npm run security:dependencies
+
   gate:
     name: CI Gate
     runs-on: ubuntu-latest

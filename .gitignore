@@ -9,6 +9,7 @@ dist-ssr/
 # Local environment
 .env
 .env.*
+.local-security/
 !.env.example
 
 # Logs
@@ -69,3 +70,4 @@ Thumbs.db
 **/specifications/
 **/.specify/
 **/.spec-kit/
+/AGENTS.md

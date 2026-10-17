@@ -3,7 +3,7 @@ import { cssClass, cssStyle } from "../../shared/lib/css-styles";
 import { BarChart3, CalendarRange, ChevronDown, Copy, Check, Pencil, Expand, FileText, Folder, Link2, MessageSquare, Minimize2, PanelLeft, PanelRightOpen, Paperclip, Phone, Plus, Search, SearchCheck, Send, Pause, Trash2, X } from "lucide-react";
 import "../../styles/assistant.css";
 import { FormEvent, ReactNode, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { SafeMarkdown as ReactMarkdown } from "../../shared/ui/SafeMarkdown";
 import remarkGfm from "remark-gfm";
 import { ApiError, api } from "../../api";
 import type { AssistantChat, AssistantExport, AssistantGraphic, AssistantMessage, AssistantMode, AssistantRun, AssistantSource, ContentSearchResponse } from "../../types";

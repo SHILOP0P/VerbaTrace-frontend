@@ -122,6 +122,7 @@ import type {
 } from "./types";
 import { AuthorizedEventStream } from "./shared/lib/authorized-event-stream";
 import { coordinateRefresh } from "./features/auth/refresh-coordinator";
+import { secureFetch as fetch } from "./shared/lib/secure-fetch";
 
 const configuredBase =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
@@ -551,6 +552,7 @@ async function request<T>(
   init: RequestInit = {},
   options: { retryOnUnauthorized?: boolean } = {},
 ): Promise<T> {
+  let admissionAccepted = false;
   const headers = new Headers(init.headers);
 
   if (
@@ -561,11 +563,37 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${apiRoot}${path}`, {
+  let response = await fetch(`${apiRoot}${path}`, {
     ...init,
     headers,
     credentials: "include",
   });
+
+  if (response.status === 202 && init.body instanceof FormData) {
+    const queued = await response.clone().json() as { file_admission?: { id: string } };
+    if (queued.file_admission) {
+      admissionAccepted = true;
+      const id = queued.file_admission.id;
+      window.dispatchEvent(new CustomEvent('verbatrace:file-admission', { detail: { id, status: 'queued' } }));
+      for (;;) {
+        await new Promise(resolve => window.setTimeout(resolve, 750));
+        let statusResponse = await fetch(`${apiRoot}/local-security/uploads/${encodeURIComponent(id)}`);
+        if (statusResponse.status === 401 && options.retryOnUnauthorized !== false) {
+          try {
+            await refreshSessionRequest();
+            statusResponse = await fetch(`${apiRoot}/local-security/uploads/${encodeURIComponent(id)}`);
+          } catch { /* Preserve the status error; never replay an admitted upload. */ }
+        }
+        if (!statusResponse.ok) { response = statusResponse; break; }
+        const job = await statusResponse.json() as { status: string; response_status?: number; payload?: unknown };
+        window.dispatchEvent(new CustomEvent('verbatrace:file-admission', { detail: { id, status: job.status } }));
+        if (job.status === 'completed' || job.status === 'failed') {
+          response = new Response(JSON.stringify(job.payload ?? { error: { code: 'upload_interrupted', message: 'Проверка файла завершилась ошибкой. Проверьте список загруженных материалов перед повтором.' } }), { status: job.response_status ?? 503, headers: { 'Content-Type': 'application/json' } });
+          break;
+        }
+      }
+    }
+  }
 
   if (response.status === 204) {
     return undefined as T;
@@ -579,6 +607,7 @@ async function request<T>(
   if (!response.ok) {
     if (
       response.status === 401 &&
+      !admissionAccepted &&
       options.retryOnUnauthorized !== false &&
       !path.startsWith("/auth/")
     ) {
@@ -2948,6 +2977,12 @@ export const api = {
     );
   },
 
+  getFileAdmissions() {
+    return request<{ items: Array<{ id: string; status: string; path: string }> }>('/local-security/uploads');
+  },
+  getInstructionPreview(id: string) {
+    return request<{ text: string; filename: string }>(`/instructions/${encodeURIComponent(id)}/preview`);
+  },
   getInstructionDraft(id:string,touch=false) {
     return request<InstructionDraft>(`/instructions/${encodeURIComponent(id)}/draft${touch?"?touch=1":""}`);
   },

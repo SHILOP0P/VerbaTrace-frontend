@@ -38,10 +38,9 @@ export function InstructionHistoryPage({ instructionId, analysisId, versionId, o
           if (cause instanceof ApiError && cause.status === 403) return false;
           throw cause;
         }),
-        api.downloadInstruction(`/instructions/${encodeURIComponent(id)}/file`),
+        api.getInstructionPreview(id),
       ]);
-      const text = value.original_filename.toLowerCase().endsWith(".md") ? await file.text() : "";
-      if (!cancelled) { setInstruction(value); setBlob(file); setMarkdown(text); setCanEdit(permission); }
+      if (!cancelled) { setInstruction(value); setBlob(undefined); setMarkdown(file.text); setCanEdit(permission); }
     }
     void load().catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Инструкция недоступна."); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

@@ -1,10 +1,11 @@
-import { createReadStream, existsSync, realpathSync } from 'node:fs';
+import { createReadStream, existsSync, realpathSync, readFileSync } from 'node:fs';
 import { stat, realpath } from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
 import { extname, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { protectBrowserRequest, proxyHeaders, securityHeaders } from './local-security.mjs';
 
 const projectDir = fileURLToPath(new URL('../', import.meta.url));
 const mediaTimeout = 45 * 60 * 1000;
@@ -42,14 +43,14 @@ function endToEndHeaders(headers) {
 }
 
 function proxy(request, response, target, agent) {
-  const headers = endToEndHeaders(request.headers);
-  headers['x-forwarded-host'] = request.headers.host;
-  headers['x-forwarded-proto'] ??= 'http';
-  headers.host = target.host;
+  const headers = proxyHeaders(endToEndHeaders(request.headers), { secure: Boolean(request.socket.encrypted), upstreamHost: target.host });
   const transport = target.protocol === 'https:' ? https : http;
   const upstream = transport.request({ protocol: target.protocol, hostname: target.hostname,
     port: target.port || undefined, path: request.url, method: request.method, headers, agent }, reply => {
-    response.writeHead(reply.statusCode ?? 502, endToEndHeaders(reply.headers));
+    const outgoingHeaders = endToEndHeaders(reply.headers);
+    // The browser boundary owns these headers, including proxied error pages.
+    for (const name of ['content-security-policy', 'x-frame-options', 'referrer-policy', 'x-content-type-options']) delete outgoingHeaders[name];
+    response.writeHead(reply.statusCode ?? 502, outgoingHeaders);
     pipeline(reply, response, () => {});
   });
   upstream.setTimeout(mediaTimeout, () => upstream.destroy(new Error('API timeout')));
@@ -159,13 +160,17 @@ async function staticFile(request, response, distDir, pathname) {
   pipeline(createReadStream(selected, { start, end }), response, () => {});
 }
 
-export function createSiteServer({ distDir = resolve(projectDir, 'dist'), apiTarget = 'http://127.0.0.1:8080' } = {}) {
+export function createSiteServer({ distDir = resolve(projectDir, 'dist'), apiTarget = 'http://127.0.0.1:8080', tls, enforceSecurity = true } = {}) {
   distDir = realpathSync(distDir);
   const target = new URL(apiTarget);
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) throw new Error('Invalid API_TARGET');
   const agent = target.protocol === 'https:' ? new https.Agent({ keepAlive: true }) : new http.Agent({ keepAlive: true });
-  const server = http.createServer((request, response) => {
-    response.setHeader('X-Content-Type-Options', 'nosniff');
+  const handler = (request, response) => {
+    securityHeaders(response);
+    if (enforceSecurity) {
+      const denied = protectBrowserRequest(request, response, { secure: Boolean(tls), port: request.socket.localPort });
+      if (denied) { if (denied[0]) plain(response, denied[0], denied[1]); return; }
+    }
     let pathname;
     try { pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname); }
     catch { return plain(response, 400, 'Invalid path'); }
@@ -174,7 +179,8 @@ export function createSiteServer({ distDir = resolve(projectDir, 'dist'), apiTar
       if (!response.headersSent) plain(response, 500, 'File is unavailable');
       else response.destroy();
     });
-  });
+  };
+  const server = tls ? https.createServer(tls, handler) : http.createServer(handler);
   server.requestTimeout = mediaTimeout;
   server.headersTimeout = 30_000;
   server.on('close', () => agent.destroy());
@@ -187,12 +193,18 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
     console.error('Build the site first: npm run build');
     process.exit(1);
   }
-  const server = createSiteServer({ distDir, apiTarget: process.env.API_TARGET || 'http://127.0.0.1:8080' });
+  const certificateDirectory = resolve(projectDir, '.local-security/tls');
+  if (!existsSync(resolve(certificateDirectory, 'localhost.pem')) || !existsSync(resolve(certificateDirectory, 'localhost-key.pem'))) {
+    console.error('Local HTTPS certificate is missing. Run the backend scripts/setup-local-security.ps1 first.');
+    process.exit(1);
+  }
+  const tls = { cert: readFileSync(resolve(certificateDirectory, 'localhost.pem')), key: readFileSync(resolve(certificateDirectory, 'localhost-key.pem')), minVersion: 'TLSv1.2' };
+  const server = createSiteServer({ distDir, apiTarget: process.env.API_TARGET || 'http://127.0.0.1:8080', tls, enforceSecurity: true });
   server.on('error', error => {
     console.error(error.code === 'EADDRINUSE' ? 'Port 5173 is already occupied. Stop the previous server.' : error.message);
     process.exit(1);
   });
-  server.listen(5173, '127.0.0.1', () => console.log('VerbaTrace: http://127.0.0.1:5173 (compiled site + API proxy)'));
+  server.listen(5173, '127.0.0.1', () => console.log('VerbaTrace: https://127.0.0.1:5173 (local HTTPS + API proxy)'));
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => {
     server.close(() => process.exit(0));
     server.closeIdleConnections();

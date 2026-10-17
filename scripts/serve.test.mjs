@@ -54,7 +54,7 @@ test('compiled server: public/app routing, source isolation, compression/cache, 
     });
   });
   const backendPort = await listen(backend);
-  const server = createSiteServer({ distDir: dist, apiTarget: `http://127.0.0.1:${backendPort}` });
+  const server = createSiteServer({ distDir: dist, apiTarget: `http://127.0.0.1:${backendPort}`, enforceSecurity: false });
   const port = await listen(server);
   t.after(async () => {
     server.closeAllConnections();

@@ -77,7 +77,7 @@ export function SelectControl({
   const controlId = id ?? generatedId;
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(() => String(defaultValue ?? ""));
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 320 });
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const rootRef = useRef<HTMLSpanElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -121,17 +121,34 @@ export function SelectControl({
     function updateMenuPosition() {
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setMenuPosition({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+      const nav = document.querySelector('.mobile-bottom-nav')?.getBoundingClientRect();
+      const bottom = nav && nav.height > 0 ? Math.min(window.innerHeight - 8, nav.top - 8) : window.innerHeight - 8;
+      const desired = Math.min(320, menuRef.current?.scrollHeight || options.length * 40 + 12);
+      const below = Math.max(0, bottom - rect.bottom - 6), above = Math.max(0, rect.top - 14);
+      const useBelow = below >= Math.min(desired, 160) || below >= above;
+      const maxHeight = Math.max(60, Math.min(320, useBelow ? below : above));
+      const height = Math.min(desired, maxHeight);
+      const width = Math.min(rect.width, window.innerWidth - 16);
+      setMenuPosition({ top: useBelow ? rect.bottom + 6 : Math.max(8, rect.top - height - 6), left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), width, maxHeight });
     }
 
     updateMenuPosition();
+    const observer = new ResizeObserver(updateMenuPosition);
+    if (menuRef.current) observer.observe(menuRef.current);
     window.addEventListener("resize", updateMenuPosition);
     window.addEventListener("scroll", updateMenuPosition, true);
     return () => {
       window.removeEventListener("resize", updateMenuPosition);
       window.removeEventListener("scroll", updateMenuPosition, true);
+      observer.disconnect();
     };
-  }, [open]);
+  }, [open, portalRoot, options.length]);
+  useLayoutEffect(() => {
+    if (!open || !portalRoot) return;
+    const selected = menuRef.current?.querySelector<HTMLButtonElement>('button[aria-selected="true"]:not(:disabled)');
+    const first = menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    (selected ?? first)?.focus({preventScroll: true});
+  }, [open, portalRoot]);
 
   function selectValue(nextValue: string) {
     if (disabled) return;
@@ -145,6 +162,7 @@ export function SelectControl({
       target: { name, value: nextValue }
     } as ChangeEvent<HTMLSelectElement>);
     setOpen(false);
+    triggerRef.current?.focus({preventScroll: true});
   }
 
   return (
@@ -161,12 +179,13 @@ export function SelectControl({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-describedby={props["aria-describedby"]}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             setOpen(false);
           }
-          if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+          if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
             event.preventDefault();
             setOpen(true);
           }
@@ -189,11 +208,22 @@ export function SelectControl({
             left: menuPosition.left,
             top: menuPosition.top,
             width: menuPosition.width,
+            maxHeight: menuPosition.maxHeight,
+            overflowY: "auto",
             pointerEvents: "auto",
             position: "fixed",
             zIndex: 10001
           })].filter(Boolean).join(" ")}
           role="listbox"
+          onKeyDown={event => {
+            const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+            const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+              event.preventDefault();
+              buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+            }
+            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setOpen(false); triggerRef.current?.focus(); }
+          }}
           aria-labelledby={controlId}
           ref={menuRef}
 

@@ -11,7 +11,7 @@ import type {
 } from "../../types";
 import { formatDate } from "../../shared/lib/formatters";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
-import { CallListSkeleton } from "../../shared/ui/loading";
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 
 type PendingAction =
   | { kind: "remove"; member: CompanyMemberListItemResponse }
@@ -180,7 +180,7 @@ export function CompanyMembersPanel({
       {error && <div className="form-error">{error}</div>}
 
       {loading ? (
-        <CallListSkeleton count={3} compact />
+        <RowsSkeleton kind="members" count={3} />
       ) : members.length === 0 ? (
         <div className="instruction-empty standalone">В компании пока только вы.</div>
       ) : (

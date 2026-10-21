@@ -10,7 +10,7 @@
     "serve": "node scripts/serve.mjs",
     "preview": "npm run serve",
     "demo": "npm run start",
-    "test:server": "node --test scripts/serve.test.mjs scripts/local-security.test.mjs scripts/admission-client.test.mjs",
+    "test:server": "node --test scripts/serve.test.mjs scripts/local-security.test.mjs scripts/admission-client.test.mjs scripts/secure-fetch.test.mjs scripts/instruction-preview.test.mjs scripts/overview-layout.test.mjs scripts/overview-persistence.test.mjs scripts/widget-gestures.test.mjs scripts/widget-geometry.test.mjs scripts/analytics-widgets.test.mjs scripts/call-processing-status.test.mjs",
     "security:dependencies": "npm audit --audit-level=high",
     "verify:local": "node scripts/verify-main-security.mjs"
   },
@@ -35,6 +35,6 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.186.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.6"
+    "vite": "^7.3.7"
   }
 }

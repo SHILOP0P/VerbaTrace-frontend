@@ -1,3 +1,4 @@
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import { Search, UserMinus, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
@@ -59,7 +60,7 @@ export function ContactsPage() {
   return <section className="contacts-page app-page atmospheric-page">
     <div className="app-page-heading readable-heading"><h1>Контакты</h1><p>Сохраните коллег, чтобы позже быстро использовать их при разметке участников звонка.</p></div>
     <section className="contacts-add glass-panel"><div><h2>Добавить контакт</h2><p>Начните вводить @username — подходящие пользователи появятся сразу.</p></div><label className="contacts-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="@username" autoComplete="off" /></label>{showSearchState && <div className="contact-suggestions">{searching ? <div className="contact-search-status">Ищу пользователей…</div> : suggestions.length === 0 ? <div className="contact-search-status">Совпадений не найдено.</div> : suggestions.map((user) => <ContactRow key={user.id} user={user} action="add" busy={busy} onAction={() => add(user)} />)}</div>}{error && <div className="form-error">{error}</div>}</section>
-    <section className="contacts-list glass-panel"><div className="panel-heading large"><div><h2>Мои контакты</h2><p>{contacts.length} сохранено</p></div><UsersRound size={22} /></div>{loading ? <div className="instruction-empty standalone">Загружаю контакты…</div> : contacts.length === 0 ? <div className="instruction-empty standalone">Контактов пока нет.</div> : <div className="contact-rows">{contacts.map((user) => <ContactRow key={user.id} user={user} action="remove" busy={busy} onAction={() => remove(user.id)} />)}</div>}</section>
+    <section className="contacts-list glass-panel"><div className="panel-heading large"><div><h2>Мои контакты</h2><p>{contacts.length} сохранено</p></div><UsersRound size={22} /></div>{loading ? <RowsSkeleton kind="contacts" /> : contacts.length === 0 ? <div className="instruction-empty standalone">Контактов пока нет.</div> : <div className="contact-rows">{contacts.map((user) => <ContactRow key={user.id} user={user} action="remove" busy={busy} onAction={() => remove(user.id)} />)}</div>}</section>
   </section>;
 }
 

@@ -1,3 +1,4 @@
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import {
   ArrowLeft,
   AppWindow,
@@ -180,6 +181,7 @@ export function IntegrationsPage({
   const [owner, setOwner] = useState(() => managed[0]?.id ?? "user");
   const ownerAutoSelectedRef = useRef(managed.length > 0);
   const [apps, setApps] = useState<DeveloperApplication[]>([]);
+  const [loadingApps, setLoadingApps] = useState(true);
   const [name, setName] = useState("");
   const [environment, setEnvironment] = useState<"sandbox" | "production">(
     "sandbox",
@@ -209,6 +211,7 @@ export function IntegrationsPage({
   }, [managed]);
   useEffect(() => {
     let alive = true;
+    setLoadingApps(true);
     setMessage("");
     setApiAllowed(false);
     const subscription = ownerType === "company" && ownerId ? api.getCompanySubscription(ownerId) : api.getSubscription();
@@ -239,7 +242,8 @@ export function IntegrationsPage({
               ? error.message
               : "Не удалось загрузить приложения.",
           );
-      });
+      })
+      .finally(() => { if (alive) setLoadingApps(false); });
     return () => {
       alive = false;
     };
@@ -499,7 +503,7 @@ export function IntegrationsPage({
       </div>
       <section className="glass integration-list">
         <h2 className="integration-title"><span className="integration-icon is-app"><AppWindow size={20}/></span>Приложения</h2>
-        {apps.length === 0 ? (
+        {loadingApps ? <RowsSkeleton kind="companies" count={2} /> : apps.length === 0 ? (
           <p>Приложений пока нет.</p>
         ) : (
           apps.map((app) => (

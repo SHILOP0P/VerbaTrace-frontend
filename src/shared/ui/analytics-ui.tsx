@@ -1,3 +1,4 @@
+import { SegmentedControl } from "./SegmentedControl";
 import { cssClass } from "../lib/css-styles";
 import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronUp, Minus } from "lucide-react";
 import { type ReactNode, useId, useMemo, useState } from "react";
@@ -109,10 +110,10 @@ export function periodRange(value: PeriodValue): { from?: string; to?: string } 
 
 export function PeriodSelect({ value, onChange, retentionDays }: { value: PeriodValue; onChange: (value: PeriodValue) => void; retentionDays?: number }) {
   return <div className="period-select">
-    <div className="segmented compact period-select-presets" role="group" aria-label="Период">
+    <SegmentedControl className="segmented compact period-select-presets" role="group" aria-label="Период">
       {(["7", "30", "90"] as const).map((preset) => <button key={preset} type="button" className={value.preset === preset ? "active" : ""} onClick={() => onChange({ preset })}>{preset} дней</button>)}
       <button type="button" className={value.preset === "custom" ? "active" : ""} onClick={() => onChange({ preset: "custom", from: value.from, to: value.to })}>Свой</button>
-    </div>
+    </SegmentedControl>
     {value.preset === "custom" ? <div className="period-select-range">
       <DateTimePicker mode="date" display="compact" ariaLabel="С" value={value.from ?? ""} onChange={(from) => onChange({ ...value, from })} />
       <span>—</span>

@@ -1,3 +1,4 @@
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import { ArrowRight, ClipboardCheck, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
@@ -38,7 +39,7 @@ export function QualityReviewsPage({ onOpen }: { onOpen: (reviewId: string) => v
     </header>
     <div className="quality-filters"><label><span>Показать</span><SelectControl aria-label="Статус проверки" value={status} onChange={(event) => setStatus(event.currentTarget.value)}><option value="">Все проверки</option><option value="pending">Ожидают проверки</option><option value="in_review">В работе</option><option value="published">Проверка завершена</option><option value="appealed">На пересмотре</option><option value="resolved">Пересмотрено</option></SelectControl></label></div>
     {error && <div className="form-error" role="alert">{error}</div>}
-    {loading ? <div className="quality-empty">Загружаю очередь…</div> : items.length === 0 ? <div className="quality-empty"><ClipboardCheck size={36} /><strong>Проверок пока нет</strong><span>Откройте готовый анализ звонка и нажмите «Исправить анализ».</span></div> : <div className="quality-list">{items.map((item) => <button className="quality-list-row" type="button" key={item.review_uuid} onClick={() => onOpen(item.review_uuid)}><span className={`quality-status is-${item.status}`}>{statusLabel(item.status)}</span><span className="quality-call-title"><small>Анализ звонка</small><strong>{callsById[item.call_uuid]?.title || "Звонок без названия"}</strong></span><span><small>Последнее изменение</small><strong>{new Date(item.updated_at).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" })}</strong></span><ArrowRight size={18} /></button>)}</div>}
+    {loading ? <RowsSkeleton kind="quality" count={5} /> : items.length === 0 ? <div className="quality-empty"><ClipboardCheck size={36} /><strong>Проверок пока нет</strong><span>Откройте готовый анализ звонка и нажмите «Исправить анализ».</span></div> : <div className="quality-list">{items.map((item) => <button className="quality-list-row" type="button" key={item.review_uuid} onClick={() => onOpen(item.review_uuid)}><span className={`quality-status is-${item.status}`}>{statusLabel(item.status)}</span><span className="quality-call-title"><small>Анализ звонка</small><strong>{callsById[item.call_uuid]?.title || "Звонок без названия"}</strong></span><span><small>Последнее изменение</small><strong>{new Date(item.updated_at).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" })}</strong></span><ArrowRight size={18} /></button>)}</div>}
   </div>;
 }
 

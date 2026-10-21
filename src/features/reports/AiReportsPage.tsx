@@ -21,18 +21,22 @@ import { useWorkspaceCompanyId } from "../../shared/lib/workspace-company";
 import { SelectControl } from "../../shared/ui/primitives";
 import { CustomScrollbar } from "../../shared/ui/custom-scrollbar";
 import { reportFormats } from "./ReportExportPanel";
+import { RowsSkeleton } from "../../shared/ui/page-loading";
+import { SkeletonLine } from "../../shared/ui/loading";
 
 export function AiReportsPage({
   calls,
-  analyses
+  analyses,
+  loading = false
 }: {
   calls: CallResponse[];
   analyses: Record<string, AnalysisResponse>;
+  loading?: boolean;
 }) {
   const reportsPageScrollRef = useRef<HTMLElement>(null);
   const workspaceCompanyId = useWorkspaceCompanyId();
   const [reports, setReports] = useState<ReportWithCallResponse[]>([]);
-  const [loadingReports, setLoadingReports] = useState(false);
+  const [loadingReports, setLoadingReports] = useState(true);
   const [formatFilter, setFormatFilter] = useState<ReportFormat | "all">("all");
   const [statusFilter, setStatusFilter] = useState<ReportStatus | "all">("all");
   const [selectedFormat, setSelectedFormat] = useState<ReportFormat>("pdf");
@@ -143,9 +147,10 @@ export function AiReportsPage({
       </div>
 
       <div className="reports-kpi-grid">
-        <ReportMetric value={readyAnalyses.length.toString()} label="Отчетов доступно" note="по готовым анализам" />
-        <ReportMetric value={processingReports.toString()} label="В очереди" note="звонки в обработке" />
+        <ReportMetric loading={loading} value={readyAnalyses.length.toString()} label="Отчетов доступно" note="по готовым анализам" />
+        <ReportMetric loading={loading} value={processingReports.toString()} label="В очереди" note="звонки в обработке" />
         <ReportMetric
+          loading={loadingReports}
           value={loadingReports ? "..." : latestReport ? reportFormatLabel(latestReport.format) : "—"}
           label="Последний экспорт"
           note={
@@ -163,6 +168,7 @@ export function AiReportsPage({
       <CallReportsSection
         reports={reports}
         loadingReports={loadingReports}
+        loadingCalls={loading}
         formatFilter={formatFilter}
         statusFilter={statusFilter}
         selectedFormat={selectedFormat}
@@ -188,6 +194,7 @@ export function AiReportsPage({
 
 function CallReportsSection({
   reports,
+  loadingCalls,
   loadingReports,
   formatFilter,
   statusFilter,
@@ -208,6 +215,7 @@ function CallReportsSection({
   onDeleteReport
 }: {
   reports: ReportWithCallResponse[];
+  loadingCalls: boolean;
   loadingReports: boolean;
   formatFilter: ReportFormat | "all";
   statusFilter: ReportStatus | "all";
@@ -260,13 +268,7 @@ function CallReportsSection({
         </div>
         <div className="report-placeholder-list">
           {loadingReports ? (
-            <div className="report-placeholder-row">
-              <FileBarChart2 size={22} />
-              <div>
-                <strong>Загружаю отчеты</strong>
-                <small>Запрос к /reports</small>
-              </div>
-            </div>
+            <RowsSkeleton kind="reports" />
           ) : reports.length > 0 ? (
             reports.slice(0, 8).map((report) => {
               const call = report.call;
@@ -344,7 +346,7 @@ function CallReportsSection({
             </span>
           </label>
           <div className="report-call-options">
-            {filteredReadyAnalyses.length === 0 ? (
+            {loadingCalls ? <RowsSkeleton kind="reports" count={2} /> : filteredReadyAnalyses.length === 0 ? (
               <div className="report-call-option empty">Готовых анализов по поиску нет</div>
             ) : (
               filteredReadyAnalyses.map((call) => (
@@ -386,10 +388,10 @@ function CallReportsSection({
   );
 }
 
-function ReportMetric({ value, label, note }: { value: string; label: string; note: string; }) {
+function ReportMetric({ value, label, note, loading = false }: { value: string; label: string; note: string; loading?: boolean; }) {
   return (
     <div className="report-metric glass-panel">
-      <strong>{value}</strong>
+      <strong>{loading ? <span role="status" aria-label="Загрузка показателя"><SkeletonLine className="skeleton-metric-value" /></span> : value}</strong>
       <span>{label}</span>
       <small>{note}</small>
     </div>

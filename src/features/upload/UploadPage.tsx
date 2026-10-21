@@ -1,3 +1,5 @@
+import { SegmentedControl } from "../../shared/ui/SegmentedControl";
+import { TableSkeleton } from "../../shared/ui/page-loading";
 import {CriterionPicker} from "../instructions/CriterionPicker";
 import type {CriterionCatalogue} from "../../types";
 import {
@@ -15,7 +17,8 @@ import {
   UsersRound,
   X
 } from "lucide-react";
-import { DragEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { DragEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { loadUploadDraft, rememberUploadDraft, saveUploadDraft, type UploadDraft } from "./upload-draft";
 import { api } from "../../api";
 import type {
   AppPage,
@@ -55,14 +58,7 @@ type SpeakerHint = {
 };
 type DiarizationRoleDraft = { id: string; name: string; description: string };
 
-export function UploadPage({
-  session,
-  companies,
-  departments,
-  loading,
-  onNavigate,
-  onUploaded
-}: {
+type UploadPageProps = {
   session: SessionState;
   companies: CompanyResponse[];
   departments: DepartmentResponse[];
@@ -70,41 +66,85 @@ export function UploadPage({
   loading: boolean;
   onNavigate: (page: AppPage) => void;
   onUploaded: (call: CallResponse, open: boolean) => void;
-}) {
-  const [uploadMode, setUploadMode] = useState<UploadMode>(readStoredUploadMode);
-  const [title, setTitle] = useState("");
-  const [media, setMedia] = useState<File | null>(null);
-  const [batchItems, setBatchItems] = useState<BatchUploadItem[]>([]);
+};
+export function UploadPage(props: UploadPageProps) {
+  const [restored, setRestored] = useState<{ draft?: UploadDraft }>();
+  useEffect(() => {
+    let stop = false;
+    void loadUploadDraft(props.session.user.id).then(draft => { if (!stop) setRestored({ draft }); }).catch(() => { if (!stop) setRestored({}); });
+    return () => { stop = true; };
+  }, [props.session.user.id]);
+  return restored ? <UploadForm key={props.session.user.id} {...props} initialDraft={restored.draft}/> : <TableSkeleton/>;
+}
+function UploadForm({
+  session,
+  companies,
+  departments,
+  loading,
+  onNavigate,
+  onUploaded,
+  initialDraft
+}: UploadPageProps & { initialDraft?: UploadDraft }) {
+  const [uploadMode, setUploadMode] = useState<UploadMode>(() => initialDraft?.uploadMode ?? readStoredUploadMode());
+  const [title, setTitle] = useState(initialDraft?.title ?? "");
+  const [media, setMedia] = useState<File | null>(initialDraft?.media ?? null);
+  const [batchItems, setBatchItems] = useState<BatchUploadItem[]>(initialDraft?.batchItems ?? []);
   const [batchDragActive, setBatchDragActive] = useState(false);
-  const [scope, setScope] = useState<VisibilityScope>("personal");
-  const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
+  const [scope, setScope] = useState<VisibilityScope>(initialDraft?.scope ?? "personal");
+  const [companyId, setCompanyId] = useState(initialDraft?.companyId ?? companies[0]?.id ?? "");
   const [departmentId, setDepartmentId] = useState(
-    departments.find((department) => department.company_uuid === companies[0]?.id)?.id ?? ""
+    initialDraft?.departmentId ?? departments.find((department) => department.company_uuid === companies[0]?.id)?.id ?? ""
   );
   const [callFolders, setCallFolders] = useState<CallFolderResponse[]>([]);
-  const [folderId, setFolderId] = useState("");
+  const [folderId, setFolderId] = useState(initialDraft?.folderId ?? "");
   const [foldersLoading, setFoldersLoading] = useState(false);
   const [folderError, setFolderError] = useState("");
   const [catalogue,setCatalogue]=useState<CriterionCatalogue>();
-  const [criterionKeys,setCriterionKeys]=useState<string[]>([]);
+  const [criterionKeys,setCriterionKeys]=useState<string[]>(initialDraft?.criterionKeys ?? []);
+  const restoredCriteria = useRef(initialDraft ? JSON.stringify([initialDraft.scope, initialDraft.companyId, initialDraft.departmentId, initialDraft.folderId]) : "");
   const [catalogueLoading,setCatalogueLoading]=useState(true);
   const [catalogueError,setCatalogueError]=useState("");
   useEffect(()=>{
     let cancelled=false;setCatalogueLoading(true);setCatalogueError("");
     const filters={company_uuid:scope==="personal"?undefined:companyId,department_uuid:scope==="department"?departmentId:undefined,folder_uuid:folderId||undefined};
     if((scope!=="personal"&&!companyId)||(scope==="department"&&!departmentId)){setCatalogueLoading(false);setCatalogue(undefined);return}
-    api.getCriterionCatalogue(filters).then(value=>{if(cancelled)return;setCatalogue(value);const defaults=value.items.filter(item=>item.active&&item.selected).map(item=>item.criterion.criterion_key);if(defaults.length>40){setCriterionKeys([]);setCatalogueError(value.can_select?"Выберите не больше 40 критериев.":"Набор содержит больше 40 критериев. Руководитель должен изменить настройки.")}else setCriterionKeys(defaults)}).catch(cause=>{if(!cancelled)setCatalogueError(cause instanceof Error?cause.message:"Критерии недоступны.")}).finally(()=>{if(!cancelled)setCatalogueLoading(false)});
+    api.getCriterionCatalogue(filters).then(value=>{
+      if(cancelled)return;
+      setCatalogue(value);
+      const defaults=value.items.filter(item=>item.active&&item.selected).map(item=>item.criterion.criterion_key);
+      const context = JSON.stringify([scope, companyId, departmentId, folderId]);
+      if (restoredCriteria.current === context && value.can_select && !value.mandatory) {
+        setCriterionKeys(current => [...new Set([...current.filter(key => value.items.some(item => item.active && item.criterion.enabled && item.criterion.criterion_key === key)), ...value.items.filter(item => item.active && (item.inherited || item.protected) && item.selected).map(item => item.criterion.criterion_key)])].slice(0, 40));
+      } else if(defaults.length>40){setCriterionKeys([]);setCatalogueError(value.can_select?"Выберите не больше 40 критериев.":"Набор содержит больше 40 критериев. Руководитель должен изменить настройки.")}else setCriterionKeys(defaults);
+      restoredCriteria.current = "";
+    }).catch(cause=>{if(!cancelled)setCatalogueError(cause instanceof Error?cause.message:"Критерии недоступны.")}).finally(()=>{if(!cancelled)setCatalogueLoading(false)});
     return()=>{cancelled=true};
   },[scope,companyId,departmentId,folderId]);
 
   const [contacts, setContacts] = useState<UserResponse[]>([]);
   const [selectedContactId, setSelectedContactId] = useState("");
-  const [speakerHints, setSpeakerHints] = useState<SpeakerHint[]>([]);
-  const [diarizationRoles, setDiarizationRoles] = useState<DiarizationRoleDraft[]>([]);
-  const [roleName, setRoleName] = useState("");
-  const [roleDescription, setRoleDescription] = useState("");
+  const [speakerHints, setSpeakerHints] = useState<SpeakerHint[]>(initialDraft?.speakerHints ?? []);
+  const [diarizationRoles, setDiarizationRoles] = useState<DiarizationRoleDraft[]>(initialDraft?.diarizationRoles ?? []);
+  const [roleName, setRoleName] = useState(initialDraft?.roleName ?? "");
+  const [roleDescription, setRoleDescription] = useState(initialDraft?.roleDescription ?? "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [draftWarning, setDraftWarning] = useState("");
+  const draft = useMemo<UploadDraft>(() => ({ uploadMode, title, media, batchItems, scope, companyId, departmentId, folderId, criterionKeys, speakerHints, diarizationRoles, roleName, roleDescription }), [uploadMode, title, media, batchItems, scope, companyId, departmentId, folderId, criterionKeys, speakerHints, diarizationRoles, roleName, roleDescription]);
+  const latestDraft = useRef(draft);
+  useEffect(() => {
+    latestDraft.current = draft;
+    rememberUploadDraft(session.user.id, draft);
+    const timer = window.setTimeout(() => {
+      void saveUploadDraft(session.user.id, draft).catch(() => setDraftWarning("Черновик сохранён в текущей вкладке. Не удалось сохранить файлы для перезагрузки страницы: в хранилище браузера недостаточно места или оно недоступно."));
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [draft, session.user.id]);
+  useEffect(() => {
+    const flush = () => { void saveUploadDraft(session.user.id, latestDraft.current).catch(() => undefined); };
+    window.addEventListener("pagehide", flush);
+    return () => { window.removeEventListener("pagehide", flush); flush(); };
+  }, [session.user.id]);
 
   const managedCompanies = useMemo(
     () => companies.filter((company) => isCompanyManager(company, session.user.id)),
@@ -357,9 +397,13 @@ useEffect(() => {
       };
       if (uploadMode === "single" && media) {
         const created = await api.createCall({ ...sharedInput, title: title.trim(), media });
+        latestDraft.current = { ...latestDraft.current, title: "", media: null };
+        void saveUploadDraft(session.user.id, latestDraft.current).catch(() => undefined);
+        setTitle(""); setMedia(null);
         onUploaded(created, true);
       } else {
-        const queue = [...batchItems];
+        const queue = batchItems.filter(item => item.status !== "success");
+        const completed = new Set<string>();
         const results: boolean[] = [];
         const uploadBatchItem = async (item: BatchUploadItem) => {
           updateBatchItem(item.id, { status: "uploading", error: undefined });
@@ -367,6 +411,7 @@ useEffect(() => {
             const created = await api.createCall({ ...sharedInput, title: item.title.trim() || undefined, media: item.file });
             onUploaded(created, false);
             updateBatchItem(item.id, { status: "success" });
+            completed.add(item.id);
             return true;
           } catch (uploadError) {
             updateBatchItem(item.id, {
@@ -384,7 +429,12 @@ useEffect(() => {
         }));
         const failed = results.filter((result) => !result).length;
         if (failed > 0) setError(`Не удалось загрузить ${failed} из ${batchItems.length} звонков. Их можно повторить.`);
-        else onNavigate("calls");
+        else {
+          latestDraft.current = { ...latestDraft.current, batchItems: batchItems.filter(item => item.status !== "success" && !completed.has(item.id)) };
+          void saveUploadDraft(session.user.id, latestDraft.current).catch(() => undefined);
+          setBatchItems(latestDraft.current.batchItems);
+          onNavigate("calls");
+        }
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Не удалось загрузить звонок");
@@ -411,16 +461,17 @@ useEffect(() => {
 
       <form className="upload-form glass" onSubmit={submit} onKeyDown={handleFormKeyDown}>
         <h1>Загрузить звонок</h1>
+        <p className="upload-draft-note" role="status">{draftWarning || "Черновик сохраняется на этом устройстве на 24 часа: файлы, участники и критерии. Можно перейти к инструкции и вернуться. При выходе из аккаунта черновик удаляется."}</p>
         <div>
           <span className="field-title">Режим загрузки</span>
-          <div className="segmented scope">
+          <SegmentedControl className="segmented scope">
             <button type="button" className={uploadMode === "single" ? "active" : ""} disabled={busy} onClick={() => setUploadMode("single")}>
               Один звонок
             </button>
             <button type="button" className={uploadMode === "multiple" ? "active" : ""} disabled={busy} onClick={() => setUploadMode("multiple")}>
               Несколько звонков
             </button>
-          </div>
+          </SegmentedControl>
         </div>
         {uploadMode === "single" && (
           <label>
@@ -491,7 +542,7 @@ useEffect(() => {
         </div>
         <div>
           <span className="field-title">Куда добавить звонок?</span>
-          <div className="segmented scope">
+          <SegmentedControl className="segmented scope">
             {availableCallScopes.map((item) => (
               <button
                 type="button"
@@ -505,7 +556,7 @@ useEffect(() => {
                 {callScopeLabel(item)}
               </button>
             ))}
-          </div>
+          </SegmentedControl>
         </div>
         {scope !== "personal" && (
           <div className="form-grid two">
@@ -623,16 +674,18 @@ useEffect(() => {
             Изменить инструкцию
           </button>
         </div>
-        {catalogueLoading?<p role="status">Загружаем критерии…</p>:catalogue&&<CriterionPicker catalogue={catalogue} selected={criterionKeys} disabled={busy} onChange={setCriterionKeys}/>}
+        {catalogueLoading?<TableSkeleton />:catalogue&&<CriterionPicker catalogue={catalogue} selected={criterionKeys} disabled={busy} onChange={setCriterionKeys}/>}
         {catalogueError&&<p className="field-error" role="alert">{catalogueError}</p>}
 
         {error && <div className="form-error">{error}</div>}
-        <p className="upload-processing-hint">«Транскрибировать» — получить текст разговора. «Анализировать» — получить текст и анализ по выбранным инструкциям. Транскрипция доступна на всех тарифах; анализ можно запустить позже.</p>
-        <p className="upload-processing-hint">Важный или нетиповой разговор? Выберите «Транскрибировать», поправьте роли участников и запустите анализ вручную.</p>
+        <div className="upload-processing-options">
+          <div><FileText size={18}/><strong>Транскрипция</strong><p>Текст разговора. Роли участников можно поправить и запустить анализ позже.</p></div>
+          <div><CloudUpload size={18}/><strong>Транскрипция и анализ</strong><p>Текст, разбор вопросов и оценка по выбранным критериям.</p></div>
+        </div>
         {/* Running out of credits does not lose the upload: the call is accepted
             and starts by itself. Saying so here keeps the wait from looking
             like a failure. */}
-        <p className="upload-processing-hint">Если лимит кредитов исчерпан, звонок примут и поставят в очередь — обработка начнётся сама, как только лимит обновится. Очередь ограничена тарифом: когда она заполнена, загрузку придётся повторить позже.</p>
+        <details className="upload-processing-help"><summary>Как работает очередь и лимит кредитов</summary><p>Если кредитов недостаточно, звонок останется в очереди до обновления лимита. Размер очереди зависит от тарифа. Если очередь заполнена, покажем ошибку — незагруженные файлы сохранятся в черновике.</p></details>
         <div className="form-actions">
           <button className="ghost-button" type="submit" name="processing_mode" value="transcribe" disabled={busy}><FileText size={18} />{busy ? "Загружаю…" : uploadMode === "multiple" ? "Транскрибировать всё" : "Транскрибировать"}</button>
           <button className="primary-button" type="submit" name="processing_mode" value="analyze" disabled={busy}>

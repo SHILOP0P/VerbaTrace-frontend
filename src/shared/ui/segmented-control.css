@@ -1,0 +1,72 @@
+.motion-segmented {
+  position: relative;
+  isolation: isolate;
+}
+.motion-segmented > .segmented-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 8px;
+  background: var(--vt-s3, var(--app-active));
+  box-shadow: 0 1px 2px #0002;
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.motion-segmented > button {
+  position: relative;
+  z-index: 1;
+}
+html[data-theme]
+  .app-shell
+  .motion-segmented.segmented:not(.transcript-preview)
+  > button:is(.active, [aria-selected="true"], [aria-pressed="true"]) {
+  background: transparent;
+  box-shadow: none;
+}
+.assistant-workspace
+  .assistant-mode-switch.motion-segmented
+  > .segmented-thumb {
+  border-radius: 5px;
+  background: var(--assistant-accent-fill);
+}
+.analytics-section-switch.motion-segmented > .segmented-thumb {
+  background: var(--vt-accent-fill);
+}
+.iw-mobile-tabs.motion-segmented::before {
+  content: none;
+}
+.iw-mobile-tabs.motion-segmented > .segmented-thumb {
+  border-radius: 99px;
+  background: var(--vt-accent-soft);
+}
+html[data-theme]
+  .app-shell
+  .analytics-section-switch.motion-segmented
+  > button[aria-pressed="true"] {
+  color: #fff;
+}
+.motion-tab-content {
+  animation: tab-content-enter 0.18s ease-out;
+}
+@keyframes tab-content-enter {
+  from {
+    opacity: 0.65;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .motion-segmented > .segmented-thumb {
+    transition: none;
+  }
+  .motion-tab-content {
+    animation: none;
+  }
+}

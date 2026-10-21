@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Check, FlaskConical, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { api } from "../../api";
 import type { CallResponse, DraftCheckEstimate, InstructionDraft, ScorecardCriterion } from "../../types";
@@ -13,6 +13,7 @@ import { InstructionPanel, InstructionWorkspaceBody, InstructionWorkspaceHeading
 import "./instruction-draft.css";
 
 const message = (error: unknown) => error instanceof Error ? error.message : "Не удалось выполнить действие.";
+type CriterionImpact = Awaited<ReturnType<typeof api.getDraftCriterionImpact>>["items"][number];
 
 export function InstructionDraftEditor({ instructionId, title, onApplied, onClose, onBack }: { instructionId: string; title: string; onApplied: () => void; onClose: () => void; onBack: () => void }) {
   const [draft, setDraft] = useState<InstructionDraft>();
@@ -29,6 +30,10 @@ export function InstructionDraftEditor({ instructionId, title, onApplied, onClos
   const [notice, setNotice] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [pane, setPane] = useState<InstructionPane>("document");
+  const [impactReview, setImpactReview] = useState<{ version: number; items: CriterionImpact[] }>();
+  const [historyPolicies, setHistoryPolicies] = useState<Record<string, "retain" | "delete">>({});
+  const [confirmObservationDeletion, setConfirmObservationDeletion] = useState(false);
+  const impactReviewRef = useRef<HTMLDivElement>(null);
   const dirty = !!draft && (draft.content !== content || JSON.stringify(draft.criteria) !== JSON.stringify(criteria));
   const compiling = draft?.status === "queued" || draft?.status === "compiling";
   const checking = draft?.check?.status === "queued" || draft?.check?.status === "running";
@@ -37,6 +42,7 @@ export function InstructionDraftEditor({ instructionId, title, onApplied, onClos
   const estimateKey = `${draft?.lock_version}:${call?.id}:${selectedKeys}`;
   function accept(value: InstructionDraft) {
     setDraft(value); setContent(value.content); setCriteria(value.criteria); setEstimate(undefined); setAcknowledged(false);
+    setImpactReview(undefined); setHistoryPolicies({}); setConfirmObservationDeletion(false);
     setSelected(current => current.filter(key => value.criteria.some(item => item.criterion_key === key)));
   }
   useEffect(() => {
@@ -65,6 +71,8 @@ export function InstructionDraftEditor({ instructionId, title, onApplied, onClos
   useEffect(() => { const timer = window.setTimeout(() => { void api.touchInstructionDraft(instructionId).catch(() => undefined); }, 1000); return () => window.clearTimeout(timer); }, [instructionId, content, criteria, call?.id, selectedKeys]);
   useEffect(() => { const touch = () => { void api.touchInstructionDraft(instructionId).catch(() => undefined); }; window.addEventListener("focus", touch); return () => window.removeEventListener("focus", touch); }, [instructionId]);
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn); }, [dirty]);
+  useEffect(() => { if (dirty) { setImpactReview(undefined); setHistoryPolicies({}); setConfirmObservationDeletion(false); } }, [dirty]);
+  useEffect(() => { if (impactReview) { impactReviewRef.current?.focus({ preventScroll: true }); impactReviewRef.current?.scrollIntoView({ block: "start", behavior: "auto" }); } }, [impactReview]);
   async function run(action: () => Promise<void>) { setBusy(true); setError(""); setNotice(""); try { await action(); } catch (cause) { setError(message(cause)); } finally { setBusy(false); } }
   async function save(): Promise<InstructionDraft> {
     if (!draft) throw new Error("Черновик ещё не загружен.");
@@ -77,11 +85,22 @@ export function InstructionDraftEditor({ instructionId, title, onApplied, onClos
   function change(key: string, patch: Partial<ScorecardCriterion>) { setCriteria(current => current.map(item => item.criterion_key === key ? { ...item, ...patch } : item)); setAcknowledged(false); }
   function add() { setCriteria(current => [...current, { criterion_key: crypto.randomUUID(), position: current.length + 1, title: "", requirement: "", source_excerpt: "", applicability: "", depth: "", required_question: false, cross_cutting: false, weight: 1, is_critical: false, enabled: true, edited_fields: [], change_kind: "new", warnings: [], same_as: null }]); setAcknowledged(false); }
   function choose(key: string) { setSelected(current => current.includes(key) ? current.filter(value => value !== key) : current.length < 40 ? [...current, key] : current); }
+  async function apply() {
+    if (!draft) return;
+    if (!impactReview || impactReview.version !== draft.lock_version) {
+      const value = await api.getDraftCriterionImpact(instructionId);
+      if (value.items.length) { setImpactReview({ version: draft.lock_version, items: value.items }); return; }
+    }
+    await api.applyInstructionDraft(instructionId, draft.lock_version, { history_policies: historyPolicies, confirm_observation_deletion: confirmObservationDeletion });
+    onApplied();
+  }
   const result = useMemo(() => draft?.check?.result ? { id: draft.draft_uuid, call_uuid: draft.check.call_uuid, status: "done" as const, provider: "instruction_check", result_json: draft.check.result, created_at: draft.last_used_at, updated_at: draft.last_used_at } : undefined, [draft]);
   const parsed = analysisV3Result(result);
   if (!draft) return <section className="instruction-workspace">{error ? <p className="field-error" role="alert">{error}</p> : <p role="status">Загружаем черновик…</p>}</section>;
   const cost = estimate?.key === estimateKey ? estimate.value : undefined;
   const locked = busy || compiling;
+  const removedObservations = impactReview?.items.filter(item => !item.new_key).reduce((sum, item) => sum + item.observations, 0) ?? 0;
+  const impactIncomplete = !!impactReview && (impactReview.items.some(item => item.new_key && !historyPolicies[item.old_key]) || (removedObservations > 0 && !confirmObservationDeletion));
   const check = <>
     <InstructionPanel kind="check" title="Проверка на звонке" subtitle="Проверьте формулировки на готовой расшифровке перед применением" action={<span className="iw-badge">Только отладка</span>}>
       <div className="iw-check-content"><div className="iw-check-setup"><InstructionCheckCallPicker selected={call} onChange={setCall} disabled={busy || checking} />
@@ -109,7 +128,21 @@ export function InstructionDraftEditor({ instructionId, title, onApplied, onClos
         <div className="iw-criteria-content">{draft.error && <p className="field-error" role="alert">{draft.error}</p>}{compiling ? <PreparingCriteria /> : <>{!criteria.length && <div className="iw-empty"><p>Подготовьте критерии из инструкции или добавьте их вручную.</p></div>}<InstructionCriterionCards criteria={criteria} canEdit canEditText disabled={busy} onChange={change} onRemove={key => { setCriteria(current => current.filter(item => item.criterion_key !== key).map((item, index) => ({ ...item, position: index + 1 }))); setSelected(current => current.filter(item => item !== key)); setAcknowledged(false); }} /><button className="ghost-button small iw-add-criterion" type="button" disabled={locked} onClick={add}><Plus size={16} />Добавить критерий вручную</button>
           {draft.inactive_criteria.some(item => !criteria.some(current => current.criterion_key === item.criterion_key)) && <details className="iw-inactive-criteria"><summary>Неактивные прежние критерии · {draft.inactive_criteria.filter(item => !criteria.some(current => current.criterion_key === item.criterion_key)).length}</summary>{draft.inactive_criteria.filter(item => !criteria.some(current => current.criterion_key === item.criterion_key)).map(item => <div key={item.criterion_key}><span>{item.title}</span><button className="ghost-button small" type="button" disabled={locked} onClick={() => { setCriteria(current => [...current, { ...item, enabled: true, position: current.length + 1 }]); setAcknowledged(false); }}>Вернуть в черновик</button></div>)}</details>}</>}
         </div></InstructionPanel>} check={check} />
-    <footer className="iw-apply"><label className="checkbox-row"><input type="checkbox" checked={acknowledged} disabled={busy || dirty || compiling} onChange={event => setAcknowledged(event.target.checked)} />Всё готово к применению</label><div><button className="ghost-button small iw-delete-draft" type="button" disabled={busy} onClick={() => void run(async () => { await api.deleteInstructionDraft(instructionId); onClose(); })}><Trash2 size={15} />Удалить черновик</button><button className="primary-button small" type="button" disabled={busy || dirty || compiling || invalid || !acknowledged || draft.status !== "ready" || !criteria.length} onClick={() => void run(async () => { await api.applyInstructionDraft(instructionId, draft.lock_version); onApplied(); })}><Check size={15} />Применить</button></div></footer>
+    {impactReview && <div ref={impactReviewRef} tabIndex={-1} aria-label="Изменения перед применением"><InstructionPanel kind="criteria" title="Изменения перед применением" subtitle="Выберите, что сохранить в истории прежних критериев">
+      <div className="iw-criteria-content">{impactReview.items.map(item => <div className="iw-notice" key={item.old_key}>
+        <strong>{item.title} · {item.new_key ? "замена критерия" : "удаление критерия"}</strong>
+        <p>Звонков с прежней оценкой: {item.calls}. Ручных проверок QA: {item.reviews}. Связанных наблюдений: {item.observations}. Результатов наблюдений: {item.findings}.</p>
+        {item.new_key ? <>
+          <label className="checkbox-row"><input type="radio" name={`history-${item.old_key}`} disabled={busy} checked={historyPolicies[item.old_key] === "retain"} onChange={() => setHistoryPolicies(current => ({ ...current, [item.old_key]: "retain" }))} />Сохранить прежние оценки и QA в истории. В текущих показателях они учитываться не будут.</label>
+          <label className="checkbox-row"><input type="radio" name={`history-${item.old_key}`} disabled={busy} checked={historyPolicies[item.old_key] === "delete"} onChange={() => setHistoryPolicies(current => ({ ...current, [item.old_key]: "delete" }))} />Удалить прежние оценки, цитаты и связанные данные QA. Остальные критерии сохранятся.</label>
+          {historyPolicies[item.old_key] === "delete" && <p className="field-error" role="alert">Удаление истории необратимо. Итоговые оценки будут пересчитаны.</p>}
+          {item.observations > 0 && <p>Наблюдения продолжат работу по новой версии. Прежние результаты не станут оценками нового критерия.</p>}
+        </> : <p>{item.observations > 0 ? "Связанные наблюдения, их результаты и виджеты будут удалены. " : ""}Прежние оценки звонков сохранятся в истории и перестанут участвовать в текущих показателях.</p>}
+      </div>)}
+      {removedObservations > 0 && <label className="checkbox-row"><input type="checkbox" disabled={busy} checked={confirmObservationDeletion} onChange={event => setConfirmObservationDeletion(event.target.checked)} />Подтверждаю удаление связанных наблюдений ({removedObservations}), их результатов и виджетов.</label>}
+      </div>
+    </InstructionPanel></div>}
+    <footer className="iw-apply"><label className="checkbox-row"><input type="checkbox" checked={acknowledged} disabled={busy || dirty || compiling} onChange={event => setAcknowledged(event.target.checked)} />Всё готово к применению</label><div><button className="ghost-button small iw-delete-draft" type="button" disabled={busy} onClick={() => void run(async () => { await api.deleteInstructionDraft(instructionId); onClose(); })}><Trash2 size={15} />Удалить черновик</button><button className="primary-button small" type="button" disabled={busy || dirty || compiling || invalid || !acknowledged || impactIncomplete || draft.status !== "ready" || !criteria.length} onClick={() => void run(apply)}><Check size={15} />{impactReview ? "Подтвердить и применить" : "Применить"}</button></div></footer>
   </section>;
 }
 

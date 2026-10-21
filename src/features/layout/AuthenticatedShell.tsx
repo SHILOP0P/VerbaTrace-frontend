@@ -1,3 +1,4 @@
+import { NotificationToasts } from "../notifications/NotificationToasts";
 import { cssClass } from "../../shared/lib/css-styles";
 import {
   Bell,
@@ -842,6 +843,7 @@ export function AuthenticatedShell({
         )}
       </div>
       {assistantMounted && assistantAccess.allowed.length > 0 && <AssistantBoundary open={assistantOpen} onClose={() => setAssistantOpen(false)}><AssistantWorkspace open={assistantOpen} setOpen={setAssistantOpen} companies={companies} companyId={selectedCompanyId} allowedScopes={assistantAccess.allowed} onAccessRefresh={assistantAccess.refresh} onOpenCall={onOpenCall} /></AssistantBoundary>}
+      <NotificationToasts key={session.user.id} onOpen={openNotification} />
     </div>
   );
 }

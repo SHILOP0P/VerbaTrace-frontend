@@ -1,3 +1,5 @@
+import { SegmentedControl } from "../../shared/ui/SegmentedControl";
+import { ObservationsPage } from "../observations/ObservationsPage";
 import { AlertTriangle, ArrowLeft, BarChart3, BookOpenText, FileText, Headphones, ListChecks, Lock, RefreshCw, Settings2, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ApiError, api } from "../../api";
@@ -6,6 +8,7 @@ import { DataTable, DeltaBadge, DistributionBar, EmptyState, MiniTrend, PeriodSe
 import { HoverHint, InfoHint } from "../../shared/ui/hover-hint";
 import { SelectControl } from "../../shared/ui/primitives";
 import { ScoreGauge } from "../../shared/ui/score-gauge";
+import { AnalyticsSkeleton, PageSkeleton, TableSkeleton } from "../../shared/ui/page-loading";
 import { EmployeeWorkOnMistakes } from "./WorkOnMistakes";
 import { SpeechComparison, formatSeconds as formatSpeechSeconds, formatShare, speechHints } from "../../shared/ui/speech";
 import { AnalyticsSettingsCard } from "./AnalyticsSettings";
@@ -50,7 +53,15 @@ function accessError(cause: unknown): "team" | "personal" | null {
   return null;
 }
 
-export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCall }: Props) {
+export function AnalyticsPage(props: Props) {
+ const [section,setSection]=useState(()=>new URLSearchParams(window.location.search).get("view")==="observations"?"observations":"quality");
+ useEffect(()=>{const sync=()=>setSection(new URLSearchParams(window.location.search).get("view")==="observations"?"observations":"quality");window.addEventListener("popstate",sync);return()=>window.removeEventListener("popstate",sync);},[]);
+ if(props.profileUserId && props.profileUserId!=="me")return <QualityAnalyticsPage {...props}/>;
+ function choose(value:string){setSection(value);const url=new URL(window.location.href);if(value==="observations")url.searchParams.set("view","observations");else url.searchParams.delete("view");window.history.replaceState(window.history.state,"",url);}
+ return <><SegmentedControl as="nav" className="analytics-section-switch segmented" aria-label="Раздел аналитики"><button className={section==="quality"?"active":""} aria-pressed={section==="quality"} onClick={()=>choose("quality")}>Качество звонков</button><button className={section==="observations"?"active":""} aria-pressed={section==="observations"} onClick={()=>choose("observations")}>Наблюдения</button></SegmentedControl><div key={section} className="motion-tab-content">{section==="observations"?<ObservationsPage departments={props.departments}/>:<QualityAnalyticsPage {...props}/>}</div></>;
+}
+
+function QualityAnalyticsPage({ departments, profileUserId, onNavigate, onOpenCall }: Props) {
   const workspace = useWorkspaceCompanyId();
   const base = useMemo<AnalyticsFilters>(() => workspace ? { company_uuid: workspace } : { scope: "personal" }, [workspace]);
   const [capabilities, setCapabilities] = useState<AnalyticsCapabilities>();
@@ -98,7 +109,7 @@ export function AnalyticsPage({ departments, profileUserId, onNavigate, onOpenCa
   const companyDepartments = useMemo(() => departments.filter((item) => item.company_uuid === workspace && (!capabilities?.department_uuids.length || capabilities.department_uuids.includes(item.id))), [capabilities, departments, workspace]);
 
   if (capabilitiesError) return <section className="app-page analytics-page"><EmptyState icon={<AlertTriangle size={28} />} title="Аналитика недоступна" text={capabilitiesError} /></section>;
-  if (!capabilities) return <section className="app-page analytics-page"><div className="analytics-skeleton" /></section>;
+  if (!capabilities) return <PageSkeleton page={profileUserId ? "teamAnalyticsEmployee" : "teamAnalytics"} />;
 
   // The company's settings are the owner's and the deputy's; a personal account
   // sets up its own.
@@ -200,7 +211,7 @@ function TeamView({ capabilities, filters, instructions, onNavigate, onOpenCall 
     action={<button className="primary-button" type="button" onClick={() => onNavigate("settingsTariffs")}>Перейти к тарифам</button>} />;
   if (error) return <EmptyState icon={<AlertTriangle size={28} />} title="Не удалось загрузить аналитику" text={error.message}
     action={<button className="ghost-button" type="button" onClick={() => setReload((value) => value + 1)}><RefreshCw size={16} />Повторить</button>} />;
-  if (!summary) return <div className="analytics-skeleton" />;
+  if (!summary) return <AnalyticsSkeleton />;
   if (summary.calls_analyzed === 0) return <><SummaryStrip summary={summary} role={capabilities.role} /><EmptyState icon={<BarChart3 size={28} />} title="Нет проанализированных звонков за период" text="Выберите период подлиннее или загрузите звонки." /></>;
 
   const tabs: Array<[Tab, string]> = [["criteria", "Критерии"], ["employees", "Сотрудники"]];
@@ -211,9 +222,9 @@ function TeamView({ capabilities, filters, instructions, onNavigate, onOpenCall 
   return <>
     <SummaryStrip summary={summary} role={capabilities.role} />
     <div className="analytics-trend-card"><TrendChart points={summary.trend} markers={summary.markers} label="Средний балл" /></div>
-    <div className="segmented analytics-tabs" role="tablist">
+    <SegmentedControl className="segmented analytics-tabs" role="tablist">
       {tabs.map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} className={`${tab === value ? "active" : ""}${value === "matrix" ? " analytics-tab-matrix" : ""}`} onClick={() => setTab(value)}>{label}</button>)}
-    </div>
+    </SegmentedControl>
     {tab === "criteria" ? <CriteriaTab filters={filters} onOpen={(key) => setOpenCriterion({ key })} onNavigate={onNavigate} /> : null}
     {tab === "employees" ? <EmployeesTab filters={filters} /> : null}
     {tab === "departments" ? <DepartmentsTab filters={filters} /> : null}
@@ -281,7 +292,7 @@ function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
 
 function LoadState({ error, retry }: { error: string; retry: () => void }) {
   if (error) return <EmptyState icon={<AlertTriangle size={26} />} title="Не удалось загрузить" text={error} action={<button className="ghost-button" type="button" onClick={retry}><RefreshCw size={16} />Повторить</button>} />;
-  return <div className="analytics-skeleton" />;
+  return <TableSkeleton />;
 }
 
 function CriteriaTab({ filters, onOpen, onNavigate }: { filters: AnalyticsFilters; onOpen: (key: string) => void; onNavigate: (page: AppPage) => void }) {
@@ -387,7 +398,7 @@ function CriterionPanel({ criterionKey, employee, filters, onClose, onOpenCall }
   }, [onClose]);
   return <aside className="analytics-panel" role="dialog" aria-label="Звонки критерия">
     <header><div><small>{value?.criterion.instruction.title}</small><h2>{value?.criterion.title ?? "Критерий"}</h2></div><button className="icon-button" type="button" aria-label="Закрыть" onClick={onClose}><X size={18} /></button></header>
-    <div className="segmented compact"><button type="button" className={sort === "score" ? "active" : ""} onClick={() => setSort("score")}>Сначала слабые</button><button type="button" className={sort === "occurred_at" ? "active" : ""} onClick={() => setSort("occurred_at")}>Сначала новые</button></div>
+    <SegmentedControl className="segmented compact"><button type="button" className={sort === "score" ? "active" : ""} onClick={() => setSort("score")}>Сначала слабые</button><button type="button" className={sort === "occurred_at" ? "active" : ""} onClick={() => setSort("occurred_at")}>Сначала новые</button></SegmentedControl>
     {!value ? <LoadState error={error} retry={retry} /> : <>
       <ul className="analytics-panel-calls">{value.calls.map((call) => <li key={call.call_uuid}>
         <button type="button" disabled={!call.can_open} onClick={() => onOpenCall(call.call_uuid, call.item_id, call.evidence_start_seconds)}>
@@ -426,7 +437,7 @@ function ProfileView({ userId, filters, onOpenCall, onNavigate }: { userId: stri
   if (error?.kind === "personal") return <EmptyState icon={<Lock size={28} />} title="Личный прогресс доступен на тарифах Plus и Pro" text="Общий балл остаётся на «Обзоре»."
     action={<button className="primary-button" type="button" onClick={() => onNavigate("settingsTariffs")}>Перейти к тарифам</button>} />;
   if (error) return <EmptyState icon={<AlertTriangle size={28} />} title="Профиль недоступен" text={error.message} action={<button className="ghost-button" type="button" onClick={() => setAttempt((value) => value + 1)}><RefreshCw size={16} />Повторить</button>} />;
-  if (!profile) return <div className="analytics-skeleton" />;
+  if (!profile) return <AnalyticsSkeleton profile />;
   // A personal account has no department or company to compare with.
   const solo = profile.reference.hidden && !profile.reference.label;
   const referenceName = profile.reference.label ? profile.reference.label.charAt(0).toLowerCase() + profile.reference.label.slice(1) : "";
@@ -475,7 +486,7 @@ export function WorthListening({ items, onOpenCall }: { items: AnalyticsWorthLis
     <button type="button" disabled={!item.can_open} onClick={() => onOpenCall(item.call_uuid)}>
       <FileText size={16} />
       <span><strong>{item.can_open ? item.title || "Звонок" : "Звонок недоступен вам"}</strong><small>{new Date(item.occurred_at).toLocaleDateString("ru-RU")}{item.critical_missed ? ` · критичных пропусков: ${item.critical_missed}` : ""}</small></span>
-      <b className={item.overall_score === null ? "" : `tone-${scoreTone(item.overall_score)}`}>{item.overall_score ?? "—"}</b>
+      <b className={`analytics-worth-score ${item.overall_score === null ? "" : `tone-${scoreTone(item.overall_score)}`}`}><span>{item.overall_score ?? "—"}</span><small>из 100</small></b>
     </button>
   </li>)}</ul>;
 }

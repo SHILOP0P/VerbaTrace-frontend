@@ -574,7 +574,6 @@ async function request<T>(
     if (queued.file_admission) {
       admissionAccepted = true;
       const id = queued.file_admission.id;
-      window.dispatchEvent(new CustomEvent('verbatrace:file-admission', { detail: { id, status: 'queued' } }));
       for (;;) {
         await new Promise(resolve => window.setTimeout(resolve, 750));
         let statusResponse = await fetch(`${apiRoot}/local-security/uploads/${encodeURIComponent(id)}`);
@@ -586,7 +585,6 @@ async function request<T>(
         }
         if (!statusResponse.ok) { response = statusResponse; break; }
         const job = await statusResponse.json() as { status: string; response_status?: number; payload?: unknown };
-        window.dispatchEvent(new CustomEvent('verbatrace:file-admission', { detail: { id, status: job.status } }));
         if (job.status === 'completed' || job.status === 'failed') {
           response = new Response(JSON.stringify(job.payload ?? { error: { code: 'upload_interrupted', message: 'Проверка файла завершилась ошибкой. Проверьте список загруженных материалов перед повтором.' } }), { status: job.response_status ?? 503, headers: { 'Content-Type': 'application/json' } });
           break;
@@ -1309,6 +1307,14 @@ export const api = {
 
   getPreferences() {
     return request<UserPreferencesResponse>("/auth/me/preferences");
+  },
+
+  getOverviewLayout(workspace: string) {
+    return request<import("./features/overview/layout").OverviewLayout>(`/auth/me/overview?workspace=${encodeURIComponent(workspace)}`);
+  },
+
+  saveOverviewLayout(workspace: string, layout: import("./features/overview/layout").OverviewLayout) {
+    return request<import("./features/overview/layout").OverviewLayout>(`/auth/me/overview?workspace=${encodeURIComponent(workspace)}`, { method: "PUT", body: JSON.stringify(layout) });
   },
 
   updatePreferences(input: UpdatePreferencesRequest) {
@@ -2713,6 +2719,62 @@ export const api = {
     return request<AnalyticsCapabilities>(`/analytics/capabilities${queryString(filters)}`);
   },
 
+  getObservationBudget(filters: AnalyticsFilters) {
+    return request<import("./features/observations/ObservationBudget").ObservationBudget>(`/observation-budget${queryString(filters)}`);
+  },
+  saveObservationBudget(filters: AnalyticsFilters,input:import("./features/observations/ObservationBudget").ObservationBudget) {
+    return request<import("./features/observations/ObservationBudget").ObservationBudget>(`/observation-budget${queryString(filters)}`,{method:"PUT",body:JSON.stringify(input)});
+  },
+  getObservationContext(id:string) {
+    return request<{company_uuid:string|null;department_uuid:string|null;period:import("./features/overview/layout").WidgetPeriod|null}>(`/observations/${encodeURIComponent(id)}/context`);
+  },
+  getObservations(filters: AnalyticsFilters) {
+    return request<{items: import("./features/observations/types").Observation[]}>(`/observations${queryString(filters)}`);
+  },
+
+  getObservationNotifications(id:string,filters:AnalyticsFilters) {
+    return request<import("./features/observations/types").ObservationAlertPreferences>(`/observations/${encodeURIComponent(id)}/notifications${queryString(filters)}`);
+  },
+  saveObservationNotifications(id:string,filters:AnalyticsFilters,input:import("./features/observations/types").ObservationAlertPreferences) {
+    return request<import("./features/observations/types").ObservationAlertPreferences>(`/observations/${encodeURIComponent(id)}/notifications${queryString(filters)}`,{method:"PUT",body:JSON.stringify(input)});
+  },
+  createObservation(filters: AnalyticsFilters, input: import("./features/observations/types").ObservationInput) {
+    return request<import("./features/observations/types").Observation>(`/observations${queryString(filters)}`, {method:"POST",body:JSON.stringify(input)});
+  },
+  updateObservation(id: string, filters: AnalyticsFilters, input: import("./features/observations/types").ObservationInput) {
+    return request<import("./features/observations/types").Observation>(`/observations/${encodeURIComponent(id)}${queryString(filters)}`, {method:"PATCH",body:JSON.stringify(input)});
+  },
+  setObservationStatus(item: import("./features/observations/types").Observation, filters: AnalyticsFilters, active: boolean) {
+    return request<import("./features/observations/types").Observation>(`/observations/${encodeURIComponent(item.id)}/status${queryString(filters)}`, {method:"PUT",body:JSON.stringify({lock_version:item.lock_version,active})});
+  },
+  deleteObservation(item: import("./features/observations/types").Observation, filters: AnalyticsFilters) {
+    return request<void>(`/observations/${encodeURIComponent(item.id)}${queryString({...filters,lock_version:item.lock_version})}`, {method:"DELETE"});
+  },
+  getObservationVersions(id:string,filters:AnalyticsFilters) {
+    return request<{items:import("./features/observations/types").ObservationRuleVersion[]}>(`/observations/${encodeURIComponent(id)}/versions${queryString(filters)}`);
+  },
+  markObservationRead(id:string,filters:AnalyticsFilters,lastSeenAt:string) {
+    return request<void>(`/observations/${encodeURIComponent(id)}/read${queryString(filters)}`,{method:"POST",body:JSON.stringify({last_seen_at:lastSeenAt})});
+  },
+  getObservationReplacementSuggestion(id:string,filters:AnalyticsFilters) {
+    return request<{old_criterion_key:string;new_criterion_key:string;available_calls:number}|null>(`/observations/${encodeURIComponent(id)}/replacement-suggestion${queryString(filters)}`);
+  },
+  getObservationCases(id:string,filters:AnalyticsFilters,offset=0,ruleVersion?:number) {
+    return request<{items:import("./features/observations/types").ObservationCase[]}>(`/observations/${encodeURIComponent(id)}/cases${queryString({...filters,offset,rule_version:ruleVersion})}`);
+  },
+  setObservationFeedback(id:string,caseId:string,filters:AnalyticsFilters,falsePositive:boolean) {
+    return request<void>(`/observations/${encodeURIComponent(id)}/cases/${encodeURIComponent(caseId)}/feedback${queryString(filters)}`,{method:"PUT",body:JSON.stringify({false_positive:falsePositive})});
+  },
+  estimateObservationPreparation(filters:AnalyticsFilters,description:string) {
+    return request<{maximum_credits:number}>(`/observations/prepare-estimate${queryString(filters)}`,{method:"POST",body:JSON.stringify({description})});
+  },
+  planObservationHistory(id:string,filters:AnalyticsFilters,input:{trial:boolean;call_uuids:string[];rerun:boolean;replacement?:boolean}) {
+    return request<import("./features/observations/types").ObservationPlan>(`/observations/${encodeURIComponent(id)}/history-plan${queryString(filters)}`,{method:"POST",body:JSON.stringify(input)});
+  },
+  confirmObservationHistory(id:string,filters:AnalyticsFilters,planId:string) {
+    return request<{queued:number}>(`/observations/${encodeURIComponent(id)}/history${queryString(filters)}`,{method:"POST",body:JSON.stringify({plan_uuid:planId})});
+  },
+
   getAnalyticsSummary(filters: AnalyticsFilters) {
     return request<AnalyticsSummary>(`/analytics/summary${queryString(filters)}`);
   },
@@ -2760,6 +2822,13 @@ export const api = {
 
   getNotificationSubscriptions() {
     return request<{ items: NotificationSubscription[] }>("/notification-subscriptions");
+  },
+
+  getNotificationPreferences() {
+    return request<{items: import("./features/notifications/policy").NotificationPreference[]}>("/auth/me/notification-preferences");
+  },
+  saveNotificationPreferences(items: Array<{type: string; mode: string}>) {
+    return request<{items: import("./features/notifications/policy").NotificationPreference[]}>("/auth/me/notification-preferences", {method:"PUT",body:JSON.stringify({items})});
   },
 
   updateNotificationSubscriptions(items: Array<Pick<NotificationSubscription, "kind" | "channel" | "enabled">>) {
@@ -3004,8 +3073,11 @@ export const api = {
   },
   deleteInstructionDraft(id:string) {return request(`/instructions/${encodeURIComponent(id)}/draft`,{method:"DELETE"});},
   touchInstructionDraft(id:string) {return request(`/instructions/${encodeURIComponent(id)}/draft/touch`,{method:"POST"});},
-  applyInstructionDraft(id:string,lockVersion:number) {
-    return request<InstructionScorecard>(`/instructions/${encodeURIComponent(id)}/draft/apply`,{method:"POST",body:JSON.stringify({lock_version:lockVersion,ready:true})});
+  getDraftCriterionImpact(id: string) {
+    return request<{ items: Array<{ old_key: string; new_key: string | null; title: string; observations: number; calls: number; available_calls: number; reviews: number; findings: number }> }>(`/instructions/${encodeURIComponent(id)}/draft/criterion-impact`);
+  },
+  applyInstructionDraft(id:string,lockVersion:number,options: { confirm_observation_deletion?: boolean; history_policies?: Record<string, "retain" | "delete"> } = {}) {
+    return request<InstructionScorecard>(`/instructions/${encodeURIComponent(id)}/draft/apply`,{method:"POST",body:JSON.stringify({lock_version:lockVersion,ready:true,...options})});
   },
   estimateDraftCheck(id:string,lockVersion:number,callId:string,keys:string[]) {
     return request<DraftCheckEstimate>(`/instructions/${encodeURIComponent(id)}/draft/check-estimate`,{method:"POST",body:JSON.stringify({lock_version:lockVersion,call_uuid:callId,criterion_keys:keys})});

@@ -1,3 +1,4 @@
+import { SegmentedControl } from "../../shared/ui/SegmentedControl";
 import {FolderCriteriaEditor} from "../instructions/FolderCriteriaEditor";
 import { cssClass } from "../../shared/lib/css-styles";
 import {
@@ -1069,7 +1070,7 @@ const managerOptions = filterOptions?.managers ?? [];
           <strong>{call.title}</strong>
           <span className="call-row-meta">
             {rowTone === "ok"
-              ? <span className="vt-sr-only">{callStatusChip(call.status, call.is_test ? undefined : analyses[call.id]?.status)}</span>
+              ? <span className="vt-sr-only">{callStatusChip(call.status, call.is_test ? undefined : analyses[call.id]?.status, call.transcription_only)}</span>
               : <StatusChip transcriptionOnly={call.transcription_only} status={call.status} analysisStatus={call.is_test ? undefined : analyses[call.id]?.status} label={call.is_test ? "Тестовый" : undefined} isTest={call.is_test} />}
             <small>
               {groupByDay ? `${callClock(callMoment(call))} · ` : `${formatDate(callMoment(call))} · `}{formatDuration(call.duration_seconds)}
@@ -1248,7 +1249,7 @@ const managerOptions = filterOptions?.managers ?? [];
           <span>Только избранные</span>
         </label>
         {hasScopes && (
-          <div className="call-scope-tabs segmented scope">
+          <SegmentedControl className="call-scope-tabs segmented scope">
             {scopeOptions.map(([value, label]) => (
               <button
                 key={value}
@@ -1258,7 +1259,7 @@ const managerOptions = filterOptions?.managers ?? [];
                 {label}
               </button>
             ))}
-          </div>
+          </SegmentedControl>
         )}
         {!searchQuery.trim() && <><section className="call-folder-panel">
           <div className="call-folder-heading">

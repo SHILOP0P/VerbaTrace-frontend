@@ -2021,18 +2021,18 @@ html[data-theme="light"] .app-shell .quality-donut-core {
   border-radius: 8px;
 }
 
-.app-shell .custom-select {
+:is(.app-shell, .vt-portal) .custom-select {
   position: relative;
   display: block;
   min-width: 0;
   width: 100%;
 }
 
-.app-shell .custom-select.open {
+:is(.app-shell, .vt-portal) .custom-select.open {
   z-index: 80;
 }
 
-.app-shell .select-trigger {
+:is(.app-shell, .vt-portal) .select-trigger {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -2049,21 +2049,21 @@ html[data-theme="light"] .app-shell .quality-donut-core {
   cursor: pointer;
 }
 
-.app-shell .select-trigger > span,
-.app-shell .select-trigger .select-value > span {
+:is(.app-shell, .vt-portal) .select-trigger > span,
+:is(.app-shell, .vt-portal) .select-trigger .select-value > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.app-shell .select-value {
+:is(.app-shell, .vt-portal) .select-value {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.app-shell .select-option-color {
+:is(.app-shell, .vt-portal) .select-option-color {
   --select-option-color: #ff7a43;
   display: inline-block;
   width: 12px;
@@ -2075,7 +2075,7 @@ html[data-theme="light"] .app-shell .quality-donut-core {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--select-option-color) 18%, transparent);
 }
 
-.app-shell .select-trigger::after {
+:is(.app-shell, .vt-portal) .select-trigger::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -2089,31 +2089,31 @@ html[data-theme="light"] .app-shell .quality-donut-core {
   transform: translateY(-64%) rotate(45deg);
 }
 
-.app-shell .custom-select.open .select-trigger::after {
+:is(.app-shell, .vt-portal) .custom-select.open .select-trigger::after {
   transform: translateY(-28%) rotate(225deg);
 }
 
-.app-shell .select-trigger:hover:not(:disabled),
-.app-shell .custom-select.open .select-trigger {
+:is(.app-shell, .vt-portal) .select-trigger:hover:not(:disabled),
+:is(.app-shell, .vt-portal) .custom-select.open .select-trigger {
   border-color: var(--app-border);
   background: rgba(255, 250, 245, 0.055);
 }
 
-.app-shell .select-trigger:focus-visible {
+:is(.app-shell, .vt-portal) .select-trigger:focus-visible {
   border-color: rgba(255, 90, 47, 0.56);
   box-shadow: 0 0 0 3px rgba(255, 90, 47, 0.14);
   outline: 0;
 }
 
-.app-shell .custom-select.disabled {
+:is(.app-shell, .vt-portal) .custom-select.disabled {
   opacity: 0.64;
 }
 
-.app-shell .custom-select.disabled .select-trigger {
+:is(.app-shell, .vt-portal) .custom-select.disabled .select-trigger {
   cursor: not-allowed;
 }
 
-.app-shell .select-menu {
+:is(.app-shell, .vt-portal) .select-menu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
@@ -2135,7 +2135,7 @@ html[data-theme="light"] .app-shell .quality-donut-core {
   -webkit-backdrop-filter: blur(18px) saturate(1.08);
 }
 
-.app-shell .select-menu button {
+:is(.app-shell, .vt-portal) .select-menu button {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2155,31 +2155,36 @@ html[data-theme="light"] .app-shell .quality-donut-core {
   line-height: 1.2;
 }
 
-.app-shell .select-menu button > span {
+:is(.app-shell, .vt-portal) .select-menu button > span {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.app-shell .select-menu button.active {
+:is(.app-shell, .vt-portal) .select-menu button:focus-visible {
+  outline: 0;
+  border-color: rgba(255, 90, 47, 0.56);
+  box-shadow: inset 0 0 0 1px rgba(255, 90, 47, 0.24);
+}
+
+:is(.app-shell, .vt-portal) .select-menu button.active {
   color: var(--app-accent-strong);
   background: rgba(255, 90, 47, 0.14);
   border-color: rgba(255, 90, 47, 0.22);
 }
 
-.app-shell .select-menu button:hover:not(.active) {
+:is(.app-shell, .vt-portal) .select-menu button:hover:not(.active) {
   color: inherit;
   background: transparent;
   border-color: transparent;
 }
 
-.app-shell .select-menu button:disabled {
+:is(.app-shell, .vt-portal) .select-menu button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-html[data-theme="dark"] .app-shell .select-menu {
+html[data-theme="dark"] :is(.app-shell, .vt-portal) .select-menu {
   background: rgba(28, 19, 15, 0.98);
   border-color: rgba(255, 250, 245, 0.16);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
@@ -2198,7 +2203,7 @@ html[data-theme="dark"] .app-shell .select-menu {
   line-height: 1.1;
 }
 
-.app-shell select {
+:is(.app-shell, .vt-portal) select {
   appearance: none;
   -webkit-appearance: none;
   padding-right: 38px !important;
@@ -2219,28 +2224,28 @@ html[data-theme="dark"] .app-shell .select-menu {
   cursor: pointer;
 }
 
-.app-shell select:focus {
+:is(.app-shell, .vt-portal) select:focus {
   border-color: rgba(255, 90, 47, 0.56);
   box-shadow: 0 0 0 3px rgba(255, 90, 47, 0.14);
   outline: 0;
 }
 
-.app-shell select:hover:not(:disabled) {
+:is(.app-shell, .vt-portal) select:hover:not(:disabled) {
   border-color: var(--app-border);
   background-color: rgba(255, 250, 245, 0.055);
 }
 
-.app-shell select:disabled {
+:is(.app-shell, .vt-portal) select:disabled {
   cursor: not-allowed;
   opacity: 0.64;
 }
 
-.app-shell select option {
+:is(.app-shell, .vt-portal) select option {
   color: var(--app-text);
   background: var(--app-glass-strong);
 }
 
-.app-shell .select-control::after {
+:is(.app-shell, .vt-portal) .select-control::after {
   display: none;
 }
 

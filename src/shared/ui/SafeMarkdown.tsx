@@ -13,9 +13,14 @@ const components: Components = {
   },
 };
 
-export function SafeMarkdown(props: ComponentProps<typeof ReactMarkdown>) {
+const scrollableComponents: Components = {
+  ...components,
+  table: ({ children }) => <div className="instruction-table-scroll" role="region" aria-label="Таблица документа" tabIndex={0}><table>{children}</table></div>,
+};
+
+export function SafeMarkdown({ scrollTables, ...props }: ComponentProps<typeof ReactMarkdown> & { scrollTables?: boolean }) {
   if ((props.children?.length ?? 0) > 1_000_000) return <p role="status">Текст превышает предел безопасного предпросмотра.</p>;
-  return <ReactMarkdown {...props} remarkPlugins={[...(props.remarkPlugins ?? []), remarkRenderBudget]} skipHtml components={components} />;
+  return <ReactMarkdown {...props} remarkPlugins={[...(props.remarkPlugins ?? []), remarkRenderBudget]} skipHtml components={scrollTables ? scrollableComponents : components} />;
 }
 
 type RenderNode = { type: string; children?: RenderNode[]; value?: string };

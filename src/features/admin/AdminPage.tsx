@@ -1,3 +1,4 @@
+import { TableSkeleton } from "../../shared/ui/page-loading";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowLeft, Building2, CalendarClock, CheckCircle2, Headphones, ListTodo, RefreshCw, ScrollText, Search, ShieldCheck, Undo2, Users, X, XCircle } from "lucide-react";
 import { api, ApiError, getAdminCallMediaUrl } from "../../api";
@@ -279,7 +280,7 @@ export function AdminPage({ capabilities, onNavigate }: { capabilities: AdminCap
           <p className="admin-section-summary">{section === "users" ? `Пользователей: ${usersTotal}` : section === "companies" ? `Компаний: ${companiesTotal}` : `Действий: ${actionsTotal}`}</p>
           {notice && <p className="admin-notice" role="status">{notice}</p>}
           <div className="admin-results" aria-busy={loading}>
-            {loading && !loaded[section] ? <p className="admin-empty">Загрузка данных…</p> : section === "users" ? <UsersTable users={users} onOpen={openUser} /> : section === "companies" ? <CompaniesTable companies={companies} onOpen={openCompany} /> : <ActionsTable actions={actions} onOpen={openAction} onOpenScope={openActionScope} />}
+            {loading && !loaded[section] ? <TableSkeleton /> : section === "users" ? <UsersTable users={users} onOpen={openUser} /> : section === "companies" ? <CompaniesTable companies={companies} onOpen={openCompany} /> : <ActionsTable actions={actions} onOpen={openAction} onOpenScope={openActionScope} />}
           </div>
         </>}
       </div>

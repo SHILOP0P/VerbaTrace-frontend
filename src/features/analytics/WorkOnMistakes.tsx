@@ -1,3 +1,4 @@
+import { TableSkeleton } from "../../shared/ui/page-loading";
 import { cssClass } from "../../shared/lib/css-styles";
 import { ArrowRight, CheckCircle2, ChevronDown, History, Repeat2, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -164,7 +165,7 @@ export function EmployeeWorkOnMistakes({ userId, filters, onOpenCall }: { userId
   const openShown = progress && !showAllOpen ? progress.open.slice(0, 8) : progress?.open ?? [];
   return <section className="analytics-block mistakes-profile">
     <h2>Работа над ошибками</h2>
-    {!progress ? <div className="analytics-skeleton is-short" /> : <div className={`mistakes-profile-grid${single ? " is-single" : ""}`}>
+    {!progress ? <TableSkeleton /> : <div className={`mistakes-profile-grid${single ? " is-single" : ""}`}>
       {single && <p className="mistakes-empty"><History size={16} />Закрытых за период нет. Ошибка закрывается после трёх звонков подряд с баллом от 75.</p>}
       <div>
         <h3>Открытые ошибки <b>{progress.open.length}</b></h3>

@@ -1,4 +1,6 @@
 import { cssClass } from "../../shared/lib/css-styles";
+import { SkeletonLine } from "../../shared/ui/loading";
+import { TableSkeleton } from "../../shared/ui/page-loading";
 import {
   Activity,
   ArrowLeft,
@@ -60,10 +62,10 @@ export function MonitoringPage({ calls, onBack }: { calls: CallResponse[]; onBac
       </div>
 
       <div className="monitoring-kpi-grid">
-        <MetricCard icon={<Workflow size={20} />} label="В очереди" value={loading ? "..." : (queue?.pending ?? 0).toString()} note={`${queue?.running ?? 0} выполняется`} />
-        <MetricCard icon={<Activity size={20} />} label="Ошибки" value={loading ? "..." : (queue?.failed ?? 0).toString()} note={`${queue?.retry ?? 0} на повторе`} />
-        <MetricCard icon={<Clock3 size={20} />} label="Среднее время" value={formatDuration(monitoring?.average_processing_seconds)} note="на одну завершённую обработку" />
-        <MetricCard icon={<RotateCcw size={20} />} label="Повторы" value={loading ? "..." : (queue?.retry ?? 0).toString()} note="ожидают повторной обработки" />
+        <MetricCard loading={loading && !monitoring} icon={<Workflow size={20} />} label="В очереди" value={loading ? "..." : (queue?.pending ?? 0).toString()} note={`${queue?.running ?? 0} выполняется`} />
+        <MetricCard loading={loading && !monitoring} icon={<Activity size={20} />} label="Ошибки" value={loading ? "..." : (queue?.failed ?? 0).toString()} note={`${queue?.retry ?? 0} на повторе`} />
+        <MetricCard loading={loading && !monitoring} icon={<Clock3 size={20} />} label="Среднее время" value={formatDuration(monitoring?.average_processing_seconds)} note="на одну завершённую обработку" />
+        <MetricCard loading={loading && !monitoring} icon={<RotateCcw size={20} />} label="Повторы" value={loading ? "..." : (queue?.retry ?? 0).toString()} note="ожидают повторной обработки" />
       </div>
 
       <div className="monitoring-grid single">
@@ -77,7 +79,7 @@ export function MonitoringPage({ calls, onBack }: { calls: CallResponse[]; onBac
           </div>
           {restricted ? (
             <div className="instruction-empty standalone">Мониторинг доступен администраторам и менеджерам компании.</div>
-          ) : (
+          ) : loading && !monitoring ? <TableSkeleton /> : (
             <div className="pipeline-list">
               <PipelineStep title="Ожидают" status={`${queue?.pending ?? 0} задач`} tone="warn" progress={queueProgress(queue?.pending, queue)} />
               <PipelineStep title="Выполняются" status={`${queue?.running ?? 0} задач`} tone="warn" progress={queueProgress(queue?.running, queue)} />
@@ -92,7 +94,7 @@ export function MonitoringPage({ calls, onBack }: { calls: CallResponse[]; onBac
 }
 
 function formatDuration(value?: number | null) {
-  if (value === undefined) return "...";
+  if (value === undefined) return "Нет данных";
   if (value === null) return "Нет данных";
   if (!Number.isFinite(value) || value < 0) return "Нет данных";
   if (value < 10) return `${value.toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} с`;
@@ -115,18 +117,20 @@ function MetricCard({
   icon,
   label,
   value,
+  loading = false,
   note
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  loading?: boolean;
   note: string;
 }) {
   return (
     <div className="monitoring-metric glass-panel">
       <span>{icon}</span>
       <div>
-        <strong>{value}</strong>
+        <strong>{loading ? <span role="status" aria-label="Загрузка показателя"><SkeletonLine className="skeleton-metric-value" /></span> : value}</strong>
         <small>{label}</small>
       </div>
       <em>{note}</em>

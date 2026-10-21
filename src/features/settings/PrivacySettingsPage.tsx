@@ -2,6 +2,7 @@ import { ArrowLeft, Eye, EyeOff, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api";
 import { SelectControl } from "../../shared/ui/primitives";
+import { FieldsSkeleton } from "../../shared/ui/page-loading";
 import type { CompanyResponse, DepartmentResponse, PrivacyEntityType, PrivacyPolicyConfig, PrivacyPolicyScope, PrivacyPolicyView } from "../../types";
 
 const fallbackConfig: PrivacyPolicyConfig = {
@@ -113,10 +114,10 @@ export function PrivacySettingsPage({ companies, departments, onBack }: { compan
     {scope.type === "department" && inheritedVersion && <p className="privacy-inheritance-note">Пока у отдела нет собственной опубликованной политики, действует политика компании. Публикация здесь создаст override только для этого отдела.</p>}
     {view && !view.can_manage && scope.type !== "personal" && <div className="privacy-readonly-note">Настройку компании и её отделов может изменять только менеджер компании.</div>}
     {error && <div className="form-error" role="alert">{error}</div>}
-    <div className="privacy-settings-grid">
+    <div className="privacy-settings-grid" aria-busy={!view && !error}>
       <section className="glass-panel privacy-policy-card">
-        <div className="privacy-card-title"><div><small>{scopeLabel}</small><h2>Что скрывать</h2></div><label className="privacy-master-switch integration-checkbox"><input type="checkbox" disabled={!view?.can_manage} checked={config.enabled} onChange={(event) => { setConfig((current) => ({ ...current, enabled: event.target.checked })); setPreview(undefined); }} /><span>{config.enabled ? "Защита включена" : "Защита выключена"}</span></label></div>
-        <div className="privacy-entity-grid">{view?.catalog.map((item) => <label className={`privacy-entity-option integration-checkbox${selected.has(item.entity_type) ? " selected" : ""}`} key={item.entity_type}><input type="checkbox" disabled={!config.enabled || !view.can_manage} checked={selected.has(item.entity_type)} onChange={() => toggleEntity(item.entity_type)} /><span><strong>{item.label}</strong><small>{visibleMarker(item.marker)}</small></span></label>)}</div>
+        <div className="privacy-card-title"><div><small>{scopeLabel}</small><h2>Что скрывать</h2></div><label className="privacy-master-switch integration-checkbox"><input type="checkbox" disabled={!view?.can_manage} checked={config.enabled} onChange={(event) => { setConfig((current) => ({ ...current, enabled: event.target.checked })); setPreview(undefined); }} /><span>{!view ? "Загрузка политики…" : config.enabled ? "Защита включена" : "Защита выключена"}</span></label></div>
+        {!view && !error ? <FieldsSkeleton count={4} /> : <div className="privacy-entity-grid">{view?.catalog.map((item) => <label className={`privacy-entity-option integration-checkbox${selected.has(item.entity_type) ? " selected" : ""}`} key={item.entity_type}><input type="checkbox" disabled={!config.enabled || !view.can_manage} checked={selected.has(item.entity_type)} onChange={() => toggleEntity(item.entity_type)} /><span><strong>{item.label}</strong><small>{visibleMarker(item.marker)}</small></span></label>)}</div>}
         {moneySelected && <div className="privacy-warning"><strong>Денежные суммы будут скрыты</strong><span>AI увидит факт упоминания суммы, но не сможет проверить конкретную цену, скидку или лимит.</span></div>}
       </section>
       <aside className="glass-panel privacy-access-card"><h2>Доступ к записи</h2><label><span>Кто может прослушивать запись</span><SelectControl disabled={!view?.can_manage} aria-label="Кто может прослушивать запись" className="privacy-select" menuClassName="privacy-select-menu privacy-access-select-menu" value={config.original_media_access} onChange={(event) => { setConfig((current) => ({ ...current, original_media_access: event.target.value as PrivacyPolicyConfig["original_media_access"], sanitized_media: "off" })); setPreview(undefined); }}><option value="call_acl">Все с доступом к звонку</option>{scope.type !== "personal" && <option value="uploader_and_scope_managers">Загрузивший и руководители</option>}<option value="uploader_only">Только загрузивший</option></SelectControl></label><p>Политика защиты очищает транскрипцию. Аудио- и видеозапись не изменяется.</p></aside>

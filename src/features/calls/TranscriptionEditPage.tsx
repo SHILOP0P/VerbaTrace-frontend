@@ -1,3 +1,4 @@
+import { TranscriptSkeleton } from "../../shared/ui/page-loading";
 import { cssClass } from "../../shared/lib/css-styles";
 import { ArrowLeft, Check, Eye, Plus, RotateCcw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -168,7 +169,7 @@ export function TranscriptionEditPage({
     }
   }
 
-  if (loading && !transcription) return <div className="transcription-edit-page"><div className="transcription-edit-loading">Загружаю транскрипцию…</div></div>;
+  if (loading && !transcription) return <div className="transcription-edit-page"><button className="ghost-button small" type="button" onClick={onBack}><ArrowLeft size={17} />К звонку</button><TranscriptSkeleton /></div>;
   if (!call || !transcription) return <div className="transcription-edit-page"><div className="empty-state">Транскрипция не найдена.</div></div>;
   if (!transcription.editable) return <div className="transcription-edit-page"><button className="ghost-button small" type="button" onClick={onBack}><ArrowLeft size={17} />К звонку</button><div className="empty-state">Эту транскрипцию нельзя редактировать{transcription.editability_reason ? `: ${transcription.editability_reason}` : "."}</div></div>;
 

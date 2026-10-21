@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import type { SessionState, UserResponse } from "../../types";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
+import { clearUploadDraft } from "../upload/upload-draft";
 
 type AuthContextValue = {
   ready: boolean;
@@ -23,27 +24,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [sessionEndedOpen, setSessionEndedOpen] = useState(false);
   const lastRefreshRef = useRef(0);
+  const sessionRevisionRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const revision = sessionRevisionRef.current;
     try {
       const { user } = await api.refreshSession();
+      if (revision !== sessionRevisionRef.current) return "superseded";
+      sessionRevisionRef.current++;
       lastRefreshRef.current = Date.now();
       setSession({ user });
-      return true;
-    } catch {
-      return false;
+      setSessionEndedOpen(false);
+      return "authenticated";
+    } catch (error) {
+      if (revision !== sessionRevisionRef.current) return "superseded";
+      return error instanceof ApiError && error.status === 401 ? "expired" : "unavailable";
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+    const revision = sessionRevisionRef.current;
     api.refreshSession()
       .then(({ user }) => {
-        if (cancelled) return;
+        if (cancelled || revision !== sessionRevisionRef.current) return;
+        sessionRevisionRef.current++;
         lastRefreshRef.current = Date.now();
         setSession({ user });
+        setSessionEndedOpen(false);
       })
-      .catch(() => { if (!cancelled) setSession(null); })
+      .catch(() => { if (!cancelled && revision === sessionRevisionRef.current) setSession(null); })
       .finally(() => { if (!cancelled) setReady(true); });
     return () => { cancelled = true; };
   }, []);
@@ -68,13 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh, session]);
 
   useEffect(() => {
-    // A failed request does not end the session by itself: one more refresh is
-    // tried, and only its failure logs the person out — with a dialog, not by
-    // dropping them on the landing page mid-task.
+    // Network, server, CSRF and rotation errors do not prove session expiry.
+    // Show the dialog only after a definitive authentication refusal.
     const onSessionExpired = () => {
+      const revision = sessionRevisionRef.current;
       void (async () => {
-        if (await refresh()) return;
-        setSessionEndedOpen(true);
+        if (await refresh() === "expired" && revision === sessionRevisionRef.current) setSessionEndedOpen(true);
       })();
     };
     window.addEventListener("verbatrace:session-expired", onSessionExpired);
@@ -87,10 +96,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ready,
     session,
     setAuthenticatedUser: (user) => {
+      sessionRevisionRef.current++;
       lastRefreshRef.current = Date.now();
       setSession({ user });
+      setSessionEndedOpen(false);
     },
-    clearSession: () => setSession(null)
+    clearSession: () => {
+      if (session) void clearUploadDraft(session.user.id).catch(() => undefined);
+      sessionRevisionRef.current++;
+      setSessionEndedOpen(false);
+      setSession(null);
+    }
   }), [ready, session]);
 
   return (
@@ -104,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cancelLabel="Закрыть"
         onCancel={() => setSessionEndedOpen(false)}
         onConfirm={() => {
+          sessionRevisionRef.current++;
           setSessionEndedOpen(false);
           setSession(null);
         }}

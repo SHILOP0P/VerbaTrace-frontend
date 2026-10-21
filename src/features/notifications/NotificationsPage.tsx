@@ -1,3 +1,4 @@
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import { Bell, Check, CheckCheck, ChevronRight, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
@@ -110,7 +111,7 @@ export function NotificationsPage({ onOpen }: { onOpen: (notification: Notificat
 
       {error && <div className="notifications-page-error" role="alert">{error}</div>}
       {loading ? (
-        <div className="notifications-page-state"><LoaderCircle className="spin" size={22} /> Загружаем уведомления…</div>
+        <RowsSkeleton kind="notifications" count={6} />
       ) : notifications.length === 0 ? (
         <div className="notifications-page-state">Уведомлений пока нет.</div>
       ) : (

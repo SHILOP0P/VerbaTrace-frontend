@@ -123,7 +123,7 @@ export const settingsRoutes: Array<{ page: AppPage; label: string; description: 
   {
     page: "settingsNotifications",
     label: "Уведомления",
-    description: "Итоги недели и провальные звонки: что приходит и куда."
+    description: "Настройте список уведомлений, всплывающие оповещения и личные исключения."
   },
   {
     page: "profileDevices",

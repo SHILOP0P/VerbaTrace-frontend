@@ -138,16 +138,19 @@ function AnalysisV3View({ analysis, onEvidenceActivate }: { analysis: AnalysisRe
     {/* priority_score ranks the advice; printed next to the call's scores it
         read as one more score, so only its level is shown. */}
     {topRecommendations.length > 0 && <AnalysisSection title="Что сделать в первую очередь"><ol className="analysis-recommendations">{topRecommendations.map((item,index)=><li className="analysis-recommendation" key={item.id}>
-      <span className="analysis-recommendation-index" aria-hidden="true">{index + 1}</span>
-      <div className="analysis-recommendation-body">
-        <div className="analysis-recommendation-head">
+      <details className="analysis-recommendation-disclosure">
+        <summary className="analysis-recommendation-head">
+          <span className="analysis-recommendation-index" aria-hidden="true">{index + 1}</span>
           <strong>{displayText(item.title)}</strong>
           <span className={`analysis-recommendation-priority ${item.priority}`}>{recommendationPriorityLabels[item.priority] ?? "приоритет не определён"}</span>
-        </div>
+          <ChevronDown size={16} className="analysis-recommendation-chevron"/>
+        </summary>
+        <div className="analysis-recommendation-body">
         <p className="analysis-recommendation-action">{displayText(item.action)}</p>
         {item.reason && <p className="analysis-recommendation-note"><span>Почему</span>{displayText(item.reason)}</p>}
         {item.expected_result && <p className="analysis-recommendation-note is-effect"><span>Что даст</span>{displayText(item.expected_result)}</p>}
       </div>
+      </details>
     </li>)}</ol></AnalysisSection>}
     <AnalysisSection title="Подробный разбор">
       {speakers.length > 1 && <div ref={filterRef} className="analysis-speaker-filter" role="group" aria-label="Фильтр вопросов по спикеру"><i className="analysis-filter-indicator" aria-hidden="true"/><button className={speakerFilter === "all" ? "active" : ""} onClick={()=>setSpeakerFilter("all")}>Все <b>{result.items.filter(item=>item.kind==="question").length}</b></button>{speakers.map(speaker=><button key={speaker} className={speakerFilter === speaker ? "active" : ""} onClick={()=>setSpeakerFilter(speaker)}>{transcriptionSpeakerLabel(speaker, speakerAssignments)} <b>{result.items.filter(item=>item.kind==="question" && itemSpeaker(item)===speaker).length}</b></button>)}</div>}

@@ -25,12 +25,15 @@ export function ScoreGauge({
   size = 160,
   caption = "из 100",
   loading = false,
+  fluid = false,
   label
 }: {
   value: number | null;
   size?: number;
   caption?: string;
   loading?: boolean;
+  /** Let an enclosing resizable card own the gauge dimensions. */
+  fluid?: boolean;
   label?: string;
 }) {
   const progress = useDrawProgress(loading ? "loading" : String(value), 900);
@@ -41,7 +44,7 @@ export function ScoreGauge({
   const ariaLabel = label ?? (value === null ? "Оценки нет" : `Оценка ${formatScore(value)} из 100`);
 
   return (
-    <div className={[`score-gauge tone-${tone}${loading ? " is-loading" : ""}`, cssClass({ width: size, height: size, "--gauge-size": `${size}px` } as CSSProperties)].filter(Boolean).join(" ")}  role="img" aria-label={loading ? "Оценка загружается" : ariaLabel}>
+    <div className={[`score-gauge tone-${tone}${loading ? " is-loading" : ""}${fluid ? " is-fluid" : ""}`, !fluid && cssClass({ width: size, height: size, "--gauge-size": `${size}px` } as CSSProperties)].filter(Boolean).join(" ")}  role="img" aria-label={loading ? "Оценка загружается" : ariaLabel}>
       <svg viewBox="0 0 220 220" width={size} height={size} aria-hidden="true">
         <circle className="score-gauge-track" cx="110" cy="110" r={RADIUS} strokeDasharray={`${ARC} ${CIRCUMFERENCE}`} transform="rotate(135 110 110)" />
         {value !== null && !loading && <circle className="score-gauge-value" cx="110" cy="110" r={RADIUS} strokeDasharray={`${drawn} ${CIRCUMFERENCE}`} transform="rotate(135 110 110)" />}

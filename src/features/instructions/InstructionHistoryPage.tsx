@@ -1,3 +1,4 @@
+import { InstructionSkeleton } from "../../shared/ui/page-loading";
 import { Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../api";
@@ -45,7 +46,7 @@ export function InstructionHistoryPage({ instructionId, analysisId, versionId, o
     void load().catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Инструкция недоступна."); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [instructionId, analysisId, versionId, reload]);
-  if (loading) return <section className="instruction-workspace"><div className="instruction-history-loading" role="status" aria-label="Загружаем инструкцию" /></section>;
+  if (loading) return <section className="instruction-workspace"><button className="ghost-button small" type="button" onClick={onBack}>К инструкциям</button><InstructionSkeleton /></section>;
   if (!instruction || error) return <section className="instruction-workspace"><button className="ghost-button small" type="button" onClick={onBack}>К инструкциям</button><p className="field-error" role="alert">{error || "Инструкция недоступна."}</p></section>;
   if (editing && canEdit) return <InstructionDraftEditor instructionId={instruction.id} title={instruction.title} onBack={onBack} onClose={() => setDraftMode(false)} onApplied={() => { setDraftMode(false); setReload(value => value + 1); }} />;
   return <section className="instruction-workspace atmospheric-page">

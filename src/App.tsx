@@ -1,3 +1,4 @@
+import { storeWorkspaceCompanyId } from "./shared/lib/workspace-company";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { api, ApiError, openAuthorizedEventStream } from "./api";
 import type {
@@ -25,7 +26,8 @@ import {
 import { callIdFromLocation, pageUrl } from "./app/location";
 import { useTheme } from "./app/use-theme";
 import { loadOrganizationContext, loadWorkspaceContext } from "./app/workspace-loader";
-import { TextBlockSkeleton } from "./shared/ui/loading";
+import { PageSkeleton, SessionLoading } from "./shared/ui/page-loading";
+import { SettingsPage } from "./features/settings/SettingsPage";
 import { PageLoadBoundary } from "./shared/ui/PageLoadBoundary";
 import {
   nextTimelineStatuses,
@@ -58,7 +60,6 @@ const ProfilePage = lazy(() => import("./features/profile/ProfilePage").then(m =
 const ProfileEditPage = lazy(() => import("./features/profile/ProfilePage").then(m => ({ default: m.ProfileEditPage })));
 const DevicesPage = lazy(() => import("./features/profile/ProfilePage").then(m => ({ default: m.DevicesPage })));
 const AiReportsPage = lazy(() => import("./features/reports/AiReportsPage").then(m => ({ default: m.AiReportsPage })));
-const SettingsPage = lazy(() => import("./features/settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const PrivacySettingsPage = lazy(() => import("./features/settings/PrivacySettingsPage").then(m => ({ default: m.PrivacySettingsPage })));
 const NotificationSettingsPage = lazy(() => import("./features/settings/NotificationSettingsPage").then(m => ({ default: m.NotificationSettingsPage })));
 const TariffsPage = lazy(() => import("./features/tariffs/TariffsPage").then(m => ({ default: m.TariffsPage })));
@@ -69,7 +70,6 @@ const QualityReviewsPage = lazy(() => import("./features/quality-reviews/Quality
 const QualityReviewPage = lazy(() => import("./features/quality-reviews/QualityReviewPage").then(m => ({ default: m.QualityReviewPage })));
 const SupportAccessDecisionDialog = lazy(() => import("./features/support-access/SupportAccessDecisionDialog").then(m => ({ default: m.SupportAccessDecisionDialog })));
 const CriteriaRequestDialog = lazy(() => import("./features/instructions/CriteriaRequestDialog").then(m => ({ default: m.CriteriaRequestDialog })));
-const pageLoading = <section role="status" aria-label="Загрузка раздела"><TextBlockSkeleton rows={4} /></section>;
 
 const callsRefreshIntervalMs = 5_000;
 
@@ -468,6 +468,18 @@ function App() {
   }
 
   function openNotificationTarget(notification: NotificationResponse) {
+    if(notification.entity_type==="observation" && notification.entity_uuid){
+      const id=notification.entity_uuid;
+      void api.getObservationContext(id).then(context=>{
+        storeWorkspaceCompanyId(context.company_uuid??"");
+        const query=new URLSearchParams({view:"observations",observation:id});
+        if(context.department_uuid)query.set("department",context.department_uuid);
+        if(context.period?.mode==="rolling")query.set("period",String(context.period.days));
+        if(context.period?.mode==="custom"){query.set("period","custom");query.set("from",context.period.from??"");query.set("to",context.period.to??"");}
+        window.history.pushState({},"",`/app/analytics?${query}`);window.dispatchEvent(new PopStateEvent("popstate"));
+      }).catch(()=>navigate("teamAnalytics"));return;
+    }
+
 	if (notification.entity_type === "folder_criteria_request" && notification.entity_uuid) { setCriteriaRequestId(notification.entity_uuid); return; }
 	if(notification.entity_type==="support_access_request"&&notification.entity_uuid){setSupportAccessRequestId(notification.entity_uuid);return}
 	if(notification.entity_type==="action_external_sync"&&notification.entity_uuid){api.getActionExternalSyncRequest(notification.entity_uuid).then((sync)=>{window.history.pushState({},"",`/app/actions/${encodeURIComponent(sync.action_uuid)}`);window.dispatchEvent(new PopStateEvent("popstate"))}).catch(()=>navigate("actions"));return}
@@ -621,24 +633,24 @@ function App() {
   if (!authReady) {
     return (
       <main className="preflight-screen" aria-label="Проверка сессии">
-        {pageLoading}
+        <SessionLoading />
       </main>
     );
   }
 
-  if (!session) return <main className="preflight-screen" aria-label="Переход к входу">{pageLoading}</main>;
+  if (!session) return <main className="preflight-screen" aria-label="Переход к входу"><SessionLoading /></main>;
 
   if (!workspaceReady) {
     return (
       <main className="preflight-screen" aria-label="Проверка сессии">
-        {pageLoading}
+        <SessionLoading />
       </main>
     );
   }
 
   return (
     <PageLoadBoundary>
-    <Suspense fallback={pageLoading}>
+    <Suspense fallback={<SessionLoading />}>
     <AuthenticatedShell
       activePage={page}
       session={session}
@@ -661,7 +673,7 @@ function App() {
       onLogout={logout}
     >
       <PageLoadBoundary resetKey={page}>
-      <Suspense fallback={pageLoading}>
+      <Suspense fallback={<PageSkeleton page={page} />}>
       {(page === "teamAnalytics" || page === "teamAnalyticsEmployee") && (
         <AnalyticsPage
           departments={departments}
@@ -781,7 +793,7 @@ function App() {
       )}
 
       {page === "reports" && (
-        <AiReportsPage calls={calls} analyses={analyses} />
+        <AiReportsPage calls={calls} analyses={analyses} loading={loadingWorkspace} />
       )}
 
       {page === "contacts" && <ContactsPage />}
@@ -894,6 +906,7 @@ function App() {
           session={session}
           companies={companies}
           personalSubscription={personalSubscription}
+          loading={loadingWorkspace}
           onUserUpdated={updateSessionUser}
           onCompanyCreated={async (company) => {
             setCompanies((current) => [company, ...current]);

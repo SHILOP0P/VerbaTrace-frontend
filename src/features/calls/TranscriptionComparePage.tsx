@@ -1,3 +1,4 @@
+import { TranscriptSkeleton } from "../../shared/ui/page-loading";
 import { cssClass } from "../../shared/lib/css-styles";
 import { ArrowLeft, Check, ChevronDown, GitCompareArrows, Plus, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -330,7 +331,7 @@ export function TranscriptionComparePage({
     </header>
 
     {error && <div className="form-error">{error}</div>}
-    {loading ? <div className="transcription-compare-loading">Загружаю версии…</div> : <>
+    {loading ? <TranscriptSkeleton compare /> : <>
       <section className="compare-selection-panel" aria-label="Выбранные версии">
         <div className="compare-selected-versions">
           {selected.map((revision) => <span ref={(element) => { if (element) chipRefs.current.set(revision, element); else chipRefs.current.delete(revision); }} className={["compare-version-chip", cssClass({ "--version-color": versionColor(revision) } as CSSProperties)].filter(Boolean).join(" ")}  key={revision}>

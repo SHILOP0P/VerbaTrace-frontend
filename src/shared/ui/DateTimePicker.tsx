@@ -18,12 +18,13 @@ type DateTimePickerProps = {
   mode?: "date" | "date-time";
   placement?: "auto" | "right-center" | "below";
   ariaLabel?: string;
+  dialogLabel?: string;
   /** "compact" shows 17.09.2026 instead of 17 сентября 2026 г., for a trigger
    *  that has to fit half a phone screen. */
   display?: "long" | "compact";
 };
 
-export function DateTimePicker({ value, onChange, required, id, mode = "date-time", placement = "auto", ariaLabel, display = "long" }: DateTimePickerProps) {
+export function DateTimePicker({ value, onChange, required, id, mode = "date-time", placement = "auto", ariaLabel, dialogLabel, display = "long" }: DateTimePickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
   const triggerFormat = compact ? COMPACT_VALUE_FORMAT : VALUE_FORMAT;
   const [open, setOpen] = useState(false);
   const [openTimePart, setOpenTimePart] = useState<"hours" | "minutes" | null>(null);
-  const [popoverPosition, setPopoverPosition] = useState({ top: 12, left: 12, width: 360 });
+  const [popoverPosition, setPopoverPosition] = useState({ top: 12, left: 12, width: 280 });
   const [view, setView] = useState(() => startOfMonth(selected ?? new Date()));
 
   useEffect(() => {
@@ -67,8 +68,8 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
       const panelRect = placement === "right-center" ? trigger.closest<HTMLElement>(".calls-sidebar")?.getBoundingClientRect() : undefined;
       const anchorRect = panelRect ?? dialogRect;
       const viewportGap = 12;
-      const width = Math.min(360, window.innerWidth - viewportGap * 2);
-      const height = popoverRef.current?.offsetHeight ?? 520;
+      const width = Math.min(dateOnly ? 280 : 304, window.innerWidth - viewportGap * 2);
+      const height = popoverRef.current?.offsetHeight ?? (dateOnly ? 360 : 420);
       if (placement === "below") {
         const below = rect.bottom + 8;
         const above = rect.top - height - 8;
@@ -103,7 +104,7 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
       window.removeEventListener("resize", schedulePosition);
       window.removeEventListener("scroll", schedulePosition, true);
     };
-  }, [open, view, placement]);
+  }, [open, view, placement, dateOnly]);
 
   const days = useMemo(() => calendarDays(view), [view]);
   const time = selected ?? new Date();
@@ -124,7 +125,7 @@ export function DateTimePicker({ value, onChange, required, id, mode = "date-tim
     <button className={`date-time-trigger${dateOnly ? " date-time-trigger-date-only" : ""}${selected ? "" : " is-empty"}`} ref={triggerRef} type="button" aria-label={ariaLabel} aria-haspopup="dialog" aria-expanded={open} aria-required={required} onClick={() => setOpen((current) => !current)}>
       {dateOnly ? <><span>{selected ? triggerFormat.format(selected) : compact ? "Дата" : "Выберите дату"}</span><CalendarDays size={18}/></> : <><CalendarDays size={18}/><span>{selected ? VALUE_FORMAT.format(selected) : "Выберите дату"}</span><i/><Clock3 size={17}/><span>{selected ? `${pad(selected.getHours())}:${pad(selected.getMinutes())}` : "--:--"}</span></>}
     </button>
-    {open ? createPortal(<div className={[`date-time-popover vt-portal${dateOnly ? " date-time-popover-date-only" : ""}`, cssClass(popoverPosition)].filter(Boolean).join(" ")} ref={popoverRef}  role="dialog" aria-label={dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения"} onWheel={scrollOwningDialog}>
+    {open ? createPortal(<div className={[`date-time-popover vt-portal${dateOnly ? " date-time-popover-date-only" : ""}`, cssClass(popoverPosition)].filter(Boolean).join(" ")} ref={popoverRef}  role="dialog" aria-label={dialogLabel ?? (dateOnly ? "Выбор даты разговора" : "Выбор срока выполнения")} onWheel={scrollOwningDialog}>
       <div className="date-time-month">
         <button type="button" aria-label="Предыдущий месяц" onClick={() => setView(addMonths(view, -1))}><ChevronLeft size={18}/></button>
         <strong aria-live="polite">{MONTH_FORMAT.format(view)}</strong>

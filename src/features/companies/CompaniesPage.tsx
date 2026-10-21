@@ -25,7 +25,7 @@ import type {
 } from "../../types";
 
 import { departmentRoleText, formatDate, membershipStatusText } from "../../shared/lib/formatters";
-import { CallListSkeleton } from "../../shared/ui/loading";
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import { ProfileField, SelectControl } from "../../shared/ui/primitives";
 import { InvitationCreatePanel } from "../invitations/InvitationsPage";
 import { CompanyMembersPanel } from "./CompanyMembersPanel";
@@ -115,7 +115,7 @@ export function CompaniesPage({
       return (
         <section className="companies-layout">
           <div className="company-workspace-empty glass">
-            <CallListSkeleton count={3} compact />
+            <RowsSkeleton kind="companies" count={3} />
           </div>
         </section>
       );
@@ -209,7 +209,7 @@ export function CompaniesPage({
           </div>
 
           {loading ? (
-            <CallListSkeleton count={3} compact />
+            <RowsSkeleton kind="companies" count={3} />
           ) : (
             <div className="company-limit-list">
               {companies.map((company) => (
@@ -732,7 +732,7 @@ export function DepartmentWorkspace({
         </div>
         {error && <div className="form-error">{error}</div>}
         {loading ? (
-          <CallListSkeleton count={3} compact />
+          <RowsSkeleton kind="companies" count={3} />
         ) : members.length === 0 ? (
           <div className="instruction-empty standalone">В отделе пока нет работников.</div>
         ) : (

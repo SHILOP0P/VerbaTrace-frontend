@@ -1,3 +1,4 @@
+import { SegmentedControl } from "../../shared/ui/SegmentedControl";
 import {
   ArrowLeft,
   Bell,
@@ -20,7 +21,7 @@ import type {
 
 import { formatDate, invitationRoleLabel } from "../../shared/lib/formatters";
 import { ConfirmDialog } from "../../shared/ui/confirm-dialog";
-import { CallListSkeleton } from "../../shared/ui/loading";
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import { SelectControl } from "../../shared/ui/primitives";
 
 export function InvitationsPage({
@@ -68,7 +69,7 @@ export function InvitationsPage({
           <span className="status-chip warn">{pendingInvitations.length}</span>
         </div>
         {loading ? (
-          <CallListSkeleton count={3} compact />
+          <RowsSkeleton kind="invitations" count={3} />
         ) : pendingInvitations.length === 0 ? (
           <div className="empty-panel">
             <Bell size={34} />
@@ -307,7 +308,7 @@ export function InvitationCreatePanel({
   return (
     <form className="invitation-create glass" onSubmit={submit}>
       <h2>Отправить приглашение</h2>
-      {allowCompanyInvitations && <div className="segmented scope">
+      {allowCompanyInvitations && <SegmentedControl className="segmented scope">
         <button
           type="button"
           className={mode === "company" ? "active" : ""}
@@ -322,7 +323,7 @@ export function InvitationCreatePanel({
         >
           Отдел
         </button>
-      </div>}
+      </SegmentedControl>}
       <label>
         Компания
         <SelectControl value={companyId} onChange={(event) => setCompanyId(event.target.value)}>

@@ -2,6 +2,7 @@ import { ButtonHTMLAttributes, ReactNode, type RefObject, useEffect, useId, useL
 import { Check, ChevronDown } from "lucide-react";
 import { cssClass } from "../../shared/lib/css-styles";
 import type { AssistantMode } from "../../types";
+import { SegmentedControl } from "../../shared/ui/SegmentedControl";
 
 export function AssistantPanelIndicator({ root, value }: { root: RefObject<HTMLElement | null>; value: string | null }) {
  const [position, setPosition] = useState({ left: 0, top: 0, width: 0, height: 0 });
@@ -22,26 +23,9 @@ export function AssistantPanelIndicator({ root, value }: { root: RefObject<HTMLE
 }
 
 export function AssistantModeSwitch({ value, disabled, onChange }: { value: AssistantMode; disabled: boolean; onChange: (value: AssistantMode) => void }) {
- const root = useRef<HTMLDivElement>(null);
- const [position, setPosition] = useState({ left: 0, width: 0 });
- useLayoutEffect(() => {
-  const node = root.current;
-  if (!node) return;
-  const measure = () => {
-   const selected = node.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
-   if (!selected) return;
-   const next = { left: selected.offsetLeft, width: selected.offsetWidth };
-   setPosition(previous => previous.left === next.left && previous.width === next.width ? previous : next);
-  };
-  measure();
-  const observer = new ResizeObserver(measure);
-  observer.observe(node);
-  return () => observer.disconnect();
- }, [value]);
- return <div ref={root} className="assistant-mode-switch" role="group" aria-label="Режим работы">
-  <span aria-hidden="true" className={"assistant-mode-thumb " + cssClass({ width: position.width, transform: `translateX(${position.left}px)` })}/>
+ return <SegmentedControl className="assistant-mode-switch" role="group" aria-label="Режим работы">
   {(["search", "research"] as const).map(mode => <button type="button" key={mode} aria-pressed={value === mode} disabled={disabled} onClick={() => onChange(mode)}>{mode === "search" ? "Поиск" : "Исследование"}</button>)}
- </div>;
+ </SegmentedControl>;
 }
 
 // Keep the content mounted for the closing motion, then remove it completely.

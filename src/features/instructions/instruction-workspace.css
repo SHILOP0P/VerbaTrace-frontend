@@ -18,6 +18,8 @@ html[data-theme] .app-shell .instruction-workspace.instruction-workspace{width:1
 .iw-result{border-color:color-mix(in srgb,var(--vt-good) 23%,var(--vt-line-mid))}.iw-result>.iw-card-heading{background:linear-gradient(var(--vt-good-soft),var(--vt-good-soft)),var(--vt-s1)}.iw-result>.iw-card-heading h2>svg{color:var(--vt-good)}.iw-result-content{padding:22px;min-width:0}.iw-result-empty{display:flex;align-items:center;gap:13px;min-height:65px;color:var(--vt-text-3);font-size:13px;line-height:1.6}.iw-result-empty>svg{flex-shrink:0;color:var(--vt-good)}.iw-result-empty p{margin:0}.iw-result-empty small{display:block;margin-top:4px;font-size:12px}.iw-result-count,.iw-result-retention{margin:0 0 14px;font-size:12px;color:var(--vt-text-3);line-height:1.6}.iw-result-retention{margin:16px 0 0}
 .iw-apply{position:sticky;bottom:16px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px;padding:14px 18px;border:1px solid var(--vt-line-mid);border-radius:13px;background:var(--vt-s1);box-shadow:var(--vt-shadow-soft)}.iw-apply>.checkbox-row{margin:0;font-size:12px;font-weight:400;color:var(--vt-text-2)}.iw-apply>div{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.iw-apply button{font-size:12px}.iw-delete-draft{border-color:transparent!important;background:none!important;color:var(--vt-text-3)!important}
 .instruction-workspace button:focus-visible,.instruction-workspace input:focus-visible,.instruction-workspace textarea:focus-visible,.instruction-workspace summary:focus-visible{outline:2px solid var(--vt-accent-text);outline-offset:3px}.instruction-workspace button:disabled{cursor:default}.instruction-workspace button:disabled:not(.iw-weight button){opacity:.55}
+.iw-file-replace{min-width:160px;justify-content:center;transition:background 150ms,border-color 150ms}.iw-file-replace.is-dragging{outline:2px dashed var(--vt-accent-text);outline-offset:3px;background:var(--vt-accent-soft)}.iw-upload-error{flex-basis:100%;margin:0;font-size:12px}.instruction-workspace .instruction-pdf-text pre{margin:0;padding:0;border:0;background:none;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.7;color:inherit}
+.instruction-workspace .instruction-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}.instruction-workspace .instruction-table-scroll table{table-layout:auto;min-width:460px;width:100%}.instruction-workspace .instruction-table-scroll :is(th,td){word-break:normal;overflow-wrap:normal;white-space:normal}.instruction-workspace .instruction-table-scroll:focus-visible{outline:2px solid var(--vt-accent-text);outline-offset:2px}
 @keyframes iw-content-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1100px){.iw-card-heading{flex-wrap:wrap}.iw-card-heading .iw-document-modes{margin-left:auto}.iw-check-targets{grid-template-columns:1fr}.iw-criterion-quick{padding-left:14px}}
 @media(max-width:1024px){.iw-pane-document{position:static}.iw-apply{position:static;box-shadow:none}}
@@ -31,17 +33,32 @@ html[data-theme] .app-shell .instruction-workspace :is(.iw-criterion-quick,.iw-c
   html[data-theme] .app-shell .instruction-workspace .iw-card-heading .small{font-size:11px;padding:8px 10px;min-height:36px;white-space:normal}
   html[data-theme] .app-shell .instruction-workspace .iw-document-modes button{font-size:11px;width:65px;padding:6px 8px}
 }
-/* Keep compact criteria aligned with the document's top edge. Only a long
-   criteria list grows to the document height and scrolls inside its card. */
+/* The viewport's spare height belongs inside the two cards, not between rows.
+   Headers and actions stay visible while each column scrolls independently. */
 @media(min-width:1025px){
   html[data-theme] .app-shell:has(.instruction-workspace){min-height:calc(100dvh - var(--app-header-top))}
   html[data-theme] .app-shell .workspace:has(>.instruction-workspace){padding-bottom:16px}
   html[data-theme] .app-shell .workspace-frame:has(>.workspace>.instruction-workspace){min-height:calc(100dvh - var(--app-header-top) - var(--app-header-height));height:auto}
-  .iw-body{grid-template-rows:minmax(var(--iw-column-height,0px),auto);align-items:start}
-  .iw-pane-document,.iw-pane-criteria{position:static;align-self:start;height:auto;min-height:0}
   .iw-pane-check{align-self:start}
-  .iw-pane-criteria .iw-criteria-content{max-height:var(--iw-criteria-limit,min(680px,70vh));overflow:auto}
   .iw-apply{position:static;box-shadow:none}
+}
+/* The preparing state occupies the available document-column height without
+   inheriting the completed list's scrolling area or adding its own padding. */
+.iw-pane-criteria .iw-criteria-content:has(>.iw-preparing){display:grid;height:clamp(340px,55dvh,440px);min-height:340px;max-height:none;overflow:hidden;padding:0;box-sizing:border-box}
+.iw-pane-criteria .iw-criteria-content>.iw-preparing{height:100%;min-height:0;box-sizing:border-box}
+@media(min-width:761px){
+  .iw-body{grid-template-rows:var(--iw-column-height,480px);align-items:stretch}
+  .iw-pane-document,.iw-pane-criteria{position:static;align-self:stretch;height:100%;min-height:0}
+  .iw-pane-document>.iw-card,.iw-pane-criteria>.iw-card{display:flex;flex-direction:column;height:100%;box-sizing:border-box}
+  .iw-pane :is(.iw-card-heading,.iw-document-footer){flex-shrink:0}
+  .iw-pane-document .iw-document-preview{flex:1;min-height:0;max-height:none;overscroll-behavior:contain}
+  .iw-pane-document .iw-document-viewport{flex:1;min-height:0;height:auto!important;transition:none}
+  .iw-pane-document .iw-document-slides{height:100%;align-items:stretch}
+  .iw-pane-document .iw-document-slide:not(.iw-document-preview){display:flex;flex-direction:column;overflow:auto}
+  .iw-pane-document .iw-editor-label{flex:1;min-height:0;grid-template-rows:auto minmax(0,1fr)}
+  .instruction-workspace .iw-pane-document .iw-editor-label textarea{min-height:0;max-height:none;height:100%;resize:none}
+  .iw-pane-criteria .iw-card .iw-criteria-content{flex:1;min-height:0;max-height:none;overflow:auto;box-sizing:border-box;overscroll-behavior:contain}
+  .iw-pane-criteria .iw-card .iw-criteria-content:has(>.iw-preparing){height:auto;overflow:hidden}
 }
 html[data-theme] .app-shell .instruction-workspace .iw-call-search>input{padding:0;margin:0;border:0;min-height:0;background:transparent;box-shadow:none;font-size:13px}
 @media(max-width:760px){

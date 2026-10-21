@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import type { NotificationSubscription } from "../../types";
+import { SkeletonLine } from "../../shared/ui/loading";
 
 const kindLabels: Record<NotificationSubscription["kind"], { title: string; text: string; icon: LucideIcon }> = {
   weekly_digest: { title: "Итоги недели", text: "В понедельник утром: звонки, средний балл, слабые критерии и работа над ошибками за прошлую неделю.", icon: CalendarCheck },
@@ -15,7 +16,9 @@ const channels: NotificationSubscription["channel"][] = ["in_app", "email", "tel
 const kinds: NotificationSubscription["kind"][] = ["weekly_digest", "critical_call_alert"];
 
 /** Personal settings of which events come and where. Mail and Telegram are shown switched off until they are connected. */
-export function NotificationSettingsPage({ onBack }: { onBack: () => void }) {
+export { PolicyNotificationSettings as NotificationSettingsPage } from "./PolicyNotificationSettings";
+
+function LegacyNotificationSettingsPage({ onBack }: { onBack: () => void }) {
   const [items, setItems] = useState<NotificationSubscription[]>();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -45,8 +48,7 @@ export function NotificationSettingsPage({ onBack }: { onBack: () => void }) {
     <button className="ghost-button small" type="button" onClick={onBack}><ArrowLeft size={17} />К настройкам</button>
     <header className="privacy-settings-heading glass-panel"><span><BellRing size={28} /></span><div><h1>Уведомления</h1><p>Какие события приходят и куда. Сейчас работает колокольчик в приложении; почта и Telegram появятся позже.</p></div></header>
     {error && <div className="form-error" role="alert">{error}</div>}
-    {!items && !error ? <div className="analytics-skeleton is-short" /> : null}
-    {items && <div className="notification-matrix glass-panel" role="table" aria-label="События и каналы">
+    {(!error || items) && <div className="notification-matrix glass-panel" role="table" aria-label="События и каналы" aria-busy={!items}>
       <div className="notification-matrix-row is-head" role="row">
         <span role="columnheader">Событие</span>
         {channels.map((channel) => {
@@ -64,6 +66,7 @@ export function NotificationSettingsPage({ onBack }: { onBack: () => void }) {
           {channels.map((channel) => {
             const item = cell(kind, channel);
             const waiting = !item?.available;
+            if (!items) return <span key={channel} className="notification-matrix-cell" role="cell" data-channel={channelLabels[channel]} aria-label={`Загрузка настройки: ${channelLabels[channel]}`}><SkeletonLine className="loading-toggle" /><span className="notification-matrix-channel">{channelLabels[channel]}{channel !== "in_app" ? " · скоро" : ""}</span></span>;
             return <label key={channel} className={`notification-matrix-cell${waiting ? " is-waiting" : ""}`} role="cell" data-channel={channelLabels[channel]}>
               <input type="checkbox" className="vt-sr-only" checked={Boolean(item?.enabled)} disabled={waiting || busy === `${kind}/${channel}`}
                 aria-label={`${kindLabels[kind].title}: ${channelLabels[channel]}`} onChange={() => item && void toggle(item)} />

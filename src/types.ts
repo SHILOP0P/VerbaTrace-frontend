@@ -1523,6 +1523,8 @@ export interface SearchResponse {
 }
 
 export interface NotificationResponse {
+	mode?: "off" | "inbox" | "inbox_toast";
+	requires_response?: boolean;
   id: string;
   type:
     | "invitation"

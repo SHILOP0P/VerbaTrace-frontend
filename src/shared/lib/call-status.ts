@@ -67,26 +67,28 @@ export function nextTimelineStatuses(previous: CallStatus[], status: CallStatus)
   return timelineFromStatus(status);
 }
 
-export function callStatusChip(status: CallStatus, analysisStatus?: AnalysisStatus) {
+export function callStatusChip(status: CallStatus, analysisStatus?: AnalysisStatus, transcriptionOnly = false) {
+  if (transcriptionOnly && status === "transcribed" && !analysisStatus) return "Транскрипция готова";
   if (status === "failed") return statusMeta.failed.chip;
   if (status === "awaiting_credits" || status === "cancelled") return statusMeta[status].chip;
   if (analysisStatus === "failed") return "Ошибка анализа";
   if (analysisStatus === "stale") return "Обновите анализ";
   if (status === "new") return "В очереди";
   if (status === "processing") return "Транскрибируется";
-  if (status === "transcribed" && (analysisStatus === "pending" || analysisStatus === "processing")) return "Анализируется";
+  if (status === "transcribed") return analysisStatus === "processing" ? "Анализируется" : analysisStatus === "done" ? "Анализ готов" : "В очереди на анализ";
   if (status === "analyzed" && analysisStatus !== undefined && analysisStatus !== "done") return "Анализируется";
   return statusMeta[status].chip;
 }
 
-export function callStatusTone(status: CallStatus, analysisStatus?: AnalysisStatus) {
+export function callStatusTone(status: CallStatus, analysisStatus?: AnalysisStatus, transcriptionOnly = false) {
+  if (transcriptionOnly && status === "transcribed" && !analysisStatus) return "ok";
   if (status === "failed" || analysisStatus === "failed") return "bad";
   if (
     status === "new" ||
     status === "processing" ||
     status === "awaiting_credits" ||
     status === "cancelled" ||
-    (status === "transcribed" && (analysisStatus === "pending" || analysisStatus === "processing")) ||
+    (status === "transcribed" && analysisStatus !== "done") ||
     (status === "analyzed" && analysisStatus !== undefined && analysisStatus !== "done")
   ) return "warn";
   return "ok";

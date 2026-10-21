@@ -27,7 +27,7 @@ export function InfoHint({ label, text }: { label: string; text: string | string
  * browser's own title tooltip cannot be styled and waits a second, so the
  * explanations of the analytics screens go through this instead.
  */
-export function HoverHint({ label, detail, children, className = "", style, focusable = true }: {
+export function HoverHint({ label, detail, children, className = "", style, focusable = true, placement: preferred = "auto", ariaLabel }: {
   label: ReactNode;
   /** A list is shown line by line: what the number is, then what to compare it with. */
   detail?: ReactNode | string[];
@@ -36,6 +36,8 @@ export function HoverHint({ label, detail, children, className = "", style, focu
   style?: CSSProperties;
   /** Off inside a control that already takes focus, such as a button. */
   focusable?: boolean;
+  placement?: "auto" | "above";
+  ariaLabel?: string;
 }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
@@ -55,7 +57,7 @@ export function HoverHint({ label, detail, children, className = "", style, focu
     const width = tip.offsetWidth, height = tip.offsetHeight;
     const center = anchor.left + anchor.width / 2;
     const left = Math.max(margin, Math.min(window.innerWidth - width - margin, center - width / 2));
-    const above = anchor.bottom + gap + height > window.innerHeight - margin && anchor.top - gap - height > margin;
+    const above = (preferred === "above" || anchor.bottom + gap + height > window.innerHeight - margin) && anchor.top - gap - height > margin;
     setPlacement({ left, top: above ? anchor.top - gap - height : anchor.bottom + gap, arrow: Math.max(11, Math.min(width - 11, center - left)), above });
 
     // A fixed tooltip would drift away from its anchor on scroll.
@@ -66,13 +68,14 @@ export function HoverHint({ label, detail, children, className = "", style, focu
       window.removeEventListener("scroll", close, true);
       window.removeEventListener("resize", close);
     };
-  }, [open]);
+  }, [open, preferred, label]);
 
   return <span
     ref={anchorRef}
     className={[`hover-hint ${className}`.trim(), cssClass(style)].filter(Boolean).join(" ")}
 
     tabIndex={focusable ? 0 : undefined}
+    aria-label={ariaLabel}
     aria-describedby={open ? id : undefined}
     onMouseEnter={() => setOpen(true)}
     onMouseLeave={() => setOpen(false)}

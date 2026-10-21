@@ -1,3 +1,5 @@
+import { SkeletonLine } from "../../shared/ui/loading";
+import { RowsSkeleton } from "../../shared/ui/page-loading";
 import {
   ArrowLeft,
   Bell,
@@ -54,11 +56,13 @@ export function ProfilePage({
   session,
   companies,
   personalSubscription,
+  loading = false,
   onNavigate
 }: {
   session: SessionState;
   companies: CompanyResponse[];
   personalSubscription: Subscription | null;
+  loading?: boolean;
   onUserUpdated: (user: UserResponse) => void;
   onCompanyCreated: (company: CompanyResponse) => void | Promise<void>;
   onNavigate: (page: AppPage) => void;
@@ -105,7 +109,7 @@ export function ProfilePage({
                   <span>{username}</span>
                   <span aria-hidden="true">·</span>
                   <button type="button" onClick={() => onNavigate("settingsTariffs")}>
-                    {personalSubscription?.plan.name ?? "Выбрать тариф"}
+                    {loading ? <SkeletonLine className="short" /> : personalSubscription?.plan.name ?? "Выбрать тариф"}
                   </button>
                 </div>
               </div>
@@ -145,6 +149,14 @@ export function ProfilePage({
         </aside>
       </div>
 
+      <AnalysisPersonalizationCard
+        scope="personal"
+        ownerUuid={session.user.id}
+        title="Персонализация анализа"
+        description="Этот текст используется только для ваших личных звонков и помогает анализатору учитывать ваш контекст."
+        editable
+      />
+
       <section className="profile-card glass-panel">
         <div className="panel-heading large">
           <div>
@@ -152,7 +164,7 @@ export function ProfilePage({
             <p>Компании, в которых состоит пользователь.</p>
           </div>
         </div>
-        {companies.length === 0 ? (
+        {loading ? <RowsSkeleton kind="companies" count={2} /> : companies.length === 0 ? (
           <div className="instruction-empty standalone">Компаний пока нет.</div>
         ) : (
           <div className="company-mini-list">
@@ -341,13 +353,6 @@ export function ProfileEditPage({
       {avatarFile && <AvatarEditor file={avatarFile} busy={busy} onCancel={() => setAvatarFile(null)} onSave={async (file) => { setBusy(true); setError(""); try { const response = await api.uploadAvatar(file); onUserUpdated({ ...session.user, avatar_url: `${response.avatar_url}?v=${Date.now()}` }); setSuccess("Аватар обновлен."); setAvatarFile(null); } catch (avatarError) { setError(avatarError instanceof Error ? avatarError.message : "Не удалось загрузить аватар"); } finally { setBusy(false); } }} />}
 
       <div className="profile-edit-grid single">
-        <AnalysisPersonalizationCard
-          scope="personal"
-          ownerUuid={session.user.id}
-          title="Персонализация анализа"
-          description="Этот текст используется только для ваших личных звонков и помогает анализатору учитывать ваш контекст."
-          editable={!busy}
-        />
         <form
           className="profile-edit-form glass-panel"
           onSubmit={async (event) => {
@@ -478,7 +483,7 @@ export function DevicesPage({
         <p className={`session-control-status ${sessionControl.canManage ? "ready" : "waiting"}`}>{sessionControlMessage}</p>
         {actionError && <div className="form-error">{actionError}</div>}
         {loading ? (
-          <div className="instruction-empty standalone">Загружаю устройства...</div>
+          <RowsSkeleton kind="devices" count={3} />
         ) : error ? (
           <div className="form-error">Не удалось загрузить устройства. Можно завершить все сеансы и войти заново.</div>
         ) : sessions.length === 0 ? (
